@@ -216,7 +216,7 @@
         let money = 5000; // Počáteční stav peněz
     let tollBooths = []; // Seznam mýtných bran
 
-    function updateMoneyDisplay() {
+      function updateMoneyDisplay() {
         document.getElementById("money").textContent = money.toLocaleString();
     }
 
@@ -239,7 +239,7 @@
 
         // Generování peněz každých 20 sekund
         setInterval(() => {
-            money += 20;
+            money += 5;
             updateMoneyDisplay();
         }, 20000);
     }
