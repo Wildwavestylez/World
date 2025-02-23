@@ -26,7 +26,11 @@
 </head>
 <body>
     <div id="map"></div>
+     
    <div id="info">
+        <button onclick="buildGarage()">Postavit garáž údržby</button>
+        <button onclick="buyMaintenanceCar()">Koupit údržbové auto</button>
+        <button onclick="startMaintenance()">Vyslat údržbu</button>
     Rozloha: <span id="area">0</span> km² | 
     Počet obyvatel: <span id="population">0</span> | 
     Peníze: <span id="money">5000</span> Kč
@@ -217,6 +221,7 @@
 
         let money = 5000; // Počáteční stav peněz
     let tollBooths = []; // Seznam mýtných bran
+        
 
       function updateMoneyDisplay() {
         document.getElementById("money").textContent = money.toLocaleString();
@@ -241,7 +246,7 @@
 
         // Generování peněz každých 20 sekund
         setInterval(() => {
-            money += 5;
+            money += 25;
             updateMoneyDisplay();
         }, 20000);
     }
