@@ -85,32 +85,78 @@
 
          let roadLayer = L.layerGroup().addTo(map);
 
-   function fetchRoads(bounds) {
-        let bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
-        let query = `
-            [out:json];
-            (
-                way["highway"="primary"](${bbox});
-                way["highway"="secondary"](${bbox});
-                way["highway"="tertiary"](${bbox});
-            );
-            out geom;
-        `;
-        
-        fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
-            .then(response => response.json())
-            .then(data => {
-                roadLayer.clearLayers();
-                data.elements.forEach(way => {
-                    let coordinates = way.geometry.map(point => [point.lat, point.lon]);
-                    L.polyline(coordinates, { color: 'red', weight: 3 }).addTo(roadLayer);
+   let roads = []; // Seznam všech úseků silnic
+
+function fetchRoads(bounds) {
+    let bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+    let query = `
+        [out:json];
+        (
+            way["highway"="primary"](${bbox});
+            way["highway"="secondary"](${bbox});
+            way["highway"="tertiary"](${bbox});
+        );
+        out geom;
+    `;
+
+    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            roadLayer.clearLayers();
+            roads = []; // Resetujeme seznam silnic
+
+            data.elements.forEach(way => {
+                let coordinates = way.geometry.map(point => [point.lat, point.lon]);
+                let segments = splitRoadIntoSegments(coordinates, 200); // Rozdělit na úseky po 200m
+                
+                segments.forEach(segment => {
+                    let road = {
+                        coordinates: segment,
+                        status: "red", // Nově načtené silnice budou poškozené
+                        polyline: L.polyline(segment, { color: 'red', weight: 3 }).addTo(roadLayer)
+                    };
+                    roads.push(road);
                 });
-            })
-            .catch(error => console.error("Chyba při načítání silnic:", error));
+            });
+        })
+        .catch(error => console.error("Chyba při načítání silnic:", error));
+}
+
+// Funkce pro rozdělení silnice na úseky po dané délce (200 m)
+function splitRoadIntoSegments(coords, segmentLength) {
+    let segments = [];
+    let currentSegment = [];
+    let accumulatedDistance = 0;
+
+    for (let i = 0; i < coords.length - 1; i++) {
+        let pointA = L.latLng(coords[i]);
+        let pointB = L.latLng(coords[i + 1]);
+        let distance = pointA.distanceTo(pointB);
+
+        if (accumulatedDistance + distance >= segmentLength) {
+            segments.push([...currentSegment, pointB]);
+            currentSegment = [pointB];
+            accumulatedDistance = 0;
+        } else {
+            currentSegment.push(pointB);
+            accumulatedDistance += distance;
+        }
     }
 
-    // První načtení silnic
+    if (currentSegment.length > 1) {
+        segments.push(currentSegment);
+    }
+
+    return segments;
+}
+
+// První načtení silnic
+fetchRoads(map.getBounds());
+
+// Obnova silnic při změně polygonu
+map.on('moveend', () => {
     fetchRoads(map.getBounds());
+});
 
     // Obnova silnic při změně polygonu
     map.on('moveend', () => {
