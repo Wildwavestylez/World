@@ -111,7 +111,7 @@
             polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0027);
 
             moveTracker[selectedIndex] = 0;
-            blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 60000;
+            blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
             for (let i = 0; i < moveTracker.length; i++) {
                 if (i !== selectedIndex) moveTracker[i]++;
@@ -151,7 +151,7 @@
         setInterval(() => {
             expandPolygon();
             unlockBlockedPoints();
-        }, 60000);
+        }, 1000);
     </script>
 </body>
 </html>
