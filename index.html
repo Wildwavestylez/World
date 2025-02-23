@@ -51,6 +51,8 @@
 
         let populationDensity = 130; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
 
+        let roadLayer = L.layerGroup().addTo(map);
+        
            // Funkce pro načtení silniční sítě z Overpass API
          function loadRoads() {
             var overpassQuery = `[out:json];
