@@ -72,6 +72,40 @@
         // Načíst silnice po načtení mapy
         loadRoads();
 
+         let roadLayer = L.layerGroup().addTo(map);
+
+    function fetchRoads(bounds) {
+        let bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+        let query = `
+            [out:json];
+            (
+                way["highway"="primary"](${bbox});
+                way["highway"="secondary"](${bbox});
+                way["highway"="tertiary"](${bbox});
+            );
+            out geom;
+        `;
+        
+        fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                roadLayer.clearLayers();
+                data.elements.forEach(way => {
+                    let coordinates = way.geometry.map(point => [point.lat, point.lon]);
+                    L.polyline(coordinates, { color: 'red', weight: 3 }).addTo(roadLayer);
+                });
+            })
+            .catch(error => console.error("Chyba při načítání silnic:", error));
+    }
+
+    // První načtení silnic
+    fetchRoads(map.getBounds());
+
+    // Obnova silnic při změně polygonu
+    map.on('moveend', () => {
+        fetchRoads(map.getBounds());
+    });
+
         function getCentroid(points) {
             let latSum = 0, lngSum = 0;
             points.forEach(p => { latSum += p[0]; lngSum += p[1]; });
