@@ -211,6 +211,45 @@
             expandPolygon();
             unlockBlockedPoints();
         }, 1000);
+
+        let money = 5000; // Počáteční stav peněz
+    let tollBooths = []; // Seznam mýtných bran
+
+    function updateMoneyDisplay() {
+        document.getElementById("money").textContent = money.toLocaleString();
+    }
+
+    function placeTollBooth(latlng) {
+        if (money < 5000) {
+            alert("Nemáš dost peněz na mýtnou bránu!");
+            return;
+        }
+
+        money -= 5000; // Odečtení ceny za mýtnou bránu
+        updateMoneyDisplay();
+
+        let icon = L.icon({
+            iconUrl: "https://i.imgur.com/U2n0VLa.png",
+            iconSize: [32, 32]
+        });
+
+        let marker = L.marker(latlng, { icon }).addTo(map);
+        tollBooths.push(marker);
+
+        // Generování peněz každých 20 sekund
+        setInterval(() => {
+            money += 20;
+            updateMoneyDisplay();
+        }, 20000);
+    }
+
+    // Přidání možnosti kliknutím na silnici umístit mýtnou bránu
+    map.on("click", function (e) {
+        let clickedLatLng = e.latlng;
+        placeTollBooth(clickedLatLng);
+    });
+
+    updateMoneyDisplay();
     </script>
 </body>
 </html>
