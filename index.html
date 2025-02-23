@@ -441,7 +441,12 @@ function saveRoadStatusToLocalStorage(road) {
 
 // Funkce pro načtení opravených silnic z localStorage
 function loadRepairedRoads() {
-    let repairedRoads = JSON.parse(localStorage.getItem("repairedRoads")) || [];
+    let repairedRoads = JSON.parse(localStorage.getItem("repairedRoads"));
+
+    // Zajistíme, že repairedRoads bude pole, pokud je null nebo nevalidní
+    if (!Array.isArray(repairedRoads)) {
+        repairedRoads = [];
+    }
 
     let currentTime = new Date().getTime();
     repairedRoads = repairedRoads.filter(road => {
