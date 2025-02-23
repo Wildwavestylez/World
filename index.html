@@ -53,7 +53,7 @@
 
            // Funkce pro načtení silniční sítě z Overpass API
         function loadRoads() {
-            var overpassQuery = `[out:json];way["highway"](47.06,11.80,52.16,15.86);out geom;`;
+            var overpassQuery = `[out:json];way["highway"](49.06,13.80,49.13,13.86);out geom;`;
             var overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
 
             fetch(overpassUrl)
