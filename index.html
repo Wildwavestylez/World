@@ -334,9 +334,12 @@ let vehiclePrice = 50; // Cena prvního auta
                 marker: L.marker(garage.location, { icon: L.icon({ iconUrl: 'https://i.imgur.com/Cwm3M4Z.png', iconSize: [45, 45] }) }),
                 moving: false
             };
-
-            vehicle.marker.addTo(map).bindPopup("Údržbové auto");
+         vehicle.marker.addTo(map).bindPopup("Údržbové auto");
             maintenanceVehicles.push(vehicle);
+
+
+// Tlačítko pro nákup auta
+document.getElementById('buyVehicle').addEventListener('click', buyMaintenanceVehicle);
         }
 
 
