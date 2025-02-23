@@ -30,12 +30,12 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        let map = L.map('map').setView([49.157, 13.877], 13); // Lčovice jako start
+        let map = L.map('map').setView([49.1090089, 13.8666047], 15); // Lčovice jako start
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        let center = [49.157, 13.877];
+        let center = [49.1090089, 13.8666047];
 
         let polygonPoints = [
             [center[0] + 0.002, center[1] - 0.002],
@@ -51,7 +51,7 @@
 
         let populationDensity = 130; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
 
-        let roadLayer = L.layerGroup().addTo(map);
+      
         
            // Funkce pro načtení silniční sítě z Overpass API
          function loadRoads() {
