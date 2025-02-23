@@ -33,7 +33,7 @@
         <button onclick="startMaintenance()">Vyslat údržbu</button>
     Rozloha: <span id="area">0</span> km² | 
     Počet obyvatel: <span id="population">0</span> | 
-    Peníze: <span id="money">5000</span> Kč
+    Peníze: <span id="money">20000</span> Kč
 </div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -265,7 +265,7 @@ map.on('moveend', () => {
             unlockBlockedPoints();
         }, 1000);
 
-        let money = 5000; // Počáteční stav peněz
+        let money = 20000; // Počáteční stav peněz
     let tollBooths = []; // Seznam mýtných bran
         let garagePrice = 100;
         let maintenanceCarPrice = 50;
@@ -308,28 +308,31 @@ map.on('moveend', () => {
 
     updateMoneyDisplay();
 
-         function buildGarage() {
-            if (money < garagePrice) {
-                alert("Nemáš dost peněz na garáž!");
-                return;
-            }
+        let garages = []; // Seznam garáží
+let garagePrice = 100; // Cena první garáže
 
-            money -= garagePrice;
-            updateMoneyDisplay();
+function placeGarage() {
+    if (money < garagePrice) {
+        alert("Nedostatek peněz!");
+        return;
+    }
 
-            let icon = L.icon({
-                iconUrl: "https://i.imgur.com/puN4S0i.jpeg",
-                iconSize: [32, 32]
-            });
+    money -= garagePrice;
+    garagePrice += 500; // Každá další garáž je dražší
 
-            let latlng = map.getCenter();
-            let marker = L.marker(latlng, { icon }).addTo(map);
-            garages.push(marker);
+    map.once('click', function (event) {
+        let garage = {
+            location: event.latlng,
+            marker: L.marker(event.latlng, { icon: L.icon({ iconUrl: 'https://i.imgur.com/a/RHGJwkk.png', iconSize: [32, 32] }) })
+        };
 
-            garagePrice += 500;
-            console.log("Garáž postavena na:", latlng);
-        }
+        garage.marker.addTo(map).bindPopup("Garáž údržby");
+        garages.push(garage);
+    });
+}
 
+// Tlačítko pro stavbu garáže
+document.getElementById('buildGarage').addEventListener('click', placeGarage);
         function buyMaintenanceCar() {
             if (garages.length === 0) {
                 alert("Nejdřív musíš postavit garáž!");
