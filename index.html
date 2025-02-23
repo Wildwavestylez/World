@@ -221,11 +221,14 @@
 
         let money = 5000; // Počáteční stav peněz
     let tollBooths = []; // Seznam mýtných bran
-        
+        let garagePrice = 100;
+        let maintenanceCarPrice = 50;
+        let garages = [];
+        let maintenanceCars = [];
 
       function updateMoneyDisplay() {
-        document.getElementById("money").textContent = money.toLocaleString();
-    }
+            document.getElementById("money").textContent = money.toLocaleString();
+        }
 
     function placeTollBooth(latlng) {
         if (money < 5000) {
@@ -258,6 +261,55 @@
     });
 
     updateMoneyDisplay();
+
+         function buildGarage() {
+            if (money < garagePrice) {
+                alert("Nemáš dost peněz na garáž!");
+                return;
+            }
+
+            money -= garagePrice;
+            updateMoneyDisplay();
+
+            let icon = L.icon({
+                iconUrl: "https://i.imgur.com/RHGJwkk.png",
+                iconSize: [32, 32]
+            });
+
+            let latlng = map.getCenter();
+            let marker = L.marker(latlng, { icon }).addTo(map);
+            garages.push(marker);
+
+            garagePrice += 500;
+            console.log("Garáž postavena na:", latlng);
+        }
+
+        function buyMaintenanceCar() {
+            if (garages.length === 0) {
+                alert("Nejdřív musíš postavit garáž!");
+                return;
+            }
+
+            if (money < maintenanceCarPrice) {
+                alert("Nemáš dost peněz na údržbové auto!");
+                return;
+            }
+
+            money -= maintenanceCarPrice;
+            updateMoneyDisplay();
+
+            let icon = L.icon({
+                iconUrl: "https://i.imgur.com/ez5qByM.png",
+                iconSize: [32, 32]
+            });
+
+            let garage = garages[0].getLatLng();
+            let marker = L.marker(garage, { icon }).addTo(map);
+            maintenanceCars.push(marker);
+
+            maintenanceCarPrice += 200;
+            console.log("Údržbové auto koupeno a zaparkováno v garáži.");
+        }
     </script>
 </body>
 </html>
