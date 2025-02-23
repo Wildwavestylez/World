@@ -76,7 +76,7 @@
 
          let roadLayer = L.layerGroup().addTo(map);
 
-    function fetchRoads(bounds) {
+   function fetchRoads(bounds) {
         let bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
         let query = `
             [out:json];
