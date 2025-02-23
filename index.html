@@ -427,22 +427,44 @@ function repairRoad(road, vehicle) {
 // Funkce pro uložení stavu opravené silnice do localStorage
 function saveRoadStatusToLocalStorage(road) {
     let repairedRoads = JSON.parse(localStorage.getItem("repairedRoads")) || [];
-    repairedRoads.push(road.coordinates); // Uložíme souřadnice opravené silnice
+    
+    // Pokud už je silnice v localStorage, aktualizujeme její čas opravy
+    let existingRoadIndex = repairedRoads.findIndex(repaired => arraysEqual(repaired.coordinates, road.coordinates));
+    if (existingRoadIndex !== -1) {
+        repairedRoads[existingRoadIndex].timestamp = new Date().getTime();  // Uložíme čas opravy
+    } else {
+        repairedRoads.push({ coordinates: road.coordinates, timestamp: new Date().getTime() });
+    }
+
     localStorage.setItem("repairedRoads", JSON.stringify(repairedRoads));
 }
 
 // Funkce pro načtení opravených silnic z localStorage
 function loadRepairedRoads() {
     let repairedRoads = JSON.parse(localStorage.getItem("repairedRoads")) || [];
+
+    let currentTime = new Date().getTime();
+    repairedRoads = repairedRoads.filter(road => {
+        // Zkontrolujeme, jestli už uplynulo 20 minut od opravy
+        if (currentTime - road.timestamp > 20 * 60 * 1000) {
+            return false;  // Odstraní silnici, která byla opravená před více než 20 minutami
+        }
+        return true;
+    });
+
+    // Uložení upraveného seznamu zpět do localStorage
+    localStorage.setItem("repairedRoads", JSON.stringify(repairedRoads));
+
+    // Nastavení stavu silnic na opravené (green)
     roads.forEach(road => {
-        if (repairedRoads.some(repaired => arraysEqual(repaired, road.coordinates))) {
+        if (repairedRoads.some(repaired => arraysEqual(repaired.coordinates, road.coordinates))) {
             road.status = "green"; // Pokud je silnice v seznamu opravených, nastavíme její status na "green"
             road.polyline.setStyle({ color: "green" });
         }
     });
 }
 
-// Pomocná funkce pro porovnání dvou polí souřadnic
+// Funkce pro porovnání dvou polí souřadnic
 function arraysEqual(a, b) {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
@@ -450,8 +472,7 @@ function arraysEqual(a, b) {
     }
     return true;
 }
-
-// Načtení opravených silnic při načtení stránky
+        // Načtení opravených silnic při načtení stránky
 loadRepairedRoads();
 
         function moveBack(vehicle) {
