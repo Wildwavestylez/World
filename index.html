@@ -49,7 +49,28 @@
         let blockedPoints = {};
         let moveTracker = Array(polygonPoints.length).fill(0);
 
-        let populationDensity = 80; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
+        let populationDensity = 130; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
+
+           // Funkce pro načtení silniční sítě z Overpass API
+        function loadRoads() {
+            var overpassQuery = `[out:json];way["highway"](49.06,13.80,49.13,13.86);out geom;`;
+            var overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
+
+            fetch(overpassUrl)
+                .then(response => response.json())
+                .then(data => {
+                    data.elements.forEach(element => {
+                        if (element.type === "way" && element.geometry) {
+                            var latlngs = element.geometry.map(coord => [coord.lat, coord.lon]);
+                            L.polyline(latlngs, { color: 'blue', weight: 2 }).addTo(map);
+                        }
+                    });
+                })
+                .catch(error => console.error("Chyba při načítání silnic:", error));
+        }
+
+        // Načíst silnice po načtení mapy
+        loadRoads();
 
         function getCentroid(points) {
             let latSum = 0, lngSum = 0;
