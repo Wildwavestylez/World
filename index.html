@@ -357,6 +357,59 @@ document.getElementById('buildGarage').addEventListener('click', placeGarage);
             maintenanceCarPrice += 200;
             console.log("Údržbové auto koupeno a zaparkováno v garáži.");
         }
+
+function sendMaintenanceVehicle() {
+    maintenanceVehicles.forEach(vehicle => {
+        if (vehicle.moving) return; // Pokud je auto v pohybu, neřešíme další pohyb
+
+        let targetRoad = roads.find(road => road.status === "red" || road.status === "orange");
+        if (!targetRoad) {
+            alert("Žádné poškozené úseky k opravě!");
+            return;
+        }
+
+        let vehicleMarker = vehicle.marker;
+        let path = targetRoad.coordinates;
+        vehicle.moving = true;
+
+        let index = 0;
+        function moveVehicle() {
+            if (index >= path.length) {
+                vehicle.moving = false;
+                return;
+            }
+
+            vehicleMarker.setLatLng(path[index]);
+            index++;
+
+            setTimeout(moveVehicle, 1000 / (50 / 3.6)); // Přepočet rychlosti na interval
+        }
+
+        moveVehicle();
+
+        // Po dojetí na místo opraví úsek
+        setTimeout(() => {
+            if (money >= 70) {
+                money -= 70;
+                if (targetRoad.status === "red") {
+                    targetRoad.status = "orange";
+                    targetRoad.polyline.setStyle({ color: "orange" });
+                } else if (targetRoad.status === "orange") {
+                    targetRoad.status = "green";
+                    targetRoad.polyline.setStyle({ color: "green" });
+                }
+            } else {
+                alert("Nedostatek peněz na opravu!");
+            }
+
+            vehicle.moving = false; // Auto je volné pro další opravy
+        }, 20000);
+    });
+}
+
+// Tlačítko pro vyslání údržby
+document.getElementById('sendMaintenance').addEventListener('click', sendMaintenanceVehicle);
+
     </script>
 </body>
 </html>
