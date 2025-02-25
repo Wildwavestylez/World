@@ -58,7 +58,11 @@
 
         let populationDensity = 130; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
 
-         
+ // Definice ikony pro údržbové auto
+const maintenanceVehicleIcon = L.icon({
+    iconUrl: 'https://i.imgur.com/Cwm3M4Z.png',
+    iconSize: [24, 24]
+});        
         
            // Funkce pro načtení silniční sítě z Overpass API
          function loadRoads() {
@@ -87,6 +91,68 @@
 
    let roads = []; // Seznam všech úseků silnic
 
+function getMaintenancePath(startLocation) {
+    let path = [];
+    let closestRoad = findNearestRoad(startLocation);
+    
+    if (!closestRoad) return path; // Pokud není blízká silnice, nevracíme nic
+
+    let currentSegment = closestRoad;
+    
+    while (path.length < 50) { // Max délka trasy, aby se nekonečně necyklilo
+        path.push(currentSegment.coordinates);
+        let nextSegment = findNextRoadSegment(currentSegment);
+        if (!nextSegment) break;
+        currentSegment = nextSegment;
+    }
+
+    return path;
+}
+
+function findNearestRoad(location) {
+    let nearestRoad = null;
+    let minDistance = Infinity;
+
+    roadSegments.forEach(segment => {
+        let dist = distance(location, segment.coordinates[0]); // První bod silnice
+        if (dist < minDistance) {
+            minDistance = dist;
+            nearestRoad = segment;
+        }
+    });
+
+    return nearestRoad;
+}
+
+function findNextRoadSegment(currentSegment) {
+    let nextSegment = null;
+
+    roadSegments.forEach(segment => {
+        if (segment !== currentSegment && isConnected(currentSegment, segment)) {
+            nextSegment = segment;
+        }
+    });
+
+    return nextSegment;
+}
+
+function isConnected(segmentA, segmentB) {
+    let lastPointA = segmentA.coordinates[segmentA.coordinates.length - 1];
+    let firstPointB = segmentB.coordinates[0];
+
+    return distance(lastPointA, firstPointB) < 0.001; // Menší než 100m
+}
+
+// Výpočet vzdálenosti dvou bodů
+function distance(coord1, coord2) {
+    let latDiff = coord1[0] - coord2[0];
+    let lonDiff = coord1[1] - coord2[1];
+    return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
+}
+
+
+let roadSegments = []; // Globální proměnná pro uchování segmentů silnic
+
 function fetchRoads(bounds) {
     let bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
     let query = `
@@ -102,27 +168,34 @@ function fetchRoads(bounds) {
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
         .then(data => {
-            roadLayer.clearLayers();
-            roads = []; // Resetujeme seznam silnic
+            if (!data.elements || data.elements.length === 0) {
+                console.warn("❌ Žádné nové silnice nenalezeny!");
+                return;
+            }
+
+            console.log(`✅ Načteno ${data.elements.length} nových silnic`);
 
             data.elements.forEach(way => {
                 let coordinates = way.geometry.map(point => [point.lat, point.lon]);
-                let segments = splitRoadIntoSegments(coordinates, 200); // Rozdělit na úseky po 200m
-                
+                let segments = splitRoadIntoSegments(coordinates, 200); // Rozdělení na 200m úseky
+
                 segments.forEach(segment => {
-                    let road = {
+                    let polyline = L.polyline(segment, { color: 'red', weight: 3 }).addTo(roadLayer);
+
+                    roadSegments.push({
                         coordinates: segment,
-                        status: "red", // Nově načtené silnice budou poškozené
-                        polyline: L.polyline(segment, { color: 'red', weight: 3 }).addTo(roadLayer)
-                    };
-                    roads.push(road);
+                        polyline: polyline,
+                        status: "red" // Nové silnice jsou vždy "červené"
+                    });
                 });
             });
+
+            console.log(`📌 Celkový počet silničních úseků: ${roadSegments.length}`);
         })
         .catch(error => console.error("Chyba při načítání silnic:", error));
 }
 
-// Funkce pro rozdělení silnice na úseky po dané délce (200 m)
+// Funkce pro rozdělení silnice na úseky po 200 metrech
 function splitRoadIntoSegments(coords, segmentLength) {
     let segments = [];
     let currentSegment = [];
@@ -150,19 +223,11 @@ function splitRoadIntoSegments(coords, segmentLength) {
     return segments;
 }
 
-// První načtení silnic
+// Načtení silnic po otevření mapy
 fetchRoads(map.getBounds());
-
-// Obnova silnic při změně polygonu
 map.on('moveend', () => {
     fetchRoads(map.getBounds());
 });
-
-    // Obnova silnic při změně polygonu
-    map.on('moveend', () => {
-        fetchRoads(map.getBounds());
-    });
-
         function getCentroid(points) {
             let latSum = 0, lngSum = 0;
             points.forEach(p => { latSum += p[0]; lngSum += p[1]; });
@@ -358,58 +423,62 @@ document.getElementById('buildGarage').addEventListener('click', placeGarage);
             console.log("Údržbové auto koupeno a zaparkováno v garáži.");
         }
 
-function sendMaintenanceVehicle() {
-    maintenanceVehicles.forEach(vehicle => {
-        if (vehicle.moving) return; // Pokud je auto v pohybu, neřešíme další pohyb
+function sendMaintenanceVehicle(garageLocation) {
+    if (!roadSegments || roadSegments.length === 0) {
+        console.warn("🚧 Žádné dostupné silnice k opravě!");
+        return;
+    }
 
-        let targetRoad = roads.find(road => road.status === "red" || road.status === "orange");
-        if (!targetRoad) {
-            alert("Žádné poškozené úseky k opravě!");
-            return;
-        }
+    let targetSegment = roadSegments.find(segment => segment.status === "red" || segment.status === "orange");
+    
+    if (!targetSegment) {
+        console.warn("✅ Všechny silnice jsou opravené!");
+        return;
+    }
 
-        let vehicleMarker = vehicle.marker;
-        let path = targetRoad.coordinates;
-        vehicle.moving = true;
+    console.log(`🛠 Posílám údržbu na silnici: ${targetSegment.coordinates[0]}`);
 
-        let index = 0;
-        function moveVehicle() {
-            if (index >= path.length) {
+    let vehicle = maintenanceVehicles.find(v => !v.moving);
+    if (!vehicle) {
+        console.warn("🚗 Všechna údržbová auta jsou obsazena!");
+        return;
+    }
+
+    vehicle.moving = true;
+    let route = [...targetSegment.coordinates]; // Trasa auta
+    let speed = 50 / 3600; // 50 km/h v m/s
+    let currentIndex = 0;
+
+    function moveVehicle() {
+        if (currentIndex < route.length) {
+            let nextPoint = L.latLng(route[currentIndex]);
+            vehicle.marker.setLatLng(nextPoint);
+            currentIndex++;
+            setTimeout(moveVehicle, 1000); // Aktualizace 1x za sekundu
+        } else {
+            console.log("🚧 Oprava silnice zahájena...");
+            setTimeout(() => {
+                repairSegment(targetSegment);
                 vehicle.moving = false;
-                return;
-            }
-
-            vehicleMarker.setLatLng(path[index]);
-            index++;
-
-            setTimeout(moveVehicle, 1000 / (50 / 3.6)); // Přepočet rychlosti na interval
+                console.log("✅ Silnice opravena!");
+            }, 20000); // Oprava trvá 20 vteřin
         }
+    }
 
-        moveVehicle();
-
-        // Po dojetí na místo opraví úsek
-        setTimeout(() => {
-            if (money >= 70) {
-                money -= 70;
-                if (targetRoad.status === "red") {
-                    targetRoad.status = "orange";
-                    targetRoad.polyline.setStyle({ color: "orange" });
-                } else if (targetRoad.status === "orange") {
-                    targetRoad.status = "green";
-                    targetRoad.polyline.setStyle({ color: "green" });
-                }
-            } else {
-                alert("Nedostatek peněz na opravu!");
-            }
-
-            vehicle.moving = false; // Auto je volné pro další opravy
-        }, 20000);
-    });
+    moveVehicle();
 }
-
-// Tlačítko pro vyslání údržby
-document.getElementById('sendMaintenance').addEventListener('click', sendMaintenanceVehicle);
-
+// Oprava úseku
+function repairSegment(segment) {
+    if (segment.status === "red") {
+        segment.status = "orange";
+        segment.polyline.setStyle({ color: "orange" });
+    } else if (segment.status === "orange") {
+        segment.status = "green";
+        segment.polyline.setStyle({ color: "green" });
+    } else {
+        console.log("❌ Chyba: Neplatný stav silnice");
+    }
+}
     </script>
 </body>
 </html>
