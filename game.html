@@ -581,29 +581,26 @@ function repairSegment(segment) {
         return;  
     }  
 
-    // Nastavení nové barvy (postupná oprava)
+    // Změníme status segmentu na oranžovou nebo zelenou, podle počtu oprav
     if (segment.status === "red") {
-        segment.status = "orange";
+        segment.status = "orange"; // První oprava, změní na oranžovou
     } else if (segment.status === "orange") {
-        segment.status = "green";
-    } else {
-        console.log(`🟢 Silnice ${segment.id} už je zelená, neopravuji.`);
-        return;
+        segment.status = "green"; // Druhá oprava, změní na zelenou
     }
 
-    updateSegmentColor(segment);  
+    // Změníme barvu na mapě
+    segment.polyline.setStyle({ color: segment.status });
 
+    // Uložení stavu do localStorage
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};  
     savedSegments[segment.id] = { 
         status: segment.status, 
         lastRepaired: Date.now() 
-    };
-
+    };  
     localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));  
 
-    console.log(`🛠 Silnice ${segment.id} opravena, nová barva: ${segment.status}.`);
+    console.log(`🛠 Silnice ${segment.id} opravena a změněna na ${segment.status}.`);
 }
-
 function clearLocalStorage() {
     localStorage.clear();
     alert("LocalStorage byl vymazán!");
