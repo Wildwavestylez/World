@@ -438,7 +438,10 @@ function sendMaintenanceVehicle(garageLocation) {
     }
 
     function findNextSegment() {
-        return roadSegments.find(segment => segment.status === "red" || segment.status === "orange");
+        return roadSegments.find(segment =>
+            (segment.status === "red" || segment.status === "orange") &&
+            polygon.contains(L.latLng(segment.coordinates[0])) // Silnice musí být uvnitř polygonu
+        );
     }
 
     function moveVehicleToSegment(segment) {
@@ -449,7 +452,7 @@ function sendMaintenanceVehicle(garageLocation) {
             return;
         }
 
-        console.log(`🛠 Posílám údržbu na silnici: ${segment.coordinates[0]}`);
+        console.log(`🛠 Posílám údržbu na: ${segment.coordinates[0]}`);
 
         vehicle.moving = true;
         let route = [...segment.coordinates];
@@ -467,7 +470,7 @@ function sendMaintenanceVehicle(garageLocation) {
                 setTimeout(() => {
                     repairSegment(segment);
                     console.log("✅ Silnice opravena!");
-                    moveVehicleToSegment(findNextSegment()); // Hledá další úsek
+                    moveVehicleToSegment(findNextSegment()); // Přejde na další úsek
                 }, 20000); // Oprava trvá 20 vteřin
             }
         }
@@ -478,7 +481,7 @@ function sendMaintenanceVehicle(garageLocation) {
     moveVehicleToSegment(findNextSegment());
 }
 
-// Funkce pro opravu úseku a změnu barvy
+// 🔧 Oprava silnic a změna barvy
 function repairSegment(segment) {
     if (segment.status === "red") {
         segment.status = "orange";
@@ -486,32 +489,6 @@ function repairSegment(segment) {
     } else if (segment.status === "orange") {
         segment.status = "green";
         segment.polyline.setStyle({ color: "green" });
-    }
-}
-
-// Oprava úseku
-function repairSegment(segment) {
-    if (segment.status === "red") {
-        segment.status = "orange";
-        segment.polyline.setStyle({ color: "orange" });
-    } else if (segment.status === "orange") {
-        segment.status = "green";
-        segment.polyline.setStyle({ color: "green" });
-    } else {
-        console.log("❌ Chyba: Neplatný stav silnice");
-    }
-}
-}
-// Oprava úseku
-function repairSegment(segment) {
-    if (segment.status === "red") {
-        segment.status = "orange";
-        segment.polyline.setStyle({ color: "orange" });
-    } else if (segment.status === "orange") {
-        segment.status = "green";
-        segment.polyline.setStyle({ color: "green" });
-    } else {
-        console.log("❌ Chyba: Neplatný stav silnice");
     }
 }
     </script>
