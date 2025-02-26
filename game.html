@@ -31,7 +31,7 @@
         <button id="buildGarage" onclick="placeGarage()">Postavit garáž údržby</button>
 <button id="buyVehicle" onclick="buyMaintenanceVehicle()">Koupit údržbové auto</button>
 <button id="sendMaintenance" onclick="sendMaintenanceVehicle()">Vyslat údržbu</button>
-
+button onclick="clearLocalStorage()">Vymazat LocalStorage</button>
     </div>  
     <div id="info">Peníze: <span id="money">20000</span> Kč | Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">0</span></div>
 
@@ -603,6 +603,11 @@ function repairSegment(segment) {
 
     console.log(`🛠 Silnice ${segment.id} opravena, nová barva: ${segment.status}.`);
 }
+
+function clearLocalStorage() {
+    localStorage.clear();
+    alert("LocalStorage byl vymazán!");
+  }
     
 </script>
 </body>
