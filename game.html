@@ -460,37 +460,33 @@ function moveVehicleToSegment(vehicle) {
         return;  
     }
 
-    // Najdeme nejbližší segment k opravě
-    let segment = vehicle.assignedSegments.find(s => s.status === "red" || s.status === "orange");
+    // Hledání dostupného úseku pro opravu
+    let segment = roadSegments.find(s => (s.status === "red" || s.status === "orange") && isInsidePolygon(L.latLng(s.coordinates[0])));  
 
     if (!segment) {  
-        console.log(`✅ Auto ${vehicle.marker._leaflet_id} dokončilo všechny opravy!`);  
+        console.log(`✅ Auto ${vehicle.marker._leaflet_id} opravilo všechny dostupné úseky!`);  
         vehicle.moving = false;  
         return;  
     }  
 
     console.log(`🚗 Auto ${vehicle.marker._leaflet_id} jede opravit silnici ${segment.id}`);  
 
-    // **1) Najdeme trasu od aktuální pozice ke startu segmentu**
-    let routeToSegment = getRoute(vehicle.marker.getLatLng(), segment.coordinates[0]);  
-    let fullRoute = [...routeToSegment, ...segment.coordinates]; // Spojíme trasu ke startu segmentu + trasu po segmentu
-
-    if (!fullRoute || fullRoute.length === 0) {  
+    let route = getRoute(vehicle.marker.getLatLng(), segment.coordinates);  
+    if (!route || route.length === 0) {  
         console.error(`❌ Chyba: Nelze vypočítat trasu pro auto ${vehicle.marker._leaflet_id}!`);  
         return;  
     }  
 
     vehicle.moving = true;  
-    animateVehicleAlongRoute(vehicle, fullRoute, () => {  
+    animateVehicleAlongRoute(vehicle, route, () => {  
         console.log(`✅ Auto ${vehicle.marker._leaflet_id} dorazilo na silnici ${segment.id}`);  
 
         setTimeout(() => {  
             repairSegment(segment);  
             console.log(`🔧 Auto ${vehicle.marker._leaflet_id} opravilo silnici ${segment.id}`);  
 
-            // Po opravě posuneme auto na další segment
             setTimeout(() => {  
-                moveVehicleToSegment(vehicle); // Pokračuje na další úsek  
+                moveVehicleToSegment(vehicle); // Automaticky pokračuje k dalšímu úseku  
             }, 1000); // Krátká pauza mezi opravami  
               
         }, 20000); // Oprava trvá 20 sekund  
@@ -507,14 +503,13 @@ function animateVehicleAlongRoute(vehicle, route, callback) {
             let nextPos = L.latLng(route[currentIndex + 1]);  
 
             let distance = currentPos.distanceTo(nextPos);  // Vzdálenost mezi dvěma body
-            let duration = (distance / speed) * 1000; // Čas pro daný úsek v ms
+            let duration = (distance / speed) * 1000; // Čas pro daný úsek v ms (Rychlost je 50 km/h)
 
-            // Plynulý pohyb auta
-            setTimeout(() => {
-                vehicle.marker.setLatLng(nextPos);  
-                currentIndex++;  
-                moveStep(); // Další krok
-            }, duration);
+            // Měnit pozici auta plynule
+            vehicle.marker.setLatLng(nextPos);  
+            currentIndex++;  
+
+            setTimeout(moveStep, duration); // Pohyb podle času, aby auto jelo plynule  
         } else {  
             callback(); // Po dokončení animace zavoláme opravu  
         }  
@@ -522,34 +517,17 @@ function animateVehicleAlongRoute(vehicle, route, callback) {
     moveStep();  
 }
 
-function getRoute(start, roadPoints) {
-    if (!start || !start.lat || !start.lng || !roadPoints || roadPoints.length === 0) {
-        console.warn("⚠ Chyba: Neplatné vstupy pro getRoute");
-        return [];
-    }
+function getRoute(start, roadPoints) { if (!start || roadPoints.length === 0) return [];
 
-    // Filtrovat neplatné body (null, undefined, bez souřadnic)
-    let validPoints = roadPoints.filter(p => p && p.length === 2 && !isNaN(p[0]) && !isNaN(p[1]));
+let nearestStart = roadPoints.reduce((a, b) => 
+    start.distanceTo(L.latLng(a)) < start.distanceTo(L.latLng(b)) ? a : b
+);
 
-    if (validPoints.length === 0) {
-        console.warn("⚠ Chyba: Žádné platné body v roadPoints");
-        return [];
-    }
+let routeIndex = roadPoints.findIndex(p => p[0] === nearestStart[0] && p[1] === nearestStart[1]);
+return roadPoints.slice(routeIndex); // Vracíme trasu od nejbližšího bodu
 
-    let startLatLng = L.latLng(start.lat, start.lng);
-
-    let nearestStart = validPoints.reduce((a, b) => 
-        startLatLng.distanceTo(L.latLng(a[0], a[1])) < startLatLng.distanceTo(L.latLng(b[0], b[1])) ? a : b
-    );
-
-    let routeIndex = validPoints.findIndex(p => p[0] === nearestStart[0] && p[1] === nearestStart[1]);
-    if (routeIndex === -1) {
-        console.warn("⚠ Nejbližší bod nenalezen v roadPoints");
-        return [];
-    }
-
-    return validPoints.slice(routeIndex); // Vrátíme trasu od nejbližšího bodu
 }
+
 // Funkce pro načítání stavu segmentů při function loadSegmentStatus() {  
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};  
 
