@@ -399,31 +399,32 @@ document.getElementById('buildGarage').addEventListener('click', placeGarage);
 
 
         function buyMaintenanceCar() {
-            if (garages.length === 0) {
-                alert("Nejdřív musíš postavit garáž!");
-                return;
-            }
+    if (garages.length === 0) {
+        alert("Nejdřív musíš postavit garáž!");
+        return;
+    }
 
-            if (money < maintenanceCarPrice) {
-                alert("Nemáš dost peněz na údržbové auto!");
-                return;
-            }
+    if (money < maintenanceCarPrice) {
+        alert("Nemáš dost peněz na údržbové auto!");
+        return;
+    }
 
-            money -= maintenanceCarPrice;
-            updateMoneyDisplay();
+    money -= maintenanceCarPrice;
+    updateMoneyDisplay();
 
-            let icon = L.icon({
-                iconUrl: "https://i.imgur.com/Cwm3M4Z.png",
-                iconSize: [32, 32]
-            });
+    let icon = L.icon({
+        iconUrl: "https://i.imgur.com/Cwm3M4Z.png",
+        iconSize: [32, 32]
+    });
 
-            let garage = garages[0].getLatLng();
-            let marker = L.marker(garage, { icon }).addTo(map);
-            maintenanceCars.push(marker);
+    // Opraveno: Přístup k souřadnicím správným způsobem
+    let garageLocation = garages[0].marker.getLatLng();
+    let marker = L.marker(garageLocation, { icon }).addTo(map);
+    maintenanceCars.push(marker);
 
-            maintenanceCarPrice += 200;
-            console.log("Údržbové auto koupeno a zaparkováno v garáži.");
-        }
+    maintenanceCarPrice += 200;
+    console.log("Údržbové auto koupeno a zaparkováno v garáži.");
+}
 
 function isInsidePolygon(latLng) {
     return polygon.getBounds().contains(latLng);
