@@ -30,7 +30,7 @@
    <div id="info">
         <button id="buildGarage" onclick="placeGarage()">Postavit garáž údržby</button>
         <button onclick="buyMaintenanceCar()">Koupit údržbové auto</button>
-        <button onclick="sendMaintenanceVehicle(garageLocation)">Vyslat údržbu</button>
+        <button onclick="startMaintenance()">Vyslat údržbu</button>
     Rozloha: <span id="area">0</span> km² | 
     Počet obyvatel: <span id="population">0</span> | 
     Peníze: <span id="money">20000</span> Kč
@@ -90,6 +90,16 @@ const maintenanceVehicleIcon = L.icon({
          let roadLayer = L.layerGroup().addTo(map);
 
    let roads = []; // Seznam všech úseků silnic
+
+function startMaintenance() {
+    if (garages.length === 0) {
+        alert("Nejdřív musíš postavit garáž!");
+        return;
+    }
+
+    let garageLocation = garages[0].marker.getLatLng();
+    sendMaintenanceVehicle(garageLocation);
+}
 
 function getMaintenancePath(startLocation) {
     let path = [];
