@@ -455,14 +455,16 @@ function getRoute(segment) {
 }
 
 function moveVehicleToSegment(vehicle) {  
-    if (vehicle.assignedSegments.length === 0) {  
-        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} nemá žádné úseky k opravě.`);  
+    if (!vehicle || !vehicle.marker) {  
+        console.error("❌ Chyba: Vozidlo neexistuje!");  
         return;  
     }  
 
-    let segment = vehicle.assignedSegments.shift();  
+    let segment = roadSegments.find(s => (s.status === "red" || s.status === "orange") && isInsidePolygon(L.latLng(s.coordinates[0])));  
+
     if (!segment) {  
-        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} už opravilo všechny úseky.`);  
+        console.log(`✅ Auto ${vehicle.marker._leaflet_id} opravilo všechny dostupné úseky!`);  
+        vehicle.moving = false;  
         return;  
     }  
 
@@ -480,11 +482,16 @@ function moveVehicleToSegment(vehicle) {
 
         setTimeout(() => {  
             repairSegment(segment);  
-            vehicle.moving = false;  
-            moveVehicleToSegment(vehicle); // Pokračuje na další úsek  
+            console.log(`🔧 Auto ${vehicle.marker._leaflet_id} opravilo silnici ${segment.id}`);  
+
+            setTimeout(() => {  
+                moveVehicleToSegment(vehicle); // Automaticky pokračuje k dalšímu úseku  
+            }, 1000); // Krátká pauza mezi opravami  
+              
         }, 20000); // Oprava trvá 20 sekund  
     });  
 }  
+
 function animateVehicleAlongRoute(vehicle, route, callback) {  
     let currentIndex = 0;  
     let speed = 50 / 3.6; // 50 km/h v m/s ≈ 13.89 m/s  
