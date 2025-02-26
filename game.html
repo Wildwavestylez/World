@@ -64,7 +64,7 @@
     let roads = []; // Seznam všech úseků silnic
 
 let roadSegments = []; // Seznam segmentů silnic
-    
+
     // Definice ikony pro údržbové auto
 const maintenanceVehicleIcon = L.icon({
     iconUrl: 'https://i.imgur.com/Cwm3M4Z.png',
@@ -85,7 +85,7 @@ function fetchRoads(bounds) {
                 let segmentColor = savedSegments[segmentId] || "red"; // Pokud je v localStorage, použijeme uloženou barvu
 
                 let polyline = L.polyline(coordinates, { color: segmentColor, weight: 3 }).addTo(map);
-                
+
                 roadSegments.push({ id: segmentId, coordinates, polyline, status: segmentColor });
             });
         })
@@ -129,11 +129,11 @@ map.on('moveend', () => {
     function getMaintenancePath(startLocation) {
     let path = [];
     let closestRoad = findNearestRoad(startLocation);
-    
+
     if (!closestRoad) return path; // Pokud není blízká silnice, nevracíme nic
 
     let currentSegment = closestRoad;
-    
+
     while (path.length < 50) { // Max délka trasy, aby se nekonečně necyklilo
         path.push(currentSegment.coordinates);
         let nextSegment = findNextRoadSegment(currentSegment);
@@ -184,7 +184,7 @@ function distance(coord1, coord2) {
     let lonDiff = coord1[1] - coord2[1];
     return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
 }
-    
+
         function getCentroid(points) {
             let latSum = 0, lngSum = 0;
             points.forEach(p => { latSum += p[0]; lngSum += p[1]; });
@@ -406,7 +406,7 @@ function assignSegmentsToVehicles() {
 
     maintenanceVehicles.forEach(vehicle => moveVehicleToSegment(vehicle));
 }
-    
+
 function sendMaintenanceVehicle() {
     let vehicle = maintenanceVehicles.find(v => !v.moving);
     if (!vehicle) {
@@ -422,14 +422,14 @@ function sendMaintenanceVehicle() {
 
     vehicle.moving = true;
     vehicle.assignedSegments.push(segment);
-    
+
     // Vyrazí z garáže k prvnímu segmentu
     let route = getRoute(vehicle.location, segment.coordinates[0]);
     animateVehicleAlongRoute(vehicle, route, () => moveVehicleToSegment(vehicle));
 }
-    
+
 function isInsidePolygon(latLng) { return polygon.getBounds().contains(latLng); }
-    
+
 function getRoute(start, end) {
     if (!start || !end) {
         console.error("❌ Chyba: Neplatné souřadnice pro trasu!");
@@ -451,17 +451,21 @@ function getRoute(segment) {
         console.error("❌ Chyba: Segment nemá platné souřadnice!");
         return [];
     }
-    
+
     return segment.coordinates; // Použijeme body segmentu jako trasu
 }
 
-function moveVehicleToSegment(vehicle) { if (vehicle.assignedSegments.length === 0) { console.log(🚗 Auto ${vehicle.marker._leaflet_id} nemá žádné úseky k opravě.); return; }
+function moveVehicleToSegment(vehicle) {
+    if (vehicle.assignedSegments.length === 0) {
+        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} nemá žádné úseky k opravě.`);
+        return;
+    }
 
-let segment = vehicle.assignedSegments.shift();
-if (!segment) {
-    console.log(`🚗 Auto ${vehicle.marker._leaflet_id} už opravilo všechny úseky.`);
-    return;
-}
+    let segment = vehicle.assignedSegments.shift();
+    if (!segment) {
+        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} už opravilo všechny úseky.`);
+        return;
+    }
 
 console.log(`🚗 Auto ${vehicle.marker._leaflet_id} jede opravit silnici ${segment.id}`);
 
@@ -601,7 +605,7 @@ function repairSegment(segment) {
     }
 
     newColor = segment.status;
-    
+
     // Uložíme opravený segment do localStorage
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
     savedSegments[segment.id] = { status: newColor, lastRepaired: Date.now() }; 
@@ -630,8 +634,7 @@ function clearLocalStorage() {
     localStorage.clear();
     alert("LocalStorage byl vymazán!");
   }
-    
+
 </script>
 </body>
 </html>
-        
