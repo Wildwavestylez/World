@@ -75,19 +75,28 @@ function fetchRoads(bounds) {
     let query = `[out:json];way["highway"]( ${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out geom;`;
 
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
-        .then(response => response.json())
-        .then(data => {
-            let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
-            data.elements.forEach(way => {
-                let coordinates = way.geometry.map(node => [node.lat, node.lon]);
-                let segmentId = way.id; 
+        .then(response => response.text())  // Přečteme odpověď jako text
+        .then(text => {
+            try {
+                // Zkusíme parsovat text jako JSON
+                let data = JSON.parse(text);
+                console.log("Načtená data:", data);
 
-                let segmentColor = savedSegments[segmentId] || "red"; // Pokud je v localStorage, použijeme uloženou barvu
+                let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
+                data.elements.forEach(way => {
+                    let coordinates = way.geometry.map(node => [node.lat, node.lon]);
+                    let segmentId = way.id;
 
-                let polyline = L.polyline(coordinates, { color: segmentColor, weight: 3 }).addTo(map);
-                
-                roadSegments.push({ id: segmentId, coordinates, polyline, status: segmentColor });
-            });
+                    let segmentColor = savedSegments[segmentId] || "red"; // Pokud je v localStorage, použijeme uloženou barvu
+
+                    let polyline = L.polyline(coordinates, { color: segmentColor, weight: 3 }).addTo(map);
+
+                    roadSegments.push({ id: segmentId, coordinates, polyline, status: segmentColor });
+                });
+            } catch (error) {
+                console.error("❌ Chyba při parsování JSON:", error);
+                console.log("Návratová data:", text);  // Zobrazíme text odpovědi, pokud není JSON
+            }
         })
         .catch(error => console.error("❌ Chyba při načítání silnic:", error));
 }
