@@ -520,15 +520,18 @@ function getRoute(start, roadPoints) {
 // Funkce pro načítání stavu segmentů při načítání stránky
 function loadSegmentStatus() {  
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};  
+    console.log("📥 Načítám segmenty z localStorage:", savedSegments);
 
     roadSegments.forEach(segment => {  
         if (savedSegments[segment.id]) {  
             let elapsedTime = (Date.now() - savedSegments[segment.id].lastRepaired) / 1000 / 60;  
-            
+
             if (elapsedTime > 20) {  
                 segment.status = "red"; // Po 20 minutách zpět na červenou
+                console.log(`⏳ Segment ${segment.id} byl opraven před více než 20 minutami, měním zpět na červenou.`);
             } else {  
                 segment.status = savedSegments[segment.id].status; // Jinak použij uložený stav
+                console.log(`✅ Segment ${segment.id} načten jako ${segment.status}.`);
             }  
 
             updateSegmentColor(segment);
@@ -559,6 +562,8 @@ function updateSegmentColor(segment) {
     } else {
         segment.polyline = L.polyline(segment.coordinates, { color: color, weight: 3 }).addTo(map);
     }
+
+    console.log(`🎨 Segment ${segment.id} nastaven na barvu ${color}.`);
 }
 
 // Funkce pro opravu segmentu a změnu barvy na zelenou
@@ -581,12 +586,19 @@ function repairSegment(segment) {
         segment.status = "orange";
     } else if (segment.status === "orange") {
         segment.status = "green";
+    } else {
+        console.log(`🟢 Silnice ${segment.id} už je zelená, neopravuji.`);
+        return;
     }
 
     updateSegmentColor(segment);  
 
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};  
-    savedSegments[segment.id] = { status: segment.status, lastRepaired: Date.now() };
+    savedSegments[segment.id] = { 
+        status: segment.status, 
+        lastRepaired: Date.now() 
+    };
+
     localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));  
 
     console.log(`🛠 Silnice ${segment.id} opravena, nová barva: ${segment.status}.`);
