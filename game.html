@@ -458,8 +458,9 @@ function moveVehicleToSegment(vehicle) {
     if (!vehicle || !vehicle.marker) {  
         console.error("❌ Chyba: Vozidlo neexistuje!");  
         return;  
-    }  
+    }
 
+    // Hledání dostupného úseku pro opravu
     let segment = roadSegments.find(s => (s.status === "red" || s.status === "orange") && isInsidePolygon(L.latLng(s.coordinates[0])));  
 
     if (!segment) {  
@@ -494,27 +495,27 @@ function moveVehicleToSegment(vehicle) {
 
 function animateVehicleAlongRoute(vehicle, route, callback) {  
     let currentIndex = 0;  
-    let speed = 50 / 3.6; // 50 km/h v m/s ≈ 13.89 m/s  
+    let speed = 50 / 3.6; // 50 km/h v m/s ≈ 13.89 m/s
 
     function moveStep() {  
         if (currentIndex < route.length - 1) {  
             let currentPos = L.latLng(route[currentIndex]);  
             let nextPos = L.latLng(route[currentIndex + 1]);  
 
-            let distance = currentPos.distanceTo(nextPos);  
-            let duration = (distance / speed) * 1000; // Čas v ms  
+            let distance = currentPos.distanceTo(nextPos);  // Vzdálenost mezi dvěma body
+            let duration = (distance / speed) * 1000; // Čas pro daný úsek v ms (Rychlost je 50 km/h)
 
+            // Měnit pozici auta plynule
             vehicle.marker.setLatLng(nextPos);  
             currentIndex++;  
 
-            setTimeout(moveStep, 1000); // Pohyb každou sekundu  
+            setTimeout(moveStep, duration); // Pohyb podle času, aby auto jelo plynule  
         } else {  
             callback(); // Po dokončení animace zavoláme opravu  
         }  
     }  
     moveStep();  
 }
-
 
 function getRoute(start, roadPoints) {
     if (!start || roadPoints.length === 0) return [];
