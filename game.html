@@ -371,21 +371,20 @@ function buyMaintenanceVehicle() {
     }
 
     money -= vehiclePrice;
-    vehiclePrice += 200; // Každé další auto je dražší
+    vehiclePrice += 200;
 
-    let garage = garages[0]; // První dostupná garáž
+    let garage = garages[0]; 
 
     let vehicle = {
         location: garage.location,
         marker: L.marker(garage.location, { icon: L.icon({ iconUrl: 'https://i.imgur.com/Cwm3M4Z.png', iconSize: [24, 24] }) }),
         moving: false,
-        assignedSegments: [] // Každé auto bude mít svůj vlastní seznam oprav
+        assignedSegments: [],
+        speed: 50 / 3.6 // Rychlost v m/s
     };
 
-    vehicle.marker.addTo(map).bindPopup("Údržbové auto");
+    vehicle.marker.addTo(map).bindPopup("Údržbové auto v garáži");
     maintenanceVehicles.push(vehicle);
-
-    assignSegmentsToVehicles(); // Přerozdělíme úseky mezi auta
 }
 
 function assignSegmentsToVehicles() {
@@ -406,30 +405,21 @@ function assignSegmentsToVehicles() {
     maintenanceVehicles.forEach(vehicle => moveVehicleToSegment(vehicle));
 }
     
-function sendMaintenanceVehicle(garageLocation) {
-    if (!roadSegments || roadSegments.length === 0) {
-        console.warn("🚧 Žádné dostupné silnice k opravě!");
-        return;
-    }
-
+function sendMaintenanceVehicle() {
     let vehicle = maintenanceVehicles.find(v => !v.moving);
     if (!vehicle) {
         console.warn("🚗 Všechna údržbová auta jsou obsazena!");
         return;
     }
 
-    // Najdeme segment, který ještě není přiřazen žádnému autu
-    let segment = roadSegments.find(s => (s.status === "red" || s.status === "orange") && 
-                                         isInsidePolygon(L.latLng(s.coordinates[0])));
-
+    let segment = roadSegments.find(s => s.status === "red" || s.status === "orange");
     if (!segment) {
-        console.warn("✅ Všechny silnice v oblasti jsou opravené!");
+        console.warn("✅ Všechny silnice jsou opravené!");
         return;
     }
 
     vehicle.moving = true;
     vehicle.assignedSegments.push(segment);
-
     moveVehicleToSegment(vehicle);
 }
     
@@ -468,11 +458,11 @@ function moveVehicleToSegment(vehicle) {
 
     let segment = vehicle.assignedSegments.shift();
     if (!segment) {
-        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} už opravilo všechny úseky.`);
+        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} dokončilo všechny opravy.`);
         return;
     }
 
-    console.log(`🚗 Auto ${vehicle.marker._leaflet_id} jede opravit silnici ${segment.id}`);
+    console.log(`🚗 Auto ${vehicle.marker._leaflet_id} vyráží na opravu silnice ${segment.id}`);
 
     let route = getRoute(vehicle.marker.getLatLng(), segment.coordinates);
     if (!route || route.length === 0) {
@@ -480,14 +470,12 @@ function moveVehicleToSegment(vehicle) {
         return;
     }
 
-    vehicle.moving = true;
     animateVehicleAlongRoute(vehicle, route, () => {
-        console.log(`✅ Auto ${vehicle.marker._leaflet_id} dorazilo na silnici ${segment.id}`);
-
+        console.log(`✅ Auto ${vehicle.marker._leaflet_id} dorazilo k opravě ${segment.id}`);
         setTimeout(() => {
             repairSegment(segment);
             vehicle.moving = false;
-            moveVehicleToSegment(vehicle); // Pokračuje na další úsek
+            moveVehicleToSegment(vehicle);
         }, 20000); // Oprava trvá 20 sekund
     });
 }
@@ -495,17 +483,25 @@ function moveVehicleToSegment(vehicle) {
 function animateVehicleAlongRoute(vehicle, route, callback) {
     let currentIndex = 0;
     function moveStep() {
-        if (currentIndex < route.length) {
-            let nextPoint = L.latLng(route[currentIndex]);
-            vehicle.marker.setLatLng(nextPoint);
-            currentIndex++;
-            setTimeout(moveStep, 300); // Pohyb auta každých 300 ms
-        } else {
-            callback(); // Po dokončení animace zavoláme opravu
+        if (currentIndex >= route.length - 1) {
+            callback();
+            return;
         }
+
+        let currentPoint = L.latLng(route[currentIndex]);
+        let nextPoint = L.latLng(route[currentIndex + 1]);
+
+        let distance = currentPoint.distanceTo(nextPoint); // Vzdálenost v metrech
+        let travelTime = distance / vehicle.speed * 1000; // Čas v ms
+
+        vehicle.marker.setLatLng(nextPoint);
+        currentIndex++;
+
+        setTimeout(moveStep, Math.max(1000, travelTime)); // Min. interval 1s
     }
     moveStep();
 }
+
 
 function getRoute(start, roadPoints) {
     if (!start || roadPoints.length === 0) return [];
