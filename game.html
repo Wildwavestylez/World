@@ -482,14 +482,23 @@ function getNearestSegment(vehicle) {
 }
 
 function moveVehicleToSegment(vehicle) {
-    if (vehicle.assignedSegments.length === 0) {
-        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} nemá žádné úseky k opravě.`);
-        return;
+    if (!vehicle.moving) {
+        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} se rozjíždí.`);
     }
 
-    let segment = vehicle.assignedSegments.shift();
+    let segment;
+    if (vehicle.lastSegment) {
+        // Hledáme nejbližší segment k poslednímu opravovanému úseku
+        segment = getNearestSegment(vehicle.lastSegment);
+    } else {
+        // Pokud auto ještě nic neopravovalo, začneme náhodným segmentem
+        let availableSegments = roadSegments.filter(s => s.status === "red" || s.status === "orange");
+        segment = availableSegments[Math.floor(Math.random() * availableSegments.length)];
+    }
+
     if (!segment) {
-        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} už opravilo všechny úseky.`);
+        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} nemá další úseky k opravě, přiděluji nový...`);
+        setTimeout(() => moveVehicleToSegment(vehicle), 3000); // Po 3 sekundách zkusí znovu
         return;
     }
 
@@ -502,6 +511,8 @@ function moveVehicleToSegment(vehicle) {
     }
 
     vehicle.moving = true;
+    vehicle.lastSegment = segment; // Uložíme poslední opravovaný segment
+
     animateVehicleAlongRoute(vehicle, route, () => {
         console.log(`✅ Auto ${vehicle.marker._leaflet_id} dorazilo na silnici ${segment.id}`);
 
@@ -509,19 +520,8 @@ function moveVehicleToSegment(vehicle) {
             repairSegment(segment);
             vehicle.moving = false;
 
-            // Uložíme opravený segment a ignorujeme ho po dobu 20 minut
-            let repairedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
-            repairedSegments[segment.id] = segment.status; 
-            localStorage.setItem("repairedRoads", JSON.stringify(repairedSegments));
-
-            // Najdeme další nejbližší segment, který nebyl opraven nedávno
-            let nextSegment = getNearestSegment(vehicle);
-            if (nextSegment && !repairedSegments[nextSegment.id]) {
-                vehicle.assignedSegments.push(nextSegment);
-                moveVehicleToSegment(vehicle);
-            } else {
-                console.log(`🚗 Auto ${vehicle.marker._leaflet_id} nemá další úseky k opravě.`);
-            }
+            // Po opravě okamžitě hledá nový úsek
+            moveVehicleToSegment(vehicle);
         }, 20000); // Oprava trvá 20 sekund
     });
 }
