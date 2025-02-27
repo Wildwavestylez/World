@@ -509,9 +509,14 @@ function moveVehicleToSegment(vehicle) {
             repairSegment(segment);
             vehicle.moving = false;
 
-            // Najdeme nejbližší segment a pokračujeme
+            // Uložíme opravený segment a ignorujeme ho po dobu 20 minut
+            let repairedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
+            repairedSegments[segment.id] = segment.status; 
+            localStorage.setItem("repairedRoads", JSON.stringify(repairedSegments));
+
+            // Najdeme další nejbližší segment, který nebyl opraven nedávno
             let nextSegment = getNearestSegment(vehicle);
-            if (nextSegment) {
+            if (nextSegment && !repairedSegments[nextSegment.id]) {
                 vehicle.assignedSegments.push(nextSegment);
                 moveVehicleToSegment(vehicle);
             } else {
@@ -520,6 +525,8 @@ function moveVehicleToSegment(vehicle) {
         }, 20000); // Oprava trvá 20 sekund
     });
 }
+
+
 function animateVehicleAlongRoute(vehicle, route, callback) {  
     let currentIndex = 0;  
     let speed = 50 / 3.6; // 50 km/h v m/s ≈ 13.89 m/s
