@@ -389,22 +389,34 @@ function buyMaintenanceVehicle() {
 
     console.log("🚗 Auto zakoupeno a zaparkováno v garáži.");
 }
+
+
 function assignSegmentsToVehicles() {
-    let repairableSegments = roadSegments.filter(s => s.status === "red" || s.status === "orange");
+    let repairableSegments = roadSegments
+        .filter(s => s.status === "red" || s.status === "orange");
 
     if (repairableSegments.length === 0) {
         console.log("✅ Všechny silnice jsou opravené!");
         return;
     }
 
-    maintenanceVehicles.forEach(vehicle => vehicle.assignedSegments = []); // Resetujeme přidělené úseky
+    // Zamícháme pořadí segmentů, aby auta nezačínala vždy stejným směrem
+    repairableSegments = repairableSegments.sort(() => Math.random() - 0.5);
+
+    // Každé auto dostane jiný segment na začátku
+    maintenanceVehicles.forEach(vehicle => vehicle.assignedSegments = []);
 
     repairableSegments.forEach((segment, index) => {
-        let vehicleIndex = index % maintenanceVehicles.length; // Rozdělení úseků rovnoměrně mezi auta
+        let vehicleIndex = index % maintenanceVehicles.length;
         maintenanceVehicles[vehicleIndex].assignedSegments.push(segment);
     });
 
-    maintenanceVehicles.forEach(vehicle => moveVehicleToSegment(vehicle));
+    // Spustíme pohyb aut, pokud ještě nejedou
+    maintenanceVehicles.forEach(vehicle => {
+        if (!vehicle.moving) {
+            moveVehicleToSegment(vehicle);
+        }
+    });
 }
 
 function sendMaintenanceVehicle() {
@@ -428,7 +440,7 @@ function sendMaintenanceVehicle() {
         return;
     }
 
-    // První segment - náhodný výběr
+    // Vybereme první segment náhodně
     let firstSegment = availableSegments[Math.floor(Math.random() * availableSegments.length)];
     vehicle.moving = true;
     vehicle.assignedSegments.push(firstSegment);
