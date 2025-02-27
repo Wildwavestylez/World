@@ -646,7 +646,7 @@ function resetSegment(segmentId) {
 }
 
 // Funkce pro opravu segmentu a změnu barvy na zelenou
-function repairSegment(segment) {
+function repairSegment(segment, vehicle) {
     if (money < 70) {
         alert("Nedostatek peněz na opravu!");
         return;
@@ -660,41 +660,48 @@ function repairSegment(segment) {
         return;
     }
 
-    let newColor;
-    if (segment.status === "red") {
-        segment.status = "orange"; // První oprava, změní na oranžovou
-    } else if (segment.status === "orange") {
-        segment.status = "green"; // Druhá oprava, změní na zelenou
-    } else {
-        console.warn("⚠ Silnice už je zelená.");
+    if (segment.status === "green") {
+        console.warn("⚠ Silnice už je zelená. Auto pokračuje jinam.");
+        moveVehicleToSegment(vehicle); // Po opravě na zelenou pokračuje dál
         return;
     }
 
-    newColor = segment.status;
+    // Změna barvy segmentu
+    if (segment.status === "red") {
+        segment.status = "orange";
+    } else if (segment.status === "orange") {
+        segment.status = "green";
+    }
 
     // Uložíme opravený segment do localStorage
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
-    savedSegments[segment.id] = { status: newColor, lastRepaired: Date.now() }; 
+    savedSegments[segment.id] = { status: segment.status, lastRepaired: Date.now() };
     localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
 
     // Aktualizujeme barvu polyline
     map.removeLayer(segment.polyline);
-    segment.polyline = L.polyline(segment.coordinates, { color: newColor, weight: 3 }).addTo(map);
+    segment.polyline = L.polyline(segment.coordinates, { color: segment.status, weight: 3 }).addTo(map);
 
-    console.log(`✅ Silnice opravena! Nová barva: ${newColor}`);
+    console.log(`✅ Silnice ${segment.id} opravena! Nová barva: ${segment.status}`);
 
-    // Nastavíme 20 minutový časovač pro změnu zpět na červenou
+    // Po opravě segmentu auto pokračuje k dalšímu segmentu
     setTimeout(() => {
-        segment.status = "red"; // Po 20 minutách resetujeme na červenou
-        let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
+        if (segment.status === "green") {
+            vehicle.assignedSegments = vehicle.assignedSegments.filter(s => s.id !== segment.id);
+        }
+        moveVehicleToSegment(vehicle);
+    }, 1000); // Po 1 sekundě auto hledá další segment
+
+    // Časovač pro reset segmentu zpět na červenou
+    setTimeout(() => {
+        segment.status = "red";
         savedSegments[segment.id] = { status: "red", lastRepaired: Date.now() };
         localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
 
-        // Aktualizace barvy na červenou
         map.removeLayer(segment.polyline);
         segment.polyline = L.polyline(segment.coordinates, { color: "red", weight: 3 }).addTo(map);
         console.log(`🛠 Silnice ${segment.id} byla vrácena na červenou po 20 minutách.`);
-    }, 20 * 60 * 1000); // 20 minut v milisekundách
+    }, 20 * 60 * 1000); // 20 minut
 }
 function clearLocalStorage() {
     localStorage.clear();
