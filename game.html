@@ -475,68 +475,46 @@ function getRoute(segment) {
     return segment.coordinates; // Použijeme body segmentu jako trasu
 }
 
-function moveVehicleToSegment(vehicle) {  
-    if (!vehicle || !vehicle.marker) {  
-        console.error("❌ Chyba: Vozidlo neexistuje!");  
-        return;  
-    }
-
-    // Pokud auto ještě nezačalo, vybere si první segment náhodně
+function moveVehicleToSegment(vehicle) {
     if (vehicle.assignedSegments.length === 0) {
-        let availableSegments = roadSegments.filter(s => (s.status === "red" || s.status === "orange") && isInsidePolygon(L.latLng(s.coordinates[0])));
-        
-        if (availableSegments.length === 0) {
-            console.log("✅ Všechny silnice jsou opravené!");
-            vehicle.moving = false;
-            return;
-        }
-
-        let unassignedSegments = availableSegments.filter(s => !isSegmentAssigned(s));
-        if (unassignedSegments.length === 0) unassignedSegments = availableSegments; // Pokud už jsou všechny rozděleny, bereme cokoliv
-
-        let randomIndex = Math.floor(Math.random() * unassignedSegments.length);
-        vehicle.assignedSegments.push(unassignedSegments[randomIndex]);
+        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} nemá žádné úseky k opravě.`);
+        return;
     }
 
-    // Vezmeme první úsek k opravě
-    let segment = vehicle.assignedSegments.shift();  
-    if (!segment || segment.status === "green") {  
-        console.log(`✅ Auto ${vehicle.marker._leaflet_id} přeskočilo zelený úsek.`);
-        moveVehicleToSegment(vehicle);
-        return;  
-    }  
+    // Vyfiltrujeme pouze úseky, které ještě nejsou zelené
+    vehicle.assignedSegments = vehicle.assignedSegments.filter(s => s.status !== "green");
 
-    console.log(`🚗 Auto ${vehicle.marker._leaflet_id} jede opravit silnici ${segment.id}`);  
+    if (vehicle.assignedSegments.length === 0) {
+        console.log(`🚗 Auto ${vehicle.marker._leaflet_id} dokončilo všechny opravy.`);
+        vehicle.moving = false;
+        return;
+    }
 
-    let route = getRoute(vehicle.marker.getLatLng(), segment.coordinates);  
-    if (!route || route.length === 0) {  
-        console.error(`❌ Chyba: Nelze vypočítat trasu pro auto ${vehicle.marker._leaflet_id}!`);  
-        return;  
-    }  
+    // Najdeme nejbližší segment
+    let currentPos = vehicle.marker.getLatLng();
+    let nearestSegment = vehicle.assignedSegments.reduce((prev, curr) => {
+        let prevDist = currentPos.distanceTo(L.latLng(prev.coordinates[0]));
+        let currDist = currentPos.distanceTo(L.latLng(curr.coordinates[0]));
+        return currDist < prevDist ? curr : prev;
+    });
 
-    vehicle.moving = true;  
-    animateVehicleAlongRoute(vehicle, route, () => {  
-        console.log(`✅ Auto ${vehicle.marker._leaflet_id} dorazilo na silnici ${segment.id}`);  
+    console.log(`🚗 Auto ${vehicle.marker._leaflet_id} jede opravit silnici ${nearestSegment.id}`);
 
-        setTimeout(() => {  
-            repairSegment(segment);  
-            console.log(`🔧 Auto ${vehicle.marker._leaflet_id} opravilo silnici ${segment.id}`);  
+    let route = getRoute(vehicle.marker.getLatLng(), nearestSegment.coordinates);
+    if (!route || route.length === 0) {
+        console.error(`❌ Chyba: Nelze vypočítat trasu pro auto ${vehicle.marker._leaflet_id}!`);
+        return;
+    }
 
-            // Najdeme nejbližší sousední segment, ale ignorujeme zelené
-            let nextSegment = findNearestSegment(segment);
-            if (nextSegment) {
-                vehicle.assignedSegments.push(nextSegment);
-                setTimeout(() => {  
-                    moveVehicleToSegment(vehicle); // Pokračuje na další úsek  
-                }, 1000); // Krátká pauza mezi opravami  
-            } else {
-                console.log(`✅ Auto ${vehicle.marker._leaflet_id} dokončilo všechny opravy v okolí.`);
-                vehicle.moving = false;
-            }
-              
-        }, 20000); // Oprava trvá 20 sekund  
-    });  
-}  
+    vehicle.moving = true;
+    animateVehicleAlongRoute(vehicle, route, () => {
+        console.log(`✅ Auto ${vehicle.marker._leaflet_id} dorazilo na silnici ${nearestSegment.id}`);
+
+        setTimeout(() => {
+            repairSegment(nearestSegment, vehicle);
+        }, 20000); // Oprava trvá 20 sekund
+    });
+}
 
 function findNearestSegment(currentSegment) {
     let remainingSegments = roadSegments.filter(s => (s.status === "red" || s.status === "orange") && isInsidePolygon(L.latLng(s.coordinates[0])));
