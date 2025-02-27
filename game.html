@@ -469,16 +469,21 @@ function moveVehicleToSegment(vehicle) {
         return;  
     }
 
-    // Pokud auto ještě nezačalo, vybere si první segment náhodně
+    // Pokud auto ještě nezačalo, vybere si první segment náhodně, ale tak, aby každý měl jiný
     if (vehicle.assignedSegments.length === 0) {
         let availableSegments = roadSegments.filter(s => (s.status === "red" || s.status === "orange") && isInsidePolygon(L.latLng(s.coordinates[0])));
+        
         if (availableSegments.length === 0) {
             console.log("✅ Všechny silnice jsou opravené!");
             vehicle.moving = false;
             return;
         }
-        let randomIndex = Math.floor(Math.random() * availableSegments.length);
-        vehicle.assignedSegments.push(availableSegments[randomIndex]);
+
+        let unassignedSegments = availableSegments.filter(s => !isSegmentAssigned(s));
+        if (unassignedSegments.length === 0) unassignedSegments = availableSegments; // Pokud už jsou všechny rozděleny, bereme cokoliv
+
+        let randomIndex = Math.floor(Math.random() * unassignedSegments.length);
+        vehicle.assignedSegments.push(unassignedSegments[randomIndex]);
     }
 
     // Vezmeme první úsek k opravě
@@ -505,7 +510,7 @@ function moveVehicleToSegment(vehicle) {
             repairSegment(segment);  
             console.log(`🔧 Auto ${vehicle.marker._leaflet_id} opravilo silnici ${segment.id}`);  
 
-            // Najdeme nejbližší sousední segment
+            // Najdeme nejbližší sousední segment, ale ignorujeme zelené
             let nextSegment = findNearestSegment(segment);
             if (nextSegment) {
                 vehicle.assignedSegments.push(nextSegment);
@@ -533,6 +538,11 @@ function findNearestSegment(currentSegment) {
     }, null);
 
     return nearestSegment;
+}
+
+// Kontrola, zda segment už není přiřazen jinému autu
+function isSegmentAssigned(segment) {
+    return maintenanceVehicles.some(vehicle => vehicle.assignedSegments.includes(segment));
 }
 
 
