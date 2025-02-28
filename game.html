@@ -618,7 +618,7 @@ function repairSegment(segment) {
         map.removeLayer(segment.polyline);
         segment.polyline = L.polyline(segment.coordinates, { color: "red", weight: 3 }).addTo(map);
         console.log(`🛠 Silnice ${segment.id} byla vrácena na červenou po 20 minutách.`);
-    }, 20 * 60 * 1000); // 20 minut v milisekundách
+    }, 120 * 60 * 1000); // 20 minut v milisekundách
 }
 function clearLocalStorage() {
     localStorage.clear();
