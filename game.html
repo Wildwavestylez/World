@@ -523,25 +523,43 @@ function getRoute(start, roadPoints) {
 }
 
 
-// Funkce pro načítání stavu segmentů při function loadSegmentStatus() {  
-    let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};  
+// Funkce pro načítání stavu segmentů při function loadSegmentStatus() {
+    let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
 
-    roadSegments.forEach(segment => {  
-        if (savedSegments[segment.id]) {  
-            let elapsedTime = (Date.now() - savedSegments[segment.id].lastRepaired) / 1000 / 60;  
+    roadSegments.forEach(segment => {
+        if (savedSegments[segment.id]) {
+            let elapsedTime = (Date.now() - savedSegments[segment.id].lastRepaired) / 1000 / 60;
 
             // Pokud uplynulo více než 20 minut, resetujeme status na červenou
-            if (elapsedTime > 20) {  
-                segment.status = "red"; 
+            if (elapsedTime > 20) {
+                segment.status = "red";
             } else {
                 segment.status = savedSegments[segment.id].status; // Pokud je v localStorage, použijeme uložený status
             }
 
-            // Aktualizujeme barvu na mapě
+            // Pokud je segment "green", znamená to, že už byl odstraněn z mapy
+            if (segment.status === "green") {
+                // Odstraníme polyline, pokud je segment odstraněn
+                if (segment.polyline) {
+                    map.removeLayer(segment.polyline);
+                    segment.polyline = null; // Nastavíme polyline na null, aby se s ní dál nepracovalo
+                }
+                // Odstraníme segment z roadSegments
+                roadSegments = roadSegments.filter(s => s.id !== segment.id);
+                return; // Pokud je segment "green", už nebudeme pokračovat
+            }
+
+            // Pokud segment má polyline, aktualizujeme barvu
             let color = segment.status === "green" ? "green" : segment.status === "orange" ? "orange" : "red";
-            segment.polyline.setStyle({ color: color });  
-        }  
-    });  
+            if (segment.polyline) {
+                segment.polyline.setStyle({ color: color });
+            } else {
+                // Pokud polyline ještě neexistuje, vytvoříme ji
+                segment.polyline = L.polyline(segment.coordinates, { color: color, weight: 3 }).addTo(map);
+            }
+        }
+    });
+}
 
 
 function updateSegmentColor(segment) {
