@@ -653,9 +653,11 @@ function fetchBusinessesInPolygon(polygonPoints) {
                 lon: element.lon
             }));
 
-            // Přidání do čekací listiny (pokud firma už neexistuje)
+            // Přidání firem s názvem do čekací listiny
             newBusinesses.forEach(business => {
-                if (!waitingBusinesses.some(b => b.id === business.id) &&
+                // Přidáme jen firmy, které mají jméno a ještě nejsou ve seznamu
+                if (business.name !== "Neznámá firma" && 
+                    !waitingBusinesses.some(b => b.id === business.id) &&
                     !approvedBusinesses.some(b => b.id === business.id)) {
                     waitingBusinesses.push(business);
                 }
@@ -683,7 +685,6 @@ function requestBusinessLicense() {
     }
 }
 
-
 let totalTaxes = 0;  // Celkové daně
 
 // Funkce pro výpočet daní na základě počtu obyvatel
@@ -695,6 +696,12 @@ function calculateTaxes(population) {
 function updateMoney() {
     let population = Math.round(calculatePolygonArea(polygonPoints) * populationDensity);
     let taxes = calculateTaxes(population);
+
+    // Přičteme daně z firem
+    approvedBusinesses.forEach(business => {
+        taxes += 20; // Každá schválená firma platí 20 Kč daň za minutu
+    });
+
     money += taxes;  // Přičítáme daně do pokladny
     totalTaxes += taxes;
 
@@ -712,6 +719,7 @@ function updateMoneyDisplay() {
 
 // Zavoláme funkci každou minutu (60000 ms)
 setInterval(updateMoney, 60000); // Každých 60 sekund
+
 // Periodické fetchování firem a žádostí o licenci
 setInterval(() => fetchBusinessesInPolygon(polygonPoints), 120000); // Každé 2 minuty
 setInterval(() => requestBusinessLicense(), 120000); // Každé 2 minuty
