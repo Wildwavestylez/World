@@ -625,73 +625,67 @@ function clearLocalStorage() {
     alert("LocalStorage byl vymazán!");
   }
 
-async function fetchBusinesses(polygonPoints) {
+// Seznam firem čekajících na licenci
+let waitingBusinesses = [];
+let approvedBusinesses = [];
+
+// Funkce pro získání firem v polygonu přes Overpass API
+function fetchBusinessesInPolygon(polygonPoints) {
     let overpassQuery = `
         [out:json];
         (
-            node["shop"](poly:"${formatPolygon(polygonPoints)});
-            node["craft"](poly:"${formatPolygon(polygonPoints)});
-            node["amenity"](poly:"${formatPolygon(polygonPoints)});
+            node["shop"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+            node["amenity"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+            node["craft"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
         );
-        out body;
-    `;
+        out body;`;
 
-    let url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(overpassQuery);
+    let url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
 
-    try {
-        let response = await fetch(url);
-        let data = await response.json();
-        return data.elements.map(node => ({
-            id: node.id,
-            name: node.tags.name || "Neznámý podnik",
-            type: node.tags.shop || node.tags.craft || node.tags.amenity || "Neznámý typ",
-            lat: node.lat,
-            lon: node.lon
-        }));
-    } catch (error) {
-        console.error("Chyba při načítání firem:", error);
-        return [];
-    }
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            let newBusinesses = data.elements.map(element => ({
+                id: element.id,
+                name: element.tags.name || "Neznámá firma",
+                type: element.tags.shop || element.tags.amenity || element.tags.craft || "Jiné",
+                lat: element.lat,
+                lon: element.lon
+            }));
+
+            // Přidání do čekací listiny (pokud firma už neexistuje)
+            newBusinesses.forEach(business => {
+                if (!waitingBusinesses.some(b => b.id === business.id) &&
+                    !approvedBusinesses.some(b => b.id === business.id)) {
+                    waitingBusinesses.push(business);
+                }
+            });
+
+            console.log("Čekací listina firem:", waitingBusinesses);
+        })
+        .catch(error => console.error("Chyba při načítání firem:", error));
 }
 
-// Pomocná funkce pro převod polygonu na formát Overpass API
-function formatPolygon(points) {
-    return points.map(p => `${p[0]} ${p[1]}`).join(" ");
-}
+// Funkce pro výběr firmy k žádosti o licenci
+function requestBusinessLicense() {
+    if (waitingBusinesses.length === 0) return;
 
-async function expandPolygon() {
-    // (zvětšení polygonu zůstává stejné)
-    
-    let newBusinesses = await fetchBusinesses(polygonPoints);
-    
-    newBusinesses.forEach(business => {
-        if (!businesses.some(b => b.id === business.id)) {
-            businesses.push(business);
-            pendingLicenses.push(business); // Přidáme do seznamu žádostí
-        }
-    });
+    let randomIndex = Math.floor(Math.random() * waitingBusinesses.length);
+    let business = waitingBusinesses.splice(randomIndex, 1)[0];
 
-    console.log("Nové firmy:", newBusinesses);
-}
+    let confirmation = confirm(`Firma "${business.name}" (${business.type}) žádá o licenci k podnikání. Udělit licenci?`);
 
-
-setInterval(() => {
-    if (pendingLicenses.length > 0) {
-        let business = pendingLicenses.shift(); // Vezmeme první firmu
-        showLicenseRequest(business);
-    }
-}, 120000);
-
-function showLicenseRequest(business) {
-    let confirmLicense = confirm(`${business.name} (${business.type}) žádá o licenci k podnikání. Udělit licenci?`);
-    
-    if (confirmLicense) {
-        activeBusinesses.push(business);
-        console.log(`${business.name} získal licenci.`);
+    if (confirmation) {
+        approvedBusinesses.push(business);
+        console.log(`Firma ${business.name} schválena, začne platit daně.`);
     } else {
-        console.log(`${business.name} licenci nedostal.`);
+        console.log(`Firma ${business.name} zamítnuta.`);
     }
 }
+
+// Periodické fetchování firem a žádostí o licenci
+setInterval(() => fetchBusinessesInPolygon(polygonPoints), 120000); // Každé 2 minuty
+setInterval(() => requestBusinessLicense(), 120000); // Každé 2 minuty
 </script>
 </body>
 </html>
