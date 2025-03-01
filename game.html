@@ -632,19 +632,24 @@ let approvedBusinesses = [];
 // Funkce pro získání firem v polygonu přes Overpass API
 function fetchBusinessesInPolygon(polygonPoints) {
     let overpassQuery = `
-        [out:json];
-        (
-            node["shop"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-            node["amenity"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
-                ["amenity"~"restaurant|cafe|bar|pub|bank|fuel|pharmacy|hospital|clinic|fast_food|supermarket|convenience"];
-            node["craft"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-            node["industrial"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-            node["man_made"="works"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-            node["building"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
-                ["building"~"industrial|factory|manufacture|warehouse|logistics|retail|department_store|wholesale|mall"];
-        );
-        out body;`;
-
+    [out:json];
+    (
+        node["shop"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+        node["amenity"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
+            ["amenity"~"restaurant|cafe|bar|pub|bank|fuel|pharmacy|hospital|clinic|fast_food|supermarket|convenience|marketplace|townhall|library|school|kindergarten|university|fire_station|police|post_office"];
+        node["craft"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+        node["industrial"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+        node["man_made"="works"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+        node["building"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
+            ["building"~"industrial|factory|manufacture|warehouse|logistics|retail|department_store|wholesale|mall|supermarket|public"];
+        node["landuse"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
+            ["landuse"~"industrial|commercial"];
+        node["office"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
+            ["office"~"company|industrial"];
+        node["power"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
+            ["power"="plant"];
+    );
+    out body;`;
     fetch("https://overpass-api.de/api/interpreter", {
         method: "POST",
         headers: {
