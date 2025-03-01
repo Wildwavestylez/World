@@ -242,7 +242,7 @@ function distance(coord1, coord2) {
                 selectedIndex = randomPoint.index;
             }
 
-            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0012);
+            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0015);
 
             moveTracker[selectedIndex] = 0;
             blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
@@ -625,26 +625,25 @@ function clearLocalStorage() {
     alert("LocalStorage byl vymazán!");
   }
 
-// Seznam firem čekajících na licenci
+/// Seznam firem čekajících na licenci
 let waitingBusinesses = [];
 let approvedBusinesses = [];
 
-
 // Funkce pro získání firem v polygonu přes Overpass API
 function fetchBusinessesInPolygon(polygonPoints) {
- let overpassQuery = `
-    [out:json];
-    (
-        node["shop"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-        node["amenity"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
-            ["amenity"~"restaurant|cafe|bar|pub|bank|fuel|pharmacy|hospital|clinic|fast_food|supermarket|convenience"];
-        node["craft"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-        node["industrial"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-        node["man_made"="works"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-        node["building"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
-            ["building"~"industrial|factory|manufacture|warehouse|logistics|retail|department_store|wholesale|mall"];
-    );
-    out body;`;
+    let overpassQuery = `
+        [out:json];
+        (
+            node["shop"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+            node["amenity"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
+                ["amenity"~"restaurant|cafe|bar|pub|bank|fuel|pharmacy|hospital|clinic|fast_food|supermarket|convenience"];
+            node["craft"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+            node["industrial"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+            node["man_made"="works"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+            node["building"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
+                ["building"~"industrial|factory|manufacture|warehouse|logistics|retail|department_store|wholesale|mall"];
+        );
+        out body;`;
 
     fetch("https://overpass-api.de/api/interpreter", {
         method: "POST",
@@ -665,33 +664,37 @@ function fetchBusinessesInPolygon(polygonPoints) {
             return;
         }
 
-        let newBusinesses = data.elements.map(element => ({
-            id: element.id,
-            name: element.tags.name || "Neznámá firma",
-            type: element.tags.shop || element.tags.amenity || element.tags.craft || "Jiné",
-            lat: element.lat,
-            lon: element.lon
-        }));
+        let newBusinesses = data.elements
+            .filter(element => element.tags.name) // Filtrujeme jen firmy, které mají jméno
+            .map(element => ({
+                id: element.id,
+                name: element.tags.name,
+                type: element.tags.shop || element.tags.amenity || element.tags.craft || "Jiné",
+                lat: element.lat,
+                lon: element.lon
+            }));
 
-        // Přidání firem s názvem do čekací listiny
+        let addedNewBusiness = false;
+
         newBusinesses.forEach(business => {
-            if (business.name !== "Neznámá firma" && 
-                !waitingBusinesses.some(b => b.id === business.id) &&
+            if (!waitingBusinesses.some(b => b.id === business.id) &&
                 !approvedBusinesses.some(b => b.id === business.id)) {
                 waitingBusinesses.push(business);
+                addedNewBusiness = true; // Označíme, že jsme přidali novou firmu
             }
         });
 
         console.log("Čekací listina firem:", waitingBusinesses);
+
+        // Pokud byla přidána nová firma, okamžitě spustíme žádost o licenci
+        if (addedNewBusiness) {
+            requestBusinessLicense();
+        }
     })
     .catch(error => {
         console.error("Chyba při načítání firem:", error);
     });
 }
-
-// Periodické fetchování firem
-setInterval(() => fetchBusinessesInPolygon(polygonPoints), 120000); // Každé 2 minuty
-
 // Funkce pro výběr firmy k žádosti o licenci
 function requestBusinessLicense() {
     if (waitingBusinesses.length === 0) return;
