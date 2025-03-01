@@ -643,8 +643,20 @@ function fetchBusinessesInPolygon(polygonPoints) {
     let url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
 
     fetch(url)
-        .then(response => response.json())
+        .then(response => {
+            // Zkontrolujeme, zda je odpověď v pořádku
+            if (!response.ok) {
+                throw new Error('Chyba při načítání firem: ' + response.statusText);
+            }
+            return response.json(); // Převedeme odpověď na JSON
+        })
         .then(data => {
+            // Zkontrolujeme, zda je odpovědí skutečně objekt s firemními daty
+            if (!data || !data.elements || data.elements.length === 0) {
+                console.log('Nebyly nalezeny žádné firmy.');
+                return;
+            }
+
             let newBusinesses = data.elements.map(element => ({
                 id: element.id,
                 name: element.tags.name || "Neznámá firma",
@@ -665,7 +677,9 @@ function fetchBusinessesInPolygon(polygonPoints) {
 
             console.log("Čekací listina firem:", waitingBusinesses);
         })
-        .catch(error => console.error("Chyba při načítání firem:", error));
+        .catch(error => {
+            console.error("Chyba při načítání firem:", error);
+        });
 }
 
 // Funkce pro výběr firmy k žádosti o licenci
