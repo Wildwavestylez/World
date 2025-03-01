@@ -300,37 +300,41 @@ let money = 20000; // Počáteční stav peněz hráče
         }
 
     function placeTollBooth(latlng) {
-        if (money < 5000) {
-            alert("Nemáš dost peněz na mýtnou bránu!");
-            return;
-        }
-
-        money -= 5000; // Odečtení ceny za mýtnou bránu
-        updateMoneyDisplay();
-
-        let icon = L.icon({
-            iconUrl: "https://i.imgur.com/U2n0VLa.png",
-            iconSize: [32, 32]
-        });
-
-        let marker = L.marker(latlng, { icon }).addTo(map);
-        tollBooths.push(marker);
-
-        // Generování peněz každých 20 sekund
-        setInterval(() => {
-            money += 25;
-            updateMoneyDisplay();
-        }, 15000);
+    if (money < 5000) {
+        alert("Nemáš dost peněz na mýtnou bránu!");
+        return;
     }
 
-    // Přidání možnosti kliknutím na silnici umístit mýtnou bránu
-    map.on("click", function (e) {
-        let clickedLatLng = e.latlng;
-        placeTollBooth(clickedLatLng);
-    });
+    let confirmation = confirm("Chceš postavit mýtnou bránu za 5000 Kč?");
+    if (!confirmation) {
+        return; // Pokud hráč klikne na "Ne", funkce se ukončí
+    }
 
+    money -= 5000; // Odečtení ceny za mýtnou bránu
     updateMoneyDisplay();
 
+    let icon = L.icon({
+        iconUrl: "https://i.imgur.com/U2n0VLa.png",
+        iconSize: [32, 32]
+    });
+
+    let marker = L.marker(latlng, { icon }).addTo(map);
+    tollBooths.push(marker);
+
+    // Generování peněz každých 20 sekund
+    setInterval(() => {
+        money += 25;
+        updateMoneyDisplay();
+    }, 15000);
+}
+
+// Přidání možnosti kliknutím na silnici umístit mýtnou bránu
+map.on("click", function (e) {
+    let clickedLatLng = e.latlng;
+    placeTollBooth(clickedLatLng);
+});
+
+updateMoneyDisplay();
 
 
 function placeGarage() {
