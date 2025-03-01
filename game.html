@@ -625,6 +625,73 @@ function clearLocalStorage() {
     alert("LocalStorage byl vymazán!");
   }
 
+async function fetchBusinesses(polygonPoints) {
+    let overpassQuery = `
+        [out:json];
+        (
+            node["shop"](poly:"${formatPolygon(polygonPoints)});
+            node["craft"](poly:"${formatPolygon(polygonPoints)});
+            node["amenity"](poly:"${formatPolygon(polygonPoints)});
+        );
+        out body;
+    `;
+
+    let url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(overpassQuery);
+
+    try {
+        let response = await fetch(url);
+        let data = await response.json();
+        return data.elements.map(node => ({
+            id: node.id,
+            name: node.tags.name || "Neznámý podnik",
+            type: node.tags.shop || node.tags.craft || node.tags.amenity || "Neznámý typ",
+            lat: node.lat,
+            lon: node.lon
+        }));
+    } catch (error) {
+        console.error("Chyba při načítání firem:", error);
+        return [];
+    }
+}
+
+// Pomocná funkce pro převod polygonu na formát Overpass API
+function formatPolygon(points) {
+    return points.map(p => `${p[0]} ${p[1]}`).join(" ");
+}
+
+async function expandPolygon() {
+    // (zvětšení polygonu zůstává stejné)
+    
+    let newBusinesses = await fetchBusinesses(polygonPoints);
+    
+    newBusinesses.forEach(business => {
+        if (!businesses.some(b => b.id === business.id)) {
+            businesses.push(business);
+            pendingLicenses.push(business); // Přidáme do seznamu žádostí
+        }
+    });
+
+    console.log("Nové firmy:", newBusinesses);
+}
+
+
+setInterval(() => {
+    if (pendingLicenses.length > 0) {
+        let business = pendingLicenses.shift(); // Vezmeme první firmu
+        showLicenseRequest(business);
+    }
+}, 10000);
+
+function showLicenseRequest(business) {
+    let confirmLicense = confirm(`${business.name} (${business.type}) žádá o licenci k podnikání. Udělit licenci?`);
+    
+    if (confirmLicense) {
+        activeBusinesses.push(business);
+        console.log(`${business.name} získal licenci.`);
+    } else {
+        console.log(`${business.name} licenci nedostal.`);
+    }
+}
 </script>
 </body>
 </html>
