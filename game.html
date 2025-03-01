@@ -683,6 +683,35 @@ function requestBusinessLicense() {
     }
 }
 
+
+let totalTaxes = 0;  // Celkové daně
+
+// Funkce pro výpočet daní na základě počtu obyvatel
+function calculateTaxes(population) {
+    return Math.round((population / 100) * 5); // 5 Kč na každých 100 obyvatel
+}
+
+// Funkce pro aktualizaci pokladny (přičtení daní)
+function updateMoney() {
+    let population = Math.round(calculatePolygonArea(polygonPoints) * populationDensity);
+    let taxes = calculateTaxes(population);
+    money += taxes;  // Přičítáme daně do pokladny
+    totalTaxes += taxes;
+
+    console.log(`Daně za tuto minutu: ${taxes.toLocaleString()} Kč`);
+    console.log(`Celkové daně: ${totalTaxes.toLocaleString()} Kč`);
+    
+    // Aktualizace zobrazení peněz
+    updateMoneyDisplay();
+}
+
+// Funkce pro aktualizaci zobrazení stavu pokladny
+function updateMoneyDisplay() {
+    document.getElementById("money").textContent = money.toLocaleString();
+}
+
+// Zavoláme funkci každou minutu (60000 ms)
+setInterval(updateMoney, 60000); // Každých 60 sekund
 // Periodické fetchování firem a žádostí o licenci
 setInterval(() => fetchBusinessesInPolygon(polygonPoints), 120000); // Každé 2 minuty
 setInterval(() => requestBusinessLicense(), 120000); // Každé 2 minuty
