@@ -748,17 +748,7 @@ function updateMoney() {
     updateMoneyDisplay();
 }
 
-function removeRepairedRoad(roadLayer) {
-    setTimeout(() => {
-        map.removeLayer(roadLayer); // Odstranění čáry z mapy
-        console.log("Silnice byla odstraněna z mapy, aby se uvolnila paměť.");
-    }, 30000); // 5 minut (300 000 ms)
-}
 
-// Když se silnice opraví na zelenou:
-if (newColor === "green") {
-    removeRepairedRoad(roadLayer);
-}
 
 // Funkce pro aktualizaci zobrazení stavu pokladny
 function updateMoneyDisplay() {
