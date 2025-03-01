@@ -629,58 +629,68 @@ function clearLocalStorage() {
 let waitingBusinesses = [];
 let approvedBusinesses = [];
 
+
 // Funkce pro získání firem v polygonu přes Overpass API
 function fetchBusinessesInPolygon(polygonPoints) {
-    let overpassQuery = `
-        [out:json];
-        (
-            node["shop"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-            node["amenity"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-            node["craft"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
-        );
-        out body;`;
+ let overpassQuery = `
+    [out:json];
+    (
+        node["shop"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+        node["amenity"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
+            ["amenity"~"restaurant|cafe|bar|pub|bank|fuel|pharmacy|hospital|clinic|fast_food|supermarket|convenience"];
+        node["craft"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+        node["industrial"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+        node["man_made"="works"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}");
+        node["building"](poly:"${polygonPoints.map(p => p.join(' ')).join(' ')}")
+            ["building"~"industrial|factory|manufacture|warehouse|logistics|retail|department_store|wholesale|mall"];
+    );
+    out body;`;
 
-    let url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
+    fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `data=${encodeURIComponent(overpassQuery)}`
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Chyba při načítání firem: ' + response.statusText);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data || !data.elements || data.elements.length === 0) {
+            console.log('Nebyly nalezeny žádné firmy.');
+            return;
+        }
 
-    fetch(url)
-        .then(response => {
-            // Zkontrolujeme, zda je odpověď v pořádku
-            if (!response.ok) {
-                throw new Error('Chyba při načítání firem: ' + response.statusText);
+        let newBusinesses = data.elements.map(element => ({
+            id: element.id,
+            name: element.tags.name || "Neznámá firma",
+            type: element.tags.shop || element.tags.amenity || element.tags.craft || "Jiné",
+            lat: element.lat,
+            lon: element.lon
+        }));
+
+        // Přidání firem s názvem do čekací listiny
+        newBusinesses.forEach(business => {
+            if (business.name !== "Neznámá firma" && 
+                !waitingBusinesses.some(b => b.id === business.id) &&
+                !approvedBusinesses.some(b => b.id === business.id)) {
+                waitingBusinesses.push(business);
             }
-            return response.json(); // Převedeme odpověď na JSON
-        })
-        .then(data => {
-            // Zkontrolujeme, zda je odpovědí skutečně objekt s firemními daty
-            if (!data || !data.elements || data.elements.length === 0) {
-                console.log('Nebyly nalezeny žádné firmy.');
-                return;
-            }
-
-            let newBusinesses = data.elements.map(element => ({
-                id: element.id,
-                name: element.tags.name || "Neznámá firma",
-                type: element.tags.shop || element.tags.amenity || element.tags.craft || "Jiné",
-                lat: element.lat,
-                lon: element.lon
-            }));
-
-            // Přidání firem s názvem do čekací listiny
-            newBusinesses.forEach(business => {
-                // Přidáme jen firmy, které mají jméno a ještě nejsou ve seznamu
-                if (business.name !== "Neznámá firma" && 
-                    !waitingBusinesses.some(b => b.id === business.id) &&
-                    !approvedBusinesses.some(b => b.id === business.id)) {
-                    waitingBusinesses.push(business);
-                }
-            });
-
-            console.log("Čekací listina firem:", waitingBusinesses);
-        })
-        .catch(error => {
-            console.error("Chyba při načítání firem:", error);
         });
+
+        console.log("Čekací listina firem:", waitingBusinesses);
+    })
+    .catch(error => {
+        console.error("Chyba při načítání firem:", error);
+    });
 }
+
+// Periodické fetchování firem
+setInterval(() => fetchBusinessesInPolygon(polygonPoints), 120000); // Každé 2 minuty
 
 // Funkce pro výběr firmy k žádosti o licenci
 function requestBusinessLicense() {
@@ -721,7 +731,7 @@ function updateMoney() {
 
     console.log(`Daně za tuto minutu: ${taxes.toLocaleString()} Kč`);
     console.log(`Celkové daně: ${totalTaxes.toLocaleString()} Kč`);
-    
+
     // Aktualizace zobrazení peněz
     updateMoneyDisplay();
 }
@@ -737,6 +747,9 @@ setInterval(updateMoney, 60000); // Každých 60 sekund
 // Periodické fetchování firem a žádostí o licenci
 setInterval(() => fetchBusinessesInPolygon(polygonPoints), 120000); // Každé 2 minuty
 setInterval(() => requestBusinessLicense(), 120000); // Každé 2 minuty
+</script>
+</body>
+</html>
 </script>
 </body>
 </html>
