@@ -680,7 +680,7 @@ setInterval(() => {
         let business = pendingLicenses.shift(); // Vezmeme první firmu
         showLicenseRequest(business);
     }
-}, 10000);
+}, 120000);
 
 function showLicenseRequest(business) {
     let confirmLicense = confirm(`${business.name} (${business.type}) žádá o licenci k podnikání. Udělit licenci?`);
