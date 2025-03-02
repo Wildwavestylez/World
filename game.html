@@ -82,7 +82,8 @@ function fetchRoads(bounds) {
                 let coordinates = way.geometry.map(node => [node.lat, node.lon]);
                 let segmentId = way.id;
 
-                let segmentColor = savedSegments[segmentId] || "red"; // Pokud je v localStorage, použijeme uloženou barvu
+                // Představujeme zde kontrolu, zda existuje záznam pro tento segment v localStorage
+                let segmentColor = savedSegments[segmentId] ? savedSegments[segmentId].status : "red";  // Pokud je segment v localStorage, použije uloženou barvu, jinak nastaví výchozí červenou
 
                 let polyline = L.polyline(coordinates, { color: segmentColor, weight: 3 }).addTo(map);
 
