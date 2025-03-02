@@ -546,18 +546,14 @@ function loadSegmentStatus() {
     });  
 }
 
-// Funkce pro aktualizaci barvy segmentu  
 // Funkce pro aktualizaci barvy segmentu
 function updateSegmentColor(segment) {
     if (segment.status === "green") {
-        // Pokud je segment zelený, úplně ho odstraníme z mapy po 1 minutě
+        // Pokud je segment zelený, změníme barvu na průhlednou místo odstranění
         if (segment.polyline) {
-            setTimeout(() => {
-                map.removeLayer(segment.polyline);
-                segment.polyline = null;
-                console.log(`🟢 Segment ${segment.id} byl odstraněn z mapy po 1 minutě.`);
-            }, 60000); // 1 minuta v milisekundách
+            segment.polyline.setStyle({ color: "rgba(0, 255, 0, 0)" }); // Průhledná barva
         }
+        console.log(`🟢 Segment ${segment.id} je nyní neviditelný.`);
         return;
     }
 
@@ -605,21 +601,19 @@ function repairSegment(segment) {
     localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
 
     // Aktualizujeme barvu polyline
-    map.removeLayer(segment.polyline);
-    segment.polyline = L.polyline(segment.coordinates, { color: newColor, weight: 3 }).addTo(map);
+    map.removeLayer(segment.polyline); // Smažeme starý segment z mapy
+    segment.polyline = L.polyline(segment.coordinates, { color: newColor, weight: 3 }).addTo(map); // Přidáme nový segment
 
     console.log(`✅ Silnice opravena! Nová barva: ${newColor}`);
 
-    // Odstraníme segment po 1 minutě, když je zelený
+    // Pokud je segment zelený, změňme barvu na průhlednou po 1 minutě
     if (segment.status === "green") {
         setTimeout(() => {
-            map.removeLayer(segment.polyline);
-            segment.polyline = null;
-            console.log(`🟢 Segment ${segment.id} byl odstraněn z mapy po 1 minutě.`);
+            segment.polyline.setStyle({ color: "rgba(0, 255, 0, 0)" }); // Nastavíme barvu na průhlednou
+            console.log(`🟢 Segment ${segment.id} je nyní neviditelný.`);
         }, 60000); // 1 minuta v milisekundách
     }
 }
-
 
 function clearLocalStorage() {
     localStorage.clear();
