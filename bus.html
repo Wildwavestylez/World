@@ -70,91 +70,22 @@
         let expansionCost = 100; // Cena za jeden pohyb polygonu
         let isExpanding = false; // Flag, zda probíhá rozšiřování
 
-        // Funkce pro výpočet vzdálenosti mezi dvěma geografickými body
-        function haversine(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Poloměr Země v km
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c; // Vzdálenost v kilometrech
-        }
-
-        // Funkce pro rozdělení přímky
-        function splitLine(point1, point2) {
-            let midPoint = [
-                (point1[0] + point2[0]) / 2,
-                (point1[1] + point2[1]) / 2
-            ];
-            return midPoint;
-        }
-
-        // Funkce pro rozšíření polygonu
-        function expandPolygon() {
-            if (!isExpanding || money < expansionCost) {
-                alert("Nemáte dostatek peněz na rozšíření území!");
-                return;
-            }
-
-            let center = getCentroid(polygonPoints);
-            let totalPoints = polygonPoints.length;
-
-            let availablePoints = polygonPoints
-                .map((point, index) => ({ point, index }))
-                .filter(({ index }) => !blockedPoints[index]);
-
-            if (availablePoints.length === 0) return;
-
-            let forcedMoveIndex = moveTracker.indexOf(Math.max(...moveTracker));
-            let mustMove = moveTracker[forcedMoveIndex] >= totalPoints;
-
-            let selectedIndex;
-            if (mustMove) {
-                selectedIndex = forcedMoveIndex;
-            } else {
-                let randomPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
-                selectedIndex = randomPoint.index;
-            }
-
-            // Kontrola přímek a dělení, pokud je vzdálenost > 2 km
-            for (let i = 0; i < polygonPoints.length; i++) {
-                let nextIndex = (i + 1) % polygonPoints.length;
-                let dist = haversine(polygonPoints[i][0], polygonPoints[i][1], polygonPoints[nextIndex][0], polygonPoints[nextIndex][1]);
-
-                if (dist > 2) { // Pokud je vzdálenost > 2 km, rozdělíme přímku
-                    let newPoint = splitLine(polygonPoints[i], polygonPoints[nextIndex]);
-                    polygonPoints.splice(nextIndex, 0, newPoint);  // Přidáme nový bod do poloviny
-                    moveTracker.push(0);
-                }
-            }
-
-            polygon.setLatLngs(polygonPoints);
-
-            let area = calculatePolygonArea(polygonPoints);
-            let population = Math.round(area * populationDensity);
-
-            document.getElementById("area").textContent = area.toFixed(2);
-            document.getElementById("population").textContent = population.toLocaleString();
-            document.getElementById("money").textContent = money;
-
-            // Odpočítat peníze
-            money -= expansionCost;
-            document.getElementById("money").textContent = money;
-
-            // Pokud peníze dojdou, zastavit rozšiřování
-            if (money < expansionCost) {
-                isExpanding = false;
-                document.getElementById("expandButton").disabled = true;
-            }
-        }
+        
 
         // Funkce pro získání těžiště polygonu
         function getCentroid(points) {
             let latSum = 0, lngSum = 0;
             points.forEach(p => { latSum += p[0]; lngSum += p[1]; });
             return [latSum / points.length, lngSum / points.length];
+        }
+
+        // Funkce pro posun bodu od středu
+        function movePointAway(point, center, distance) {
+            let latDiff = point[0] - center[0];
+            let lngDiff = point[1] - center[1];
+            let length = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+            let scale = distance / length;
+            return [point[0] + latDiff * scale, point[1] + lngDiff * scale];
         }
 
         // Funkce pro výpočet plochy polygonu (v km²)
@@ -177,6 +108,124 @@
 
             area = Math.abs(area * earthRadius * earthRadius / 2);
             return area;
+        }
+
+        // Funkce pro výpočet vzdálenosti mezi dvěma body v kilometrech
+function distance(coord1, coord2) {
+    const earthRadius = 6371; // Poloměr Země v km
+    const lat1 = coord1[0] * Math.PI / 180;
+    const lon1 = coord1[1] * Math.PI / 180;
+    const lat2 = coord2[0] * Math.PI / 180;
+    const lon2 = coord2[1] * Math.PI / 180;
+
+    const dlat = lat2 - lat1;
+    const dlng = lon2 - lon1;
+
+    const a = Math.sin(dlat / 2) * Math.sin(dlat / 2) +
+              Math.cos(lat1) * Math.cos(lat2) *
+              Math.sin(dlng / 2) * Math.sin(dlng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return earthRadius * c; // Vzdálenost v kilometrech
+}
+
+// Funkce pro kontrolu a rozdělení dlouhých přímek
+function checkAndSplitLongEdges() {
+    const maxDistance = 2; // Maximální vzdálenost pro rozdělení přímky (v km)
+    let newPolygonPoints = [];
+    let newMoveTracker = [];
+    let newBlockedPoints = {};
+
+    for (let i = 0; i < polygonPoints.length; i++) {
+        const p1 = polygonPoints[i];
+        const p2 = polygonPoints[(i + 1) % polygonPoints.length];
+        const dist = distance(p1, p2);
+
+        // Pokud vzdálenost mezi body překročí 2 km, rozdělíme přímku
+        if (dist > maxDistance) {
+            const midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+            newPolygonPoints.push(p1, midPoint);
+            newMoveTracker.push(0, 0); // Přidáme nový pohyblivý bod
+        } else {
+            newPolygonPoints.push(p1);
+            newMoveTracker.push(0);
+        }
+    }
+
+    // Zajistíme, že nový bod bude spojen zpět do polygonu
+    newPolygonPoints.push(polygonPoints[polygonPoints.length - 1]);
+    moveTracker = newMoveTracker;
+    polygonPoints = newPolygonPoints;
+
+    polygon.setLatLngs(polygonPoints);
+}
+
+// Funkce pro rozšiřování polygonu s kontrolou délky přímek
+function expandPolygon() {
+    if (!isExpanding || money < expansionCost) {
+        alert("Nemáte dostatek peněz na rozšíření území!");
+        return;
+    }
+
+    checkAndSplitLongEdges();  // Kontrola a rozdělení dlouhých přímek
+
+    let center = getCentroid(polygonPoints);
+    let totalPoints = polygonPoints.length;
+    let maxWaitTurns = Math.floor(1.5 * totalPoints);
+
+    let availablePoints = polygonPoints
+        .map((point, index) => ({ point, index }))
+        .filter(({ index }) => !blockedPoints[index]);
+
+    if (availablePoints.length === 0) return;
+
+    let forcedMoveIndex = moveTracker.indexOf(Math.max(...moveTracker));
+    let mustMove = moveTracker[forcedMoveIndex] >= maxWaitTurns;
+
+    let selectedIndex;
+    if (mustMove) {
+        selectedIndex = forcedMoveIndex;
+    } else {
+        let randomPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
+        selectedIndex = randomPoint.index;
+    }
+
+    polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0015);
+
+    moveTracker[selectedIndex] = 0;
+    blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
+
+    for (let i = 0; i < moveTracker.length; i++) {
+        if (i !== selectedIndex) moveTracker[i]++;
+    }
+
+    polygon.setLatLngs(polygonPoints);
+
+    let area = calculatePolygonArea(polygonPoints);
+    let population = Math.round(area * populationDensity);
+
+    document.getElementById("area").textContent = area.toFixed(2);
+    document.getElementById("population").textContent = population.toLocaleString();
+    document.getElementById("money").textContent = money;
+
+    // Odpočítat peníze
+    money -= expansionCost;
+    document.getElementById("money").textContent = money;
+
+    // Pokud peníze dojdou, zastavit rozšiřování
+    if (money < expansionCost) {
+        isExpanding = false;
+        document.getElementById("expandButton").disabled = true;
+    }
+}
+        // Funkce pro odemknutí zablokovaných bodů
+        function unlockBlockedPoints() {
+            let currentTime = Date.now();
+            for (let index in blockedPoints) {
+                if (currentTime >= blockedPoints[index]) {
+                    delete blockedPoints[index];
+                }
+            }
         }
 
         // Funkce pro začátek hry – kliknutí na mapu a potvrzení
