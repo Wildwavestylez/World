@@ -1,97 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="cs">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map Game</title>
+    <title>Rozšiřující se polygon</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        #map { height: 500px; width: 100%; }
-        #confirmation {
-            display: none;
-            position: absolute;
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+        #map {
+            width: 100%;
+            height: 78vh;
+        }
+        #info {
+            padding: 16px;
             background: white;
-            padding: 10px;
-            border: 1px solid #ccc;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            border-top: 1px solid #ccc;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
         }
     </style>
 </head>
 <body>
-
-    <div id="map"></div>
-    <div id="confirmation">
-        <p>Chcete začít ve zvolené oblasti?</p>
-        <button id="confirmBtn">Potvrdit</button>
-        <button id="cancelBtn">Zrušit</button>
+    <div id="map"></div>  
+    <div id="info">
+        Peníze: <span id="money">20000</span> Kč | 
+        Rozloha: <span id="area">0</span> km² | 
+        Počet obyvatel: <span id="population">0</span>
     </div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         // Inicializace mapy
-        var map = L.map('map').setView([49.540, 14.140], 12);  // Nastavit na výchozí polohu (Lčovice)
+        let map = L.map('map').setView([49.1151400, 13.8285094], 13);
 
-        // Přidání dlaždic mapy
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        let selectedCenter = null;
-        let polygon = null;
-
-        // Funkce pro kliknutí na mapu
-        map.on('click', function(event) {
-            selectedCenter = event.latlng;
-            
-            // Zobrazíme potvrzovací okno
-            document.getElementById('confirmation').style.display = 'block';
-            
-            // Zobrazíme pozici, kde hráč kliknul
-            let coords = selectedCenter.lat.toFixed(4) + ', ' + selectedCenter.lng.toFixed(4);
-            document.getElementById('confirmation').innerHTML = `
-                <p>Chcete začít ve zvolené oblasti?</p>
-                <p>Souřadnice: ${coords}</p>
-                <button id="confirmBtn">Potvrdit</button>
-                <button id="cancelBtn">Zrušit</button>
-            `;
-
-            // Po potvrzení vytvoříme nový polygon s tímto středem
-            document.getElementById('confirmBtn').addEventListener('click', function() {
-                document.getElementById('confirmation').style.display = 'none';
-                
-                // Nastavení nového středu pro polygon
-                let center = [selectedCenter.lat, selectedCenter.lng];
-                
-                // Nastavení polygonu kolem nového středu
-                let polygonPoints = [
-                    [center[0] + 0.002, center[1] - 0.002],
-                    [center[0] + 0.002, center[1] + 0.002],
-                    [center[0] - 0.002, center[1] + 0.002],
-                    [center[0] - 0.002, center[1] - 0.002]
-                ];
-                
-                // Aktualizujeme mapu a polygon
-                if (polygon) polygon.remove();
-                polygon = L.polygon(polygonPoints, { color: 'blue' }).addTo(map);
-                
-                // Obnovíme proměnné a UI pro nový start
-                // Například sledování pohybu bodů atd.
-            });
-
+        let polygonPoints = [];
+        let center = [0, 0];  // Výchozí střed bude 0, 0, ale změní se po výběru hráče
+        let polygon = L.polygon([], { color: 'blue' }).addTo(map);
 
         let blockedPoints = {};
-        let moveTracker = Array(polygonPoints.length).fill(0);
+        let moveTracker = [];
 
-        let populationDensity = 80; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
+        let populationDensity = 130; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
+        let money = 20000; // Počáteční peníze
 
+        // Funkce pro výpočet vzdálenosti mezi dvěma body
+        function distance(coord1, coord2) {
+            let latDiff = coord1[0] - coord2[0];
+            let lonDiff = coord1[1] - coord2[1];
+            return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
+        }
+
+        // Funkce pro získání těžiště polygonu
         function getCentroid(points) {
             let latSum = 0, lngSum = 0;
             points.forEach(p => { latSum += p[0]; lngSum += p[1]; });
             return [latSum / points.length, lngSum / points.length];
         }
 
+        // Funkce pro posun bodu od středu
         function movePointAway(point, center, distance) {
             let latDiff = point[0] - center[0];
             let lngDiff = point[1] - center[1];
@@ -100,6 +78,7 @@
             return [point[0] + latDiff * scale, point[1] + lngDiff * scale];
         }
 
+        // Funkce pro výpočet plochy polygonu (v km²)
         function calculatePolygonArea(points) {
             let earthRadius = 6371; // Poloměr Země v km
             let area = 0;
@@ -121,6 +100,7 @@
             return area;
         }
 
+        // Funkce pro rozšiřování polygonu
         function expandPolygon() {
             let center = getCentroid(polygonPoints);
             let totalPoints = polygonPoints.length;
@@ -143,26 +123,13 @@
                 selectedIndex = randomPoint.index;
             }
 
-            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0027);
+            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0015);
 
             moveTracker[selectedIndex] = 0;
-            blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 60000;
+            blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
             for (let i = 0; i < moveTracker.length; i++) {
                 if (i !== selectedIndex) moveTracker[i]++;
-            }
-
-            for (let i = 0; i < polygonPoints.length; i++) {
-                let p1 = polygonPoints[i];
-                let p2 = polygonPoints[(i + 1) % polygonPoints.length];
-
-                let distance = Math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2);
-                if (distance > 0.009) {
-                    let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
-                    polygonPoints.splice(i + 1, 0, midPoint);
-                    moveTracker.splice(i + 1, 0, 0);
-                    break;
-                }
             }
 
             polygon.setLatLngs(polygonPoints);
@@ -172,8 +139,10 @@
 
             document.getElementById("area").textContent = area.toFixed(2);
             document.getElementById("population").textContent = population.toLocaleString();
+            document.getElementById("money").textContent = money;
         }
 
+        // Funkce pro odemknutí zablokovaných bodů
         function unlockBlockedPoints() {
             let currentTime = Date.now();
             for (let index in blockedPoints) {
@@ -183,10 +152,31 @@
             }
         }
 
+        // Funkce pro začátek hry – kliknutí na mapu a potvrzení
+        map.on('click', function(event) {
+            if (polygonPoints.length === 0) {  // Umožní výběr místa pouze jednou
+                let latlng = event.latlng;
+                if (confirm("Chcete začít hru v tomto místě?")) {
+                    center = [latlng.lat, latlng.lng];
+                    polygonPoints = [
+                        [center[0] + 0.002, center[1] - 0.002],
+                        [center[0] + 0.002, center[1] + 0.002],
+                        [center[0] - 0.002, center[1] + 0.002],
+                        [center[0] - 0.002, center[1] - 0.002]
+                    ];
+                    polygon.setLatLngs(polygonPoints);
+                    expandPolygon();  // Začne rozšiřování polygonu
+                }
+            }
+        });
+
+        // Startovací funkce pro rozšiřování
         setInterval(() => {
-            expandPolygon();
-            unlockBlockedPoints();
-        }, 60000);
+            if (polygonPoints.length > 0) {  // Pokud je polygon inicializován
+                expandPolygon();
+                unlockBlockedPoints();
+            }
+        }, 1000);
     </script>
 </body>
 </html>
