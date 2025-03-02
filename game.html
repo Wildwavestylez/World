@@ -72,8 +72,7 @@ const maintenanceVehicleIcon = L.icon({
 });
 
 function fetchRoads(bounds) {
-    let query = `[out:json];way["highway"~"primary|secondary|tertiary|residential|unclassified|motorway"]
-        (${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out geom;`;
+    let query = `[out:json];way["highway"]( ${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out geom;`;
 
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
@@ -81,24 +80,17 @@ function fetchRoads(bounds) {
             let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
             data.elements.forEach(way => {
                 let coordinates = way.geometry.map(node => [node.lat, node.lon]);
-                let segmentId = way.id;
+                let segmentId = way.id; 
 
-                let segmentColor = savedSegments[segmentId] ? savedSegments[segmentId].status : "red";
-
-                // 🚨 Pokud je segment "transparent", NEVYKRESLUJEME HO
-                if (segmentColor === "transparent") {
-                    console.log(`🚫 Segment ${segmentId} je transparentní, nebude vykreslen.`);
-                    return;
-                }
+                let segmentColor = savedSegments[segmentId] || "red"; // Pokud je v localStorage, použijeme uloženou barvu
 
                 let polyline = L.polyline(coordinates, { color: segmentColor, weight: 3 }).addTo(map);
+
                 roadSegments.push({ id: segmentId, coordinates, polyline, status: segmentColor });
             });
         })
         .catch(error => console.error("❌ Chyba při načítání silnic:", error));
 }
-
-
 // Funkce pro rozdělení silnice na úseky po 200 metrech
 function splitRoadIntoSegments(coords, segmentLength) {
     let segments = [];
@@ -551,17 +543,18 @@ function loadSegmentStatus() {
         }  
     });  
 }
+
 // Funkce pro aktualizaci barvy segmentu  
-function updateSegmentColor(segment) {  
-    if (segment.status === "transparent") {  
-        // Pokud je segment průhledný, úplně ho odstraníme z mapy  
-        if (segment.polyline) {  
-            map.removeLayer(segment.polyline);  
-            segment.polyline = null;  
-        }  
-        console.log(`🔲 Segment ${segment.id} odstraněn z mapy.`);  
-        return;  
-    }  
+function updateSegmentColor(segment) {
+    if (segment.status === "green") {
+        // Pokud je segment zelený, úplně ho odstraníme z mapy
+        if (segment.polyline) {
+            map.removeLayer(segment.polyline);
+            segment.polyline = null;
+        }
+        console.log(`🟢 Segment ${segment.id} odstraněn z mapy.`);
+        return;
+    }
 
     let color = segment.status === "orange" ? "orange" : "red";  
 
@@ -571,10 +564,27 @@ function updateSegmentColor(segment) {
         segment.polyline = L.polyline(segment.coordinates, { color: color, weight: 3 }).addTo(map);  
     }  
 
-    console.log(`🎨 Segment ${segment.id} nastaven na barvu ${color}.`);  
-}  
+    console.log(`🎨 Segment ${segment.id} nastaven na barvu ${color}.`);
+}
+// Funkce pro resetování segmentu na červenou po 20 minutách
+function resetSegment(segmentId) {
+    let segment = roadSegments.find(s => s.id === segmentId);
+    if (segment) {
+        segment.status = "red";
+        console.log(`🔴 Segment ${segment.id} se vrátil na červenou.`);
 
-// Funkce pro opravu segmentu a změnu barvy na průhlednou  
+        updateSegmentColor(segment);
+
+        let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
+        savedSegments[segment.id] = {
+            status: "red",
+            lastRepaired: Date.now()
+        };
+        localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
+    }
+}
+
+// Funkce pro opravu segmentu a změnu barvy na zelenou
 function repairSegment(segment) {
     if (money < 70) {
         alert("Nedostatek peněz na opravu!");
@@ -589,27 +599,41 @@ function repairSegment(segment) {
         return;
     }
 
+    let newColor;
     if (segment.status === "red") {
-        segment.status = "orange"; // První oprava -> oranžová
+        segment.status = "orange"; // První oprava, změní na oranžovou
     } else if (segment.status === "orange") {
-        segment.status = "transparent"; // Druhá oprava -> průhledná (odstranit)
-        map.removeLayer(segment.polyline); // Úplně odstranit z mapy
-        segment.polyline = null; // Zrušit referenci na polyline
+        segment.status = "green"; // Druhá oprava, změní na zelenou
     } else {
-        console.warn("⚠ Tento segment už byl opraven.");
+        console.warn("⚠ Silnice už je zelená.");
         return;
     }
 
-    // Uložit do localStorage
+    newColor = segment.status;
+
+    // Uložíme opravený segment do localStorage
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
-    savedSegments[segment.id] = { status: segment.status };
+    savedSegments[segment.id] = { status: newColor, lastRepaired: Date.now() }; 
     localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
 
-    if (segment.status !== "transparent") {
-        segment.polyline.setStyle({ color: segment.status });
-    }
+    // Aktualizujeme barvu polyline
+    map.removeLayer(segment.polyline);
+    segment.polyline = L.polyline(segment.coordinates, { color: newColor, weight: 3 }).addTo(map);
 
-    console.log(`✅ Silnice ${segment.id} opravena! Nová barva: ${segment.status}`);
+    console.log(`✅ Silnice opravena! Nová barva: ${newColor}`);
+
+    // Nastavíme 20 minutový časovač pro změnu zpět na červenou
+    setTimeout(() => {
+        segment.status = "red"; // Po 20 minutách resetujeme na červenou
+        let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
+        savedSegments[segment.id] = { status: "red", lastRepaired: Date.now() };
+        localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
+
+        // Aktualizace barvy na červenou
+        map.removeLayer(segment.polyline);
+        segment.polyline = L.polyline(segment.coordinates, { color: "red", weight: 3 }).addTo(map);
+        console.log(`🛠 Silnice ${segment.id} byla vrácena na červenou po 20 minutách.`);
+    }, 120 * 60 * 1000); // 20 minut v milisekundách
 }
 function clearLocalStorage() {
     localStorage.clear();
