@@ -72,7 +72,7 @@ const maintenanceVehicleIcon = L.icon({
 });
 
 function fetchRoads(bounds) {
-    let query = `[out:json];way["highway"]( ${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out geom;`;
+    let query = `[out:json];way["highway"~"primary|secondary|tertiary|residential|unclassified|motorway"]( ${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out geom;`;
 
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
@@ -80,7 +80,7 @@ function fetchRoads(bounds) {
             let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
             data.elements.forEach(way => {
                 let coordinates = way.geometry.map(node => [node.lat, node.lon]);
-                let segmentId = way.id; 
+                let segmentId = way.id;
 
                 let segmentColor = savedSegments[segmentId] || "red"; // Pokud je v localStorage, použijeme uloženou barvu
 
@@ -91,6 +91,8 @@ function fetchRoads(bounds) {
         })
         .catch(error => console.error("❌ Chyba při načítání silnic:", error));
 }
+
+
 // Funkce pro rozdělení silnice na úseky po 200 metrech
 function splitRoadIntoSegments(coords, segmentLength) {
     let segments = [];
