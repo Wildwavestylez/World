@@ -72,7 +72,8 @@ const maintenanceVehicleIcon = L.icon({
 });
 
 function fetchRoads(bounds) {
-    let query = `[out:json];way["highway"~"primary|secondary|tertiary|residential|unclassified|motorway"]( ${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out geom;`;
+    let query = `[out:json];way["highway"~"primary|secondary|tertiary|residential|unclassified|motorway"]
+        (${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out geom;`;
 
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
@@ -82,11 +83,15 @@ function fetchRoads(bounds) {
                 let coordinates = way.geometry.map(node => [node.lat, node.lon]);
                 let segmentId = way.id;
 
-                // Představujeme zde kontrolu, zda existuje záznam pro tento segment v localStorage
-                let segmentColor = savedSegments[segmentId] ? savedSegments[segmentId].status : "red";  // Pokud je segment v localStorage, použije uloženou barvu, jinak nastaví výchozí červenou
+                let segmentColor = savedSegments[segmentId] ? savedSegments[segmentId].status : "red";
+
+                // 🚨 Pokud je segment "transparent", NEVYKRESLUJEME HO
+                if (segmentColor === "transparent") {
+                    console.log(`🚫 Segment ${segmentId} je transparentní, nebude vykreslen.`);
+                    return;
+                }
 
                 let polyline = L.polyline(coordinates, { color: segmentColor, weight: 3 }).addTo(map);
-
                 roadSegments.push({ id: segmentId, coordinates, polyline, status: segmentColor });
             });
         })
@@ -585,32 +590,27 @@ function repairSegment(segment) {
     }
 
     if (segment.status === "red") {
-        segment.status = "orange"; // První oprava - změní na oranžovou
+        segment.status = "orange"; // První oprava -> oranžová
     } else if (segment.status === "orange") {
-        segment.status = "transparent"; // Druhá oprava - změní na průhlednou
+        segment.status = "transparent"; // Druhá oprava -> průhledná (odstranit)
+        map.removeLayer(segment.polyline); // Úplně odstranit z mapy
+        segment.polyline = null; // Zrušit referenci na polyline
     } else {
-        console.warn("⚠ Silnice už je opravena.");
+        console.warn("⚠ Tento segment už byl opraven.");
         return;
     }
 
-    // Uložíme nový stav do localStorage
+    // Uložit do localStorage
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
-    savedSegments[segment.id] = { status: segment.status, lastRepaired: Date.now() }; 
+    savedSegments[segment.id] = { status: segment.status };
     localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
 
-    if (segment.status === "transparent") {
-        // **Pokud je segment opraven podruhé, odstraníme ho z mapy**
-        map.removeLayer(segment.polyline);
-        segment.polyline = null; // Zabráníme dalšímu pokusu o změnu barvy
-        console.log(`✅ Silnice ${segment.id} opravena a odstraněna z mapy.`);
-    } else {
-        // **Jinak jen změníme barvu**
+    if (segment.status !== "transparent") {
         segment.polyline.setStyle({ color: segment.status });
-        console.log(`🎨 Silnice ${segment.id} opravena! Nová barva: ${segment.status}`);
     }
+
+    console.log(`✅ Silnice ${segment.id} opravena! Nová barva: ${segment.status}`);
 }
-
-
 function clearLocalStorage() {
     localStorage.clear();
     alert("LocalStorage byl vymazán!");
