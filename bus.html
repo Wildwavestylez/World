@@ -302,6 +302,32 @@ document.body.appendChild(resumeButton);
                 unlockBlockedPoints();
             }
         }, 1000);
+
+// Funkce pro načtení autobusových zastávek z Overpass API
+function loadBusStops() {
+    const overpassUrl = 'https://overpass-api.de/api/interpreter?data=[out:json];(node[amenity=bus_station];node[highway=bus_stop];);out;';
+    
+    fetch(overpassUrl)
+        .then(response => response.json())
+        .then(data => {
+            const busStops = data.elements;
+            
+            // Zobrazíme zastávky na mapě
+            busStops.forEach(stop => {
+                const lat = stop.lat;
+                const lon = stop.lon;
+                
+                // Vytvoříme marker pro zastávku
+                const marker = L.marker([lat, lon])
+                    .addTo(map)
+                    .bindPopup(`Zastávka: ${stop.tags.name || 'N/A'}`);
+            });
+        })
+        .catch(error => console.error('Chyba při načítání dat z Overpass API:', error));
+}
+
+// Zavoláme funkci pro načtení zastávek
+loadBusStops();
     </script>
 </body>
 </html>
