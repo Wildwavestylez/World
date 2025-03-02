@@ -303,6 +303,9 @@ document.body.appendChild(resumeButton);
             }
         }, 1000);
 
+// Pole pro ukládání zastávek
+let busStops = [];
+
 // Funkce pro načtení autobusových zastávek z Overpass API
 function loadBusStops() {
     let bounds = map.getBounds();
