@@ -78,7 +78,14 @@ function fetchRoads(bounds) {
         .then(response => response.json())
         .then(data => {
             let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
+
             data.elements.forEach(way => {
+                // Kontrola, zda cesta není polní nebo lesní
+                if (way.tags && (way.tags.highway === "track" || way.tags.highway === "path")) {
+                    console.log(`⛔ Vynechán segment ${way.id} (polní/lesní cesta).`);
+                    return; // Přeskočíme tento segment
+                }
+
                 let coordinates = way.geometry.map(node => [node.lat, node.lon]);
                 let segmentId = way.id; 
 
@@ -91,6 +98,8 @@ function fetchRoads(bounds) {
         })
         .catch(error => console.error("❌ Chyba při načítání silnic:", error));
 }
+
+
 // Funkce pro rozdělení silnice na úseky po 200 metrech
 function splitRoadIntoSegments(coords, segmentLength) {
     let segments = [];
