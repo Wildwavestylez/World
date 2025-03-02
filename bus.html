@@ -129,6 +129,38 @@ function distance(coord1, coord2) {
     return earthRadius * c; // Vzdálenost v kilometrech
 }
 
+// Funkce pro získání centroidu polygonu
+function getCentroid(polygonPoints) {
+    let x = 0, y = 0, area = 0;
+
+    for (let i = 0; i < polygonPoints.length; i++) {
+        const p1 = polygonPoints[i];
+        const p2 = polygonPoints[(i + 1) % polygonPoints.length];
+        const cross = p1[0] * p2[1] - p2[0] * p1[1];
+        area += cross;
+        x += (p1[0] + p2[0]) * cross;
+        y += (p1[1] + p2[1]) * cross;
+    }
+
+    area *= 0.5;
+    x /= (6 * area);
+    y /= (6 * area);
+
+    return [x, y];
+}
+
+// Funkce pro pohyb bodu od středu pryč
+function movePointAwayFromCenter(point, center, distance) {
+    const dx = point[0] - center[0];
+    const dy = point[1] - center[1];
+    const angle = Math.atan2(dy, dx);
+    
+    const newX = point[0] + distance * Math.cos(angle);
+    const newY = point[1] + distance * Math.sin(angle);
+
+    return [newX, newY];
+}
+
 // Funkce pro kontrolu a rozdělení dlouhých přímek
 function checkAndSplitLongEdges() {
     const maxDistance = 2; // Maximální vzdálenost pro rozdělení přímky (v km)
@@ -169,7 +201,7 @@ function expandPolygon() {
 
     checkAndSplitLongEdges();  // Kontrola a rozdělení dlouhých přímek
 
-    let center = getCentroid(polygonPoints);
+    let center = getCentroid(polygonPoints); // Získáme centroid polygonu
     let totalPoints = polygonPoints.length;
     let maxWaitTurns = Math.floor(1.5 * totalPoints);
 
@@ -190,7 +222,8 @@ function expandPolygon() {
         selectedIndex = randomPoint.index;
     }
 
-    polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0015);
+    // Pohyb bodu od středu
+    polygonPoints[selectedIndex] = movePointAwayFromCenter(polygonPoints[selectedIndex], center, 0.0015);
 
     moveTracker[selectedIndex] = 0;
     blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
