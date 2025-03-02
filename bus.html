@@ -1,50 +1,85 @@
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expanze polygonu s rozlohou a obyvateli</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <title>Map Game</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-        }
-        #map {
-            width: 100%;
-            height: 90vh;
-        }
-        #info {
-            padding: 10px;
+        #map { height: 500px; width: 100%; }
+        #confirmation {
+            display: none;
+            position: absolute;
             background: white;
-            border-top: 1px solid #ccc;
-            font-family: Arial, sans-serif;
-            font-size: 16px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
         }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    <div id="info">Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">0</span></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div id="map"></div>
+    <div id="confirmation">
+        <p>Chcete začít ve zvolené oblasti?</p>
+        <button id="confirmBtn">Potvrdit</button>
+        <button id="cancelBtn">Zrušit</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-        let map = L.map('map').setView([49.157, 13.877], 13); // Lčovice jako start
+        // Inicializace mapy
+        var map = L.map('map').setView([49.540, 14.140], 12);  // Nastavit na výchozí polohu (Lčovice)
+
+        // Přidání dlaždic mapy
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        let center = [49.157, 13.877];
+        let selectedCenter = null;
+        let polygon = null;
 
-        let polygonPoints = [
-            [center[0] + 0.002, center[1] - 0.002],
-            [center[0] + 0.002, center[1] + 0.002],
-            [center[0] - 0.002, center[1] + 0.002],
-            [center[0] - 0.002, center[1] - 0.002]
-        ];
+        // Funkce pro kliknutí na mapu
+        map.on('click', function(event) {
+            selectedCenter = event.latlng;
+            
+            // Zobrazíme potvrzovací okno
+            document.getElementById('confirmation').style.display = 'block';
+            
+            // Zobrazíme pozici, kde hráč kliknul
+            let coords = selectedCenter.lat.toFixed(4) + ', ' + selectedCenter.lng.toFixed(4);
+            document.getElementById('confirmation').innerHTML = `
+                <p>Chcete začít ve zvolené oblasti?</p>
+                <p>Souřadnice: ${coords}</p>
+                <button id="confirmBtn">Potvrdit</button>
+                <button id="cancelBtn">Zrušit</button>
+            `;
 
-        let polygon = L.polygon(polygonPoints, { color: 'blue' }).addTo(map);
+            // Po potvrzení vytvoříme nový polygon s tímto středem
+            document.getElementById('confirmBtn').addEventListener('click', function() {
+                document.getElementById('confirmation').style.display = 'none';
+                
+                // Nastavení nového středu pro polygon
+                let center = [selectedCenter.lat, selectedCenter.lng];
+                
+                // Nastavení polygonu kolem nového středu
+                let polygonPoints = [
+                    [center[0] + 0.002, center[1] - 0.002],
+                    [center[0] + 0.002, center[1] + 0.002],
+                    [center[0] - 0.002, center[1] + 0.002],
+                    [center[0] - 0.002, center[1] - 0.002]
+                ];
+                
+                // Aktualizujeme mapu a polygon
+                if (polygon) polygon.remove();
+                polygon = L.polygon(polygonPoints, { color: 'blue' }).addTo(map);
+                
+                // Obnovíme proměnné a UI pro nový start
+                // Například sledování pohybu bodů atd.
+            });
+
 
         let blockedPoints = {};
         let moveTracker = Array(polygonPoints.length).fill(0);
