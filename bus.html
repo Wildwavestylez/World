@@ -101,46 +101,95 @@
         }
 
         // Funkce pro rozšiřování polygonu
-        function expandPolygon() {
-            let center = getCentroid(polygonPoints);
-            let totalPoints = polygonPoints.length;
-            let maxWaitTurns = Math.floor(1.5 * totalPoints);
+        // Funkce pro rozšiřování polygonu
+function expandPolygon() {
+    if (money >= 100) { // Pokud hráč má dost peněz, může rozšiřovat
+        let center = getCentroid(polygonPoints);
+        let totalPoints = polygonPoints.length;
+        let maxWaitTurns = Math.floor(1.5 * totalPoints);
 
-            let availablePoints = polygonPoints
-                .map((point, index) => ({ point, index }))
-                .filter(({ index }) => !blockedPoints[index]);
+        let availablePoints = polygonPoints
+            .map((point, index) => ({ point, index }))
+            .filter(({ index }) => !blockedPoints[index]);
 
-            if (availablePoints.length === 0) return;
+        if (availablePoints.length === 0) return;
 
-            let forcedMoveIndex = moveTracker.indexOf(Math.max(...moveTracker));
-            let mustMove = moveTracker[forcedMoveIndex] >= maxWaitTurns;
+        let forcedMoveIndex = moveTracker.indexOf(Math.max(...moveTracker));
+        let mustMove = moveTracker[forcedMoveIndex] >= maxWaitTurns;
 
-            let selectedIndex;
-            if (mustMove) {
-                selectedIndex = forcedMoveIndex;
-            } else {
-                let randomPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
-                selectedIndex = randomPoint.index;
-            }
-
-            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0015);
-
-            moveTracker[selectedIndex] = 0;
-            blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
-
-            for (let i = 0; i < moveTracker.length; i++) {
-                if (i !== selectedIndex) moveTracker[i]++;
-            }
-
-            polygon.setLatLngs(polygonPoints);
-
-            let area = calculatePolygonArea(polygonPoints);
-            let population = Math.round(area * populationDensity);
-
-            document.getElementById("area").textContent = area.toFixed(2);
-            document.getElementById("population").textContent = population.toLocaleString();
-            document.getElementById("money").textContent = money;
+        let selectedIndex;
+        if (mustMove) {
+            selectedIndex = forcedMoveIndex;
+        } else {
+            let randomPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
+            selectedIndex = randomPoint.index;
         }
+
+        polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0015);
+
+        moveTracker[selectedIndex] = 0;
+        blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
+
+        for (let i = 0; i < moveTracker.length; i++) {
+            if (i !== selectedIndex) moveTracker[i]++;
+        }
+
+        polygon.setLatLngs(polygonPoints);
+
+        let area = calculatePolygonArea(polygonPoints);
+        let population = Math.round(area * populationDensity);
+
+        document.getElementById("area").textContent = area.toFixed(2);
+        document.getElementById("population").textContent = population.toLocaleString();
+        document.getElementById("money").textContent = money;
+
+        // Odečteme 100 Kč za každý pohyb polygonu
+        money -= 100;
+        document.getElementById("money").textContent = money;
+    } else {
+        // Pokud dojdou peníze, zastavíme rozšiřování
+        alert("Nemáte dostatek peněz na rozšiřování území.");
+    }
+}
+
+// Funkce pro obnovení rozšiřování po získání peněz
+function resumeExpansion() {
+    if (money >= 100) {
+        // Začne opět rozšiřování
+        setInterval(() => {
+            if (polygonPoints.length > 0) {  // Pokud je polygon inicializován
+                expandPolygon();
+                unlockBlockedPoints();
+            }
+        }, 1000);
+    }
+}
+
+// Tlačítko pro obnovení rozšiřování
+let resumeButton = document.createElement("button");
+resumeButton.innerHTML = "Pokračovat v rozšiřování";
+resumeButton.style.position = "absolute";
+resumeButton.style.bottom = "20px";
+resumeButton.style.left = "50%";
+resumeButton.style.transform = "translateX(-50%)";
+resumeButton.style.padding = "10px";
+resumeButton.style.backgroundColor = "#4CAF50";
+resumeButton.style.color = "white";
+resumeButton.style.border = "none";
+resumeButton.style.cursor = "pointer";
+
+// Akce po kliknutí na tlačítko
+resumeButton.addEventListener("click", function() {
+    if (money >= 100) {
+        resumeExpansion();
+        this.disabled = true; // Po kliknutí tlačítko zmizí
+    } else {
+        alert("Nemáte dostatek peněz na pokračování v rozšiřování.");
+    }
+});
+
+// Přidáme tlačítko na stránku
+document.body.appendChild(resumeButton);
 
         // Funkce pro odemknutí zablokovaných bodů
         function unlockBlockedPoints() {
