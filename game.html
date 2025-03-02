@@ -521,40 +521,51 @@ function getRoute(start, roadPoints) {
     let routeIndex = roadPoints.findIndex(p => p[0] === nearestStart[0] && p[1] === nearestStart[1]);
     return roadPoints.slice(routeIndex); // Vracíme trasu od nejbližšího bodu
 }
-// Funkce pro načítání stavu segmentů při function loadSegmentStatus() {  
+// Funkce pro načítání stavu segmentů při // Funkce pro načítání stavu segmentů při načtení hry
+function loadSegmentStatus() {  
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};  
 
     roadSegments.forEach(segment => {  
         if (savedSegments[segment.id]) {  
-            let elapsedTime = (Date.now() - savedSegments[segment.id].lastRepaired) / 1000 / 60;  
+            segment.status = savedSegments[segment.id].status; // Použijeme uložený status  
 
-            // Pokud uplynulo více než 20 minut, resetujeme status na červenou
-            if (elapsedTime > 20) {  
-                segment.status = "red"; 
-            } else {
-                segment.status = savedSegments[segment.id].status; // Pokud je v localStorage, použijeme uložený status
-            }
+            if (segment.status === "green") {  
+                // Pokud je segment zelený, odstraníme ho z mapy
+                if (segment.polyline) {
+                    map.removeLayer(segment.polyline);
+                }
+                console.log(`🟢 Segment ${segment.id} byl opraven na zeleno a nebude vykreslen.`);
+                return; // Přeskočíme vykreslení  
+            }  
 
-            // Aktualizujeme barvu na mapě
-            let color = segment.status === "green" ? "green" : segment.status === "orange" ? "orange" : "red";
-            segment.polyline.setStyle({ color: color });  
+            // Aktualizujeme barvu segmentu na mapě  
+            updateSegmentColor(segment);
         }  
     });  
+}
 
-
-// Funkce pro aktualizaci barvy segmentu
+// Funkce pro aktualizaci barvy segmentu  
 function updateSegmentColor(segment) {
-    let color = segment.status === "green" ? "green" : segment.status === "orange" ? "orange" : "red";
-
-    if (segment.polyline) {
-        segment.polyline.setStyle({ color: color });
-    } else {
-        segment.polyline = L.polyline(segment.coordinates, { color: color, weight: 3 }).addTo(map);
+    if (segment.status === "green") {
+        // Pokud je segment zelený, úplně ho odstraníme z mapy
+        if (segment.polyline) {
+            map.removeLayer(segment.polyline);
+            segment.polyline = null;
+        }
+        console.log(`🟢 Segment ${segment.id} odstraněn z mapy.`);
+        return;
     }
+
+    let color = segment.status === "orange" ? "orange" : "red";  
+
+    if (segment.polyline) {  
+        segment.polyline.setStyle({ color: color });  
+    } else {  
+        segment.polyline = L.polyline(segment.coordinates, { color: color, weight: 3 }).addTo(map);  
+    }  
 
     console.log(`🎨 Segment ${segment.id} nastaven na barvu ${color}.`);
 }
-
 // Funkce pro resetování segmentu na červenou po 20 minutách
 function resetSegment(segmentId) {
     let segment = roadSegments.find(s => s.id === segmentId);
@@ -574,7 +585,6 @@ function resetSegment(segmentId) {
 }
 
 // Funkce pro opravu segmentu a změnu barvy na zelenou
-// Funkce pro opravu segmentu a změnu barvy na zelenou nebo odstranění
 function repairSegment(segment) {
     if (money < 70) {
         alert("Nedostatek peněz na opravu!");
@@ -592,38 +602,43 @@ function repairSegment(segment) {
     let newColor;
     if (segment.status === "red") {
         segment.status = "orange"; // První oprava, změní na oranžovou
-        newColor = "orange";
     } else if (segment.status === "orange") {
         segment.status = "green"; // Druhá oprava, změní na zelenou
-        newColor = "green";
     } else {
         console.warn("⚠ Silnice už je zelená.");
         return;
     }
 
-    // Aktualizace LocalStorage
+    newColor = segment.status;
+
+    // Uložíme opravený segment do localStorage
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
-    savedSegments[segment.id] = { status: newColor, lastRepaired: Date.now() };
+    savedSegments[segment.id] = { status: newColor, lastRepaired: Date.now() }; 
     localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
 
     // Aktualizujeme barvu polyline
-    segment.polyline.setStyle({ color: newColor });
+    map.removeLayer(segment.polyline);
+    segment.polyline = L.polyline(segment.coordinates, { color: newColor, weight: 3 }).addTo(map);
 
     console.log(`✅ Silnice opravena! Nová barva: ${newColor}`);
 
-    // Pokud je silnice opravena na zeleno, po 30 sekundách zmizí z mapy
-    if (segment.status === "green") {
-        setTimeout(() => {
-            if (segment.polyline) {
-                map.removeLayer(segment.polyline); // Odstraníme z mapy
-            }
-            delete savedSegments[segment.id]; // Odstraníme z LocalStorage
-            localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
+    // Nastavíme 20 minutový časovač pro změnu zpět na červenou
+    setTimeout(() => {
+        segment.status = "red"; // Po 20 minutách resetujeme na červenou
+        let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
+        savedSegments[segment.id] = { status: "red", lastRepaired: Date.now() };
+        localStorage.setItem("repairedRoads", JSON.stringify(savedSegments));
 
-            console.log(`🛠 Silnice ${segment.id} byla odstraněna z mapy.`);
-        }, 30000); // Po 30 sekundách zmizí
-    }
+        // Aktualizace barvy na červenou
+        map.removeLayer(segment.polyline);
+        segment.polyline = L.polyline(segment.coordinates, { color: "red", weight: 3 }).addTo(map);
+        console.log(`🛠 Silnice ${segment.id} byla vrácena na červenou po 20 minutách.`);
+    }, 120 * 60 * 1000); // 20 minut v milisekundách
 }
+function clearLocalStorage() {
+    localStorage.clear();
+    alert("LocalStorage byl vymazán!");
+  }
 
 /// Seznam firem čekajících na licenci
 let waitingBusinesses = [];
