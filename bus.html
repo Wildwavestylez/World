@@ -6,34 +6,34 @@
     <title>Rozšiřující se polygon</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        body, html {
             margin: 0;
             padding: 0;
+            height: 100%;
         }
         #map {
             width: 100%;
-            height: 100vh;
+            height: 78vh;
         }
         #info {
+            padding: 16px;
+            background: white;
+            border-top: 1px solid #ccc;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(255, 255, 255, 0.7);
-            padding: 10px;
-            font-size: 14px;
-            border-radius: 5px;
-        }
-        #info span {
-            display: block;
+            bottom: 0;
+            left: 0;
+            width: 100%;
         }
     </style>
 </head>
 <body>
-    <div id="map"></div>
+    <div id="map"></div>  
     <div id="info">
-        <span>Area: <span id="area">0</span> km²</span>
-        <span>Population: <span id="population">0</span></span>
+        Peníze: <span id="money">20000</span> Kč | 
+        Rozloha: <span id="area">0</span> km² | 
+        Počet obyvatel: <span id="population">0</span>
     </div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -53,6 +53,7 @@
         let moveTracker = [];
 
         let populationDensity = 130; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
+        let money = 20000; // Počáteční peníze
 
         // Funkce pro výpočet vzdálenosti mezi dvěma body
         function distance(coord1, coord2) {
@@ -131,19 +132,6 @@
                 if (i !== selectedIndex) moveTracker[i]++;
             }
 
-            for (let i = 0; i < polygonPoints.length; i++) {
-                let p1 = polygonPoints[i];
-                let p2 = polygonPoints[(i + 1) % polygonPoints.length];
-
-                let distance = Math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2);
-                if (distance > 0.005) {
-                    let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
-                    polygonPoints.splice(i + 1, 0, midPoint);
-                    moveTracker.splice(i + 1, 0, 0);
-                    break;
-                }
-            }
-
             polygon.setLatLngs(polygonPoints);
 
             let area = calculatePolygonArea(polygonPoints);
@@ -151,6 +139,7 @@
 
             document.getElementById("area").textContent = area.toFixed(2);
             document.getElementById("population").textContent = population.toLocaleString();
+            document.getElementById("money").textContent = money;
         }
 
         // Funkce pro odemknutí zablokovaných bodů
