@@ -526,40 +526,36 @@ function getRoute(start, roadPoints) {
 // Funkce pro načítání stavu segmentů při function loadSegmentStatus() {
     let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
 
-    roadSegments.forEach(segment => {
-        if (savedSegments[segment.id]) {
-            let elapsedTime = (Date.now() - savedSegments[segment.id].lastRepaired) / 1000 / 60;
-
-            // Pokud uplynulo více než 20 minut, resetujeme status na červenou
-            if (elapsedTime > 20) {
-                segment.status = "red";
-            } else {
-                segment.status = savedSegments[segment.id].status; // Pokud je v localStorage, použijeme uložený status
-            }
-
-            // Pokud je segment "green", znamená to, že už byl odstraněn z mapy
-            if (segment.status === "green") {
-                // Odstraníme polyline, pokud je segment odstraněn
-                if (segment.polyline) {
-                    map.removeLayer(segment.polyline);
-                    segment.polyline = null; // Nastavíme polyline na null, aby se s ní dál nepracovalo
-                }
-                // Odstraníme segment z roadSegments
-                roadSegments = roadSegments.filter(s => s.id !== segment.id);
-                return; // Pokud je segment "green", už nebudeme pokračovat
-            }
-
-            // Pokud segment má polyline, aktualizujeme barvu
-            let color = segment.status === "green" ? "green" : segment.status === "orange" ? "orange" : "red";
-            if (segment.polyline) {
-                segment.polyline.setStyle({ color: color });
-            } else {
-                // Pokud polyline ještě neexistuje, vytvoříme ji
-                segment.polyline = L.polyline(segment.coordinates, { color: color, weight: 3 }).addTo(map);
-            }
+    roadSegments = roadSegments.filter(segment => {  // Úprava - rovnou filtrujeme smazané segmenty
+        if (!savedSegments[segment.id]) {
+            return true; // Pokud segment neexistuje v localStorage, necháme ho v seznamu
         }
-    });
 
+        let elapsedTime = (Date.now() - savedSegments[segment.id].lastRepaired) / 1000 / 60;
+
+        // Pokud uplynulo více než 20 minut, resetujeme status na červenou
+        if (elapsedTime > 20) {
+            segment.status = "red";
+        } else {
+            segment.status = savedSegments[segment.id].status;
+        }
+
+        // Pokud je segment "green", odstraníme ho z mapy
+        if (segment.status === "green") {
+            if (segment.polyline) {
+                map.removeLayer(segment.polyline);
+                segment.polyline = null;
+            }
+            return false; // Odstraníme segment z `roadSegments`
+        }
+
+        // Aktualizujeme barvu pomocí jednotné funkce
+        updateSegmentColor(segment);
+        return true;
+    });
+}
+
+// 🔄 Aktualizace barvy segmentu
 function updateSegmentColor(segment) {
     if (!segment || !segment.polyline) {
         console.error("❌ Chyba: Neplatný segment pro změnu barvy!");
@@ -593,6 +589,7 @@ function resetSegment(segmentId) {
 }
 
 // Funkce pro opravu segmentu a změnu barvy na zelenou
+// 🛠 Oprava segmentu
 function repairSegment(segment) {
     if (money < 70) {
         alert("Nedostatek peněz na opravu!");
@@ -616,8 +613,9 @@ function repairSegment(segment) {
         // Třetí oprava - odstranění segmentu
         console.log(`✅ Segment ${segment.id} odstraněn.`);
         map.removeLayer(segment.polyline);
-        roadSegments = roadSegments.filter(s => s.id !== segment.id); // Odebrání z pole segmentů
         
+        roadSegments = roadSegments.filter(s => s.id !== segment.id); // Odebrání z pole segmentů
+
         // Uložíme stav do localStorage, že segment už neexistuje
         let savedSegments = JSON.parse(localStorage.getItem("repairedRoads")) || {};
         delete savedSegments[segment.id]; // Segment úplně odstraníme z localStorage
@@ -635,6 +633,7 @@ function repairSegment(segment) {
     // Okamžitě aktualizujeme barvu na mapě
     updateSegmentColor(segment);
 }
+
 
 function clearLocalStorage() {
     localStorage.clear();
