@@ -376,97 +376,73 @@ function isPointInsidePolygon(point, polygon) {
 loadBusStops();
 
 // Po každém rozšíření polygonu zkontrolujeme nové zastávky
-setInterval(checkStopVisibility, 40000);
+setInterval(checkStopVisibility, 10000);
 
 
-// Funkce pro načtení autobusových zastávek a linek
-function loadBusStopsAndRoutes() {
+// Pole pro ukládání linek
+let busRoutes = {};
+
+// Funkce pro načtení autobusových linek z Overpass API
+function loadBusRoutes() {
     let bounds = map.getBounds();
-    
-    let stopQuery = `
-        [out:json];
-        node["highway"="bus_stop"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-        out;
-    `;
-    
-    let stopUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(stopQuery)}`;
-    
-    fetch(stopUrl)
-        .then(response => response.json())
-        .then(data => {
-            let stopNodes = new Map();
-            
-            data.elements.forEach(stop => {
-                let stopMarker = L.marker([stop.lat, stop.lon], {
-                    icon: L.icon({
-                        iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/76/Bus-stop-icon.svg',
-                        iconSize: [20, 20]
-                    })
-                }).addTo(map);
-                
-                let stopInfo = {
-                    lat: stop.lat,
-                    lon: stop.lon,
-                    name: stop.tags.name || "Neznámá zastávka",
-                    unlocked: false,
-                    marker: stopMarker,
-                    routes: [] // Sem budeme ukládat linky
-                };
-                
-                busStops.push(stopInfo);
-                stopNodes.set(stop.id, stopInfo);
-            });
-
-            // Teď načteme linky a přiřadíme je k zastávkám
-            loadBusRoutes(stopNodes);
-        })
-        .catch(error => console.error("Chyba při načítání zastávek:", error));
-}
-
-// Funkce pro načtení autobusových linek
-function loadBusRoutes(stopNodes) {
-    let bounds = map.getBounds();
-    
-    let routeQuery = `
+    let query = `
         [out:json];
         relation["route"="bus"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-        out;
+        out body;
     `;
 
-    let routeUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(routeQuery)}`;
+    let url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
-    fetch(routeUrl)
+    fetch(url)
         .then(response => response.json())
         .then(data => {
             data.elements.forEach(route => {
-                let routeName = route.tags.name || `Linka ${route.id}`;
-                
-                // Najdeme zastávky, které jsou součástí této linky
-                route.members.forEach(member => {
-                    if (member.type === "node" && stopNodes.has(member.ref)) {
-                        let stopInfo = stopNodes.get(member.ref);
-                        stopInfo.routes.push(routeName);
-                    }
-                });
+                if (route.tags && route.tags.ref) {
+                    let routeId = route.id;
+                    let routeName = route.tags.ref;
+                    let stops = [];
+
+                    // Projdeme členy relace a uložíme zastávky
+                    route.members.forEach(member => {
+                        if (member.type === "node") {
+                            stops.push(member.ref);
+                        }
+                    });
+
+                    busRoutes[routeId] = {
+                        name: routeName,
+                        stops: stops
+                    };
+                }
             });
 
-            // Teď přidáme event listener na zastávky, aby zobrazovaly své linky
-            busStops.forEach(stop => {
-                stop.marker.bindPopup(() => {
-                    let routeList = stop.routes.length > 0 
-                        ? stop.routes.join("<br>") 
-                        : "Žádné linky nenalezeny";
-                    return `<b>${stop.name}</b><br>Procházející linky:<br>${routeList}`;
-                });
-            });
-
-            console.log("Autobusové linky načteny a přiřazeny k zastávkám.");
+            // Aktualizujeme popupy u zastávek
+            updateStopPopups();
         })
         .catch(error => console.error("Chyba při načítání linek:", error));
 }
 
-// Spustíme funkci při startu hry
-loadBusStopsAndRoutes();
+// Funkce pro aktualizaci popupů zastávek
+function updateStopPopups() {
+    busStops.forEach(stop => {
+        let stopId = stop.id;
+        let routeNames = [];
+
+        // Projdeme všechny linky a zjistíme, které tudy projíždí
+        for (let routeId in busRoutes) {
+            if (busRoutes[routeId].stops.includes(stopId)) {
+                routeNames.push(busRoutes[routeId].name);
+            }
+        }
+
+        // Aktualizujeme popup s informací o linkách
+        let popupContent = `<strong>${stop.name}</strong><br>Linky: ${routeNames.length ? routeNames.join(", ") : "Žádné"}`;
+        stop.marker.bindPopup(popupContent);
+    });
+}
+
+// Po načtení zastávek načteme linky
+loadBusRoutes();
 
     </script>
 </body>
