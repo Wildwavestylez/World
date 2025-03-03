@@ -382,7 +382,7 @@ setInterval(checkStopVisibility, 10000);
 // Pole pro ukládání linek
 let busRoutes = {};
 
-// Funkce pro načtení autobusových linek z Overpass API
+/// Funkce pro načtení autobusových linek z Overpass API
 function loadBusRoutes() {
     let bounds = map.getBounds();
     let query = `
@@ -396,32 +396,35 @@ function loadBusRoutes() {
     fetch(url)
         .then(response => response.json())
         .then(data => {
+            console.log("Načtená data linek:", data); // Debugging
+
             data.elements.forEach(route => {
-                if (route.tags && route.tags.ref) {
+                if (route.type === "relation" && route.tags && route.tags.ref) {
                     let routeId = route.id;
                     let routeName = route.tags.ref;
                     let stops = [];
 
                     // Projdeme členy relace a uložíme zastávky
                     route.members.forEach(member => {
-                        if (member.type === "node") {
+                        if (member.type === "node") { // Pouze zastávky
                             stops.push(member.ref);
                         }
                     });
 
-                    busRoutes[routeId] = {
-                        name: routeName,
-                        stops: stops
-                    };
+                    if (stops.length > 0) {
+                        busRoutes[routeId] = {
+                            name: routeName,
+                            stops: stops
+                        };
+                    }
                 }
             });
 
-            // Aktualizujeme popupy u zastávek
+            console.log("Načtené linky:", busRoutes); // Debugging
             updateStopPopups();
         })
         .catch(error => console.error("Chyba při načítání linek:", error));
 }
-
 // Funkce pro aktualizaci popupů zastávek
 function updateStopPopups() {
     busStops.forEach(stop => {
