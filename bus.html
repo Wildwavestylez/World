@@ -303,133 +303,89 @@ document.body.appendChild(resumeButton);
             }
         }, 1000);
 
-// URL na ikonu zastávky
-const busStopIcon = L.icon({
-    iconUrl: "https://i.imgur.com/ByUDLOI.png",
-    iconSize: [20, 20]
-});
-
-// Funkce pro načtení autobusových zastávek z Overpass API
-function loadBusStops() {
-    let overpassQuery = `
+// Funkce pro načtení zastávek z Overpass API
+function loadBusStops(bounds) {
+    let query = `
         [out:json];
-        node["highway"="bus_stop"](bbox);
-        out body;
+        node["highway"="bus_stop"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+        out;
     `;
 
-    let bbox = map.getBounds();
-    let queryURL = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery.replace("bbox", `${bbox.getSouth()},${bbox.getWest()},${bbox.getNorth()},${bbox.getEast()}`))}`;
+    let url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
 
-    fetch(queryURL)
+    fetch(url)
         .then(response => response.json())
         .then(data => {
-            data.elements.forEach(busStop => {
-                let lat = busStop.lat;
-                let lon = busStop.lon;
+            let rawStops = data.elements.map(node => ({
+                id: node.id,
+                lat: node.lat,
+                lon: node.lon,
+                name: node.tags.name || "Neznámá zastávka"
+            }));
 
-                let marker = L.marker([lat, lon], { icon: busStopIcon }).addTo(map);
-                marker.bindPopup("Autobusová zastávka");
-
-                // Přidáme zastávku do pole pro další kontrolu odemčení
-                busStops.push({ lat, lon, marker, unlocked: false });
-            });
+            let mergedStops = mergeCloseStops(rawStops, 100); // Sloučíme zastávky blíž než 100m
+            displayBusStops(mergedStops);
         })
         .catch(error => console.error("Chyba při načítání zastávek:", error));
 }
 
-// Funkce pro kontrolu, zda jsou zastávky v odemčeném území
-function checkUnlockedBusStops() {
-    busStops.forEach(stop => {
-        if (!stop.unlocked && isPointInPolygon([stop.lat, stop.lon], polygonPoints)) {
-            stop.unlocked = true;
-            stop.marker.setOpacity(1); // Zviditelnění zastávky
-            alert("Odemknuta nová autobusová zastávka!");
-        }
-    });
-}
-
-
-// Funkce pro kontrolu, zda bod leží uvnitř polygonu
-function isPointInPolygon(point, polygon) {
-    let x = point[0], y = point[1];
-    let inside = false;
-
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        let xi = polygon[i][0], yi = polygon[i][1];
-        let xj = polygon[j][0], yj = polygon[j][1];
-
-        let intersect = ((yi > y) !== (yj > y)) &&
-            (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-
-        if (intersect) inside = !inside;
-    }
-
-    return inside;
-}
-// Inicializujeme pole zastávek
-let busStops = [];
-
-// Spustíme načítání zastávek
-loadBusStops();
-
-// Pravidelně kontrolujeme, zda jsou nějaké zastávky nově odemčeny
-setInterval(checkUnlockedBusStops, 10000);
-
-
-// Funkce pro výpočet vzdálenosti mezi dvěma souřadnicemi (Haversinova formule)
-function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; // Poloměr Země v metrech
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c; // Výsledek v metrech
-}
-
-// Funkce pro sloučení blízkých zastávek
-function mergeCloseStops(stops, threshold = 100) {
-    let mergedStops = [];
+// Funkce pro sloučení zastávek blíže než X metrů
+function mergeCloseStops(stops, maxDistance) {
+    let merged = [];
 
     stops.forEach(stop => {
-        let foundCluster = mergedStops.find(cluster => 
-            getDistance(cluster.lat, cluster.lon, stop.lat, stop.lon) < threshold
+        let foundCluster = merged.find(cluster =>
+            getDistance(cluster.lat, cluster.lon, stop.lat, stop.lon) < maxDistance
         );
 
         if (foundCluster) {
-            // Přidáme nové jméno a zprůměrujeme polohu
-            foundCluster.names.push(stop.name);
-            foundCluster.lat = (foundCluster.lat + stop.lat) / 2;
-            foundCluster.lon = (foundCluster.lon + stop.lon) / 2;
+            foundCluster.count++;
+            if (!foundCluster.name.includes(stop.name)) {
+                foundCluster.name += ` / ${stop.name}`;
+            }
         } else {
-            // Vytvoříme novou skupinu
-            mergedStops.push({ 
-                lat: stop.lat, 
-                lon: stop.lon, 
-                names: [stop.name] 
-            });
+            merged.push({ ...stop, count: 1 });
         }
     });
 
-    return mergedStops;
+    return merged;
 }
 
-// Funkce pro vykreslení zastávek na mapu
-function displayStopsOnMap(stops) {
-    let mergedStops = mergeCloseStops(stops);
+// Funkce pro zobrazení zastávek na mapě
+function displayBusStops(stops) {
+    stops.forEach(stop => {
+        let marker = L.marker([stop.lat, stop.lon], {
+            icon: L.icon({
+                iconUrl: "https://i.imgur.com/ByUDLOI.png",
+                iconSize: [25, 25]
+            })
+        }).addTo(map);
 
-    mergedStops.forEach(stop => {
-        let marker = L.marker([stop.lat, stop.lon], { icon: stopIcon }).addTo(map);
-        
-        // Zobrazení jmen všech sloučených zastávek v popupu
-        marker.bindPopup(`<b>Zastávky:</b><br>${stop.names.join(", ")}`);
+        marker.bindPopup(`<b>${stop.name}</b>`);
     });
 }
+
+// Pomocná funkce pro výpočet vzdálenosti mezi dvěma body (v metrech)
+function getDistance(lat1, lon1, lat2, lon2) {
+    let R = 6371000;
+    let φ1 = lat1 * Math.PI / 180;
+    let φ2 = lat2 * Math.PI / 180;
+    let Δφ = (lat2 - lat1) * Math.PI / 180;
+    let Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    let a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+
+    let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+// Spustíme načítání zastávek podle aktuálních hranic mapy
+map.on("moveend", () => {
+    let bounds = map.getBounds();
+    loadBusStops(bounds);
+});
 
     </script>
 </body>
