@@ -376,173 +376,98 @@ function displayBusStops(stops) {
     });
 }
 
-// Pomocná funkce pro výpočet vzdálenosti mezi dvěma body (v metrech)
-function getDistance(lat1, lon1, lat2, lon2) {
-    let R = 6371000;
-    let φ1 = lat1 * Math.PI / 180;
-    let φ2 = lat2 * Math.PI / 180;
-    let Δφ = (lat2 - lat1) * Math.PI / 180;
-    let Δλ = (lon2 - lon1) * Math.PI / 180;
+let creatingRoute = false;
+let currentRoute = [];
+let busRoutes = [];
+let routeCost = 0;
+let baseRoutePrice = 1000;
+let baseStopPrice = 100;
+let firstRouteFree = true;
 
-    let a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-        Math.cos(φ1) * Math.cos(φ2) *
-        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+// Tlačítko pro vytváření linky
+let createRouteButton = document.createElement("button");
+createRouteButton.innerHTML = "Vytvořit linku";
+createRouteButton.style.position = "absolute";
+createRouteButton.style.top = "10px";
+createRouteButton.style.left = "10px";
+createRouteButton.style.padding = "10px";
+createRouteButton.style.backgroundColor = "#2196F3";
+createRouteButton.style.color = "white";
+createRouteButton.style.border = "none";
+createRouteButton.style.cursor = "pointer";
+document.body.appendChild(createRouteButton);
 
-    let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
+// Tlačítko pro dokončení linky
+let finishRouteButton = document.createElement("button");
+finishRouteButton.innerHTML = "Dokončit linku";
+finishRouteButton.style.position = "absolute";
+finishRouteButton.style.top = "50px";
+finishRouteButton.style.left = "10px";
+finishRouteButton.style.padding = "10px";
+finishRouteButton.style.backgroundColor = "#4CAF50";
+finishRouteButton.style.color = "white";
+finishRouteButton.style.border = "none";
+finishRouteButton.style.cursor = "pointer";
+finishRouteButton.style.display = "none"; // Skryté, dokud hráč nezačne tvořit linku
+document.body.appendChild(finishRouteButton);
 
-// Spustíme načítání zastávek podle aktuálních hranic mapy
-map.on("moveend", () => {
-    let bounds = map.getBounds();
-    loadBusStops(bounds);
+// Spustí režim vytváření linky
+createRouteButton.addEventListener("click", () => {
+    if (!firstRouteFree && money < baseRoutePrice) {
+        alert("Nemáte dostatek peněz na vytvoření linky.");
+        return;
+    }
+    creatingRoute = true;
+    currentRoute = [];
+    routeCost = firstRouteFree ? 0 : baseRoutePrice;
+    createRouteButton.disabled = true;
+    finishRouteButton.style.display = "block";
+    alert("Klikněte na zastávky v pořadí, ve kterém je chcete přidat do linky.");
 });
-    
-    
-// Funkce pro kontrolu, které zastávky jsou uvnitř polygonu
-function updateUnlockedStops() {
-    unlockedStops = busStops.filter(stop => isPointInPolygon([stop.lat, stop.lon], polygonPoints));
-}
 
-// Pomocná funkce pro kontrolu, zda bod leží uvnitř polygonu
-function isPointInPolygon(point, polygon) {
-    let x = point[0], y = point[1];
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        let xi = polygon[i][0], yi = polygon[i][1];
-        let xj = polygon[j][0], yj = polygon[j][1];
+// Přidá zastávku do linky
+function addStopToRoute(stop) {
+    if (!creatingRoute) return;
 
-        let intersect = ((yi > y) !== (yj > y)) &&
-            (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
+    let stopName = stop.feature.properties.name || "Neznámá zastávka";
 
-// Po každém rozšíření polygonu aktualizujeme seznam odemčených zastávek
-setInterval(() => {
-    if (polygonPoints.length > 0) {
-        expandPolygon();
-        unlockBlockedPoints();
-        updateUnlockedStops(); // Aktualizace seznamu zastávek
-    }
-}, 10000);
-
-function findMainNodes(stops, maxDistance = 500) {
-    let mainNodes = [];
-
-    stops.forEach(stop => {
-        let nearbyStops = stops.filter(otherStop =>
-            stop.id !== otherStop.id && getDistance(stop.lat, stop.lon, otherStop.lat, otherStop.lon) < maxDistance
-        );
-
-        if (nearbyStops.length >= 3) {  // Pokud jsou v okolí aspoň 3 další zastávky
-            mainNodes.push(stop);
-        }
-    });
-
-    console.log("Hlavní uzly:", mainNodes);
-    return mainNodes;
-}
-
-
- // Funkce pro načítání obcí s poštou z Overpass API
-function loadPostOffices(bounds) {
-    let query = `
-        [out:json];
-        node["amenity"="post_office"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-        out body;
-    `;
-
-    let url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
-
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            let postOffices = data.elements.map(node => ({
-                id: node.id,
-                lat: node.lat,
-                lon: node.lon,
-                name: node.tags.name || "Neznámá pošta"
-            }));
-
-            // Spojíme pošty a vytvoříme linky
-            createPostOfficeLines(postOffices);
-        })
-        .catch(error => console.error("Chyba při načítání pošt:", error));
-}
-
-// Funkce pro generování linek mezi obcemi s poštou
-function createPostOfficeLines(postOffices) {
-    let lines = [];
-
-    for (let i = 0; i < postOffices.length - 1; i++) {
-        let fromPost = postOffices[i];
-        let toPost = postOffices[i + 1];
-        
-        // Spojíme obce s poštou do linky
-        let line = createLineBetweenPosts(fromPost, toPost);
-        lines.push(line);
+    if (currentRoute.length >= 2) {
+        routeCost += baseStopPrice + (currentRoute.length - 2) * 100;
     }
 
-    // Vytvoření autobusů a zastávek pro každou linku
-    lines.forEach(line => {
-        createBusRoute(line);
-    });
+    if (money < routeCost) {
+        alert("Nemáte dostatek peněz na přidání další zastávky.");
+        return;
+    }
+
+    let confirmAdd = confirm(`Přidat zastávku ${stopName} k lince?`);
+    if (confirmAdd) {
+        currentRoute.push(stop);
+        alert(`Zastávka ${stopName} byla přidána k lince.`);
+    }
 }
 
-// Funkce pro vytvoření linky mezi dvěma poštami
-function createLineBetweenPosts(fromPost, toPost) {
-    // Vytvoříme trasu mezi těmito poštami
-    let line = {
-        from: fromPost,
-        to: toPost,
-        stops: [fromPost, toPost]  // Představuje zastávky na začátku a konci
-    };
+// Dokončí tvorbu linky
+finishRouteButton.addEventListener("click", () => {
+    if (currentRoute.length < 2) {
+        alert("Linka musí obsahovat alespoň dvě zastávky!");
+        return;
+    }
 
-    // Přidáme zastávky po cestě (mohou být vyhledány na základě silnic nebo vzdálenosti)
-    line.stops = addIntermediateStops(line.from, line.to);
+    busRoutes.push({ stops: currentRoute });
+    money -= routeCost;
+    firstRouteFree = false;
 
-    return line;
-}
+    alert("Linka byla vytvořena!");
+    creatingRoute = false;
+    createRouteButton.disabled = false;
+    finishRouteButton.style.display = "none";
+});
 
-// Funkce pro přidání zastávek mezi poštami (například na základě vzdálenosti nebo silnice)
-function addIntermediateStops(fromPost, toPost) {
-    // Tento krok by měl vytvořit zastávky mezi těmito poštami, pokud jsou k dispozici
-    // Zde můžeme implementovat logiku pro hledání zastávek mezi obcemi
-
-    let stops = []; 
-    // Přidáme náhodné zastávky mezi dvěma poštami pro tento příklad
-    stops.push({
-        lat: (fromPost.lat + toPost.lat) / 2,
-        lon: (fromPost.lon + toPost.lon) / 2,
-        name: "Mezizastávka"
-    });
-
-    return stops;
-}
-
-// Funkce pro vytvoření autobusové linky
-function createBusRoute(line) {
-    // Tento krok by měl vytvořit trasu autobusu na základě linek
-    console.log(`Vytvoření autobusové linky z ${line.from.name} do ${line.to.name}`);
-    // Můžeme zde přidat vizualizaci na mapě, autobusy atd.
-} 
-
-function drawBusLines(busLines) {
-    let colors = { local: "blue", regional: "green", longDistance: "red" };
-
-    Object.keys(busLines).forEach(type => {
-        busLines[type].forEach(line => {
-            let polyline = L.polyline(
-                [[line.from.lat, line.from.lon], [line.to.lat, line.to.lon]],
-                { color: colors[type], weight: 3 }
-            ).addTo(map);
-
-            polyline.bindPopup(`<b>${type} linka</b><br>${line.from.name} → ${line.to.name}`);
-        });
-    });
-}
+// Přiřazení klikací akce zastávkám
+stopsLayer.eachLayer((layer) => {
+    layer.on("click", () => addStopToRoute(layer));
+});
 
   </script>
 </body>
