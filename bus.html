@@ -387,9 +387,36 @@ map.on("moveend", () => {
     loadBusStops(bounds);
 });
 
+let busStops = []; // Globální pole pro všechny zastávky
 let unlockedStops = []; // Seznam odemčených zastávek
 
-// Funkce pro zjištění, které zastávky jsou uvnitř polygonu
+// Funkce pro načtení zastávek z Overpass API
+function loadBusStops(bounds) {
+    let query = `
+        [out:json];
+        node["highway"="bus_stop"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+        out;
+    `;
+
+    let url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            let rawStops = data.elements.map(node => ({
+                id: node.id,
+                lat: node.lat,
+                lon: node.lon,
+                name: node.tags.name || "Neznámá zastávka"
+            }));
+
+            busStops = mergeCloseStops(rawStops, 100); // Uložíme zastávky globálně
+            displayBusStops(busStops);
+        })
+        .catch(error => console.error("Chyba při načítání zastávek:", error));
+}
+
+// Funkce pro kontrolu, které zastávky jsou uvnitř polygonu
 function updateUnlockedStops() {
     unlockedStops = busStops.filter(stop => isPointInPolygon([stop.lat, stop.lon], polygonPoints));
 }
@@ -414,10 +441,9 @@ setInterval(() => {
     if (polygonPoints.length > 0) {
         expandPolygon();
         unlockBlockedPoints();
-        updateUnlockedStops(); // Aktualizace zastávek
+        updateUnlockedStops(); // Aktualizace seznamu zastávek
     }
 }, 1000);
-
     </script>
 </body>
 </html>
