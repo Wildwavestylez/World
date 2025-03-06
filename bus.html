@@ -470,22 +470,22 @@ function findMainNodes(stops, maxDistance = 500) {
 } 
 
 function drawBusLines(busLines) {
-    busLines.local.forEach(line => drawLine(line, "blue"));
-    busLines.regional.forEach(line => drawLine(line, "green"));
-    busLines.longDistance.forEach(line => drawLine(line, "red"));
+    let colors = { local: "blue", regional: "green", longDistance: "red" };
+
+    Object.keys(busLines).forEach(type => {
+        busLines[type].forEach(line => {
+            let polyline = L.polyline(
+                [[line.from.lat, line.from.lon], [line.to.lat, line.to.lon]],
+                { color: colors[type], weight: 3 }
+            ).addTo(map);
+
+            polyline.bindPopup(`<b>${type} linka</b><br>${line.from.name} → ${line.to.name}`);
+        });
+    });
 }
 
-function drawLine(line, color) {
-    let polyline = L.polyline([[line.from.lat, line.from.lon], [line.to.lat, line.to.lon]], {
-        color: color,
-        weight: 3
-    }).addTo(map);
-
-    polyline.bindPopup(`<b>Linka ${line.type}</b><br>Od: ${line.from.name}<br>Do: ${line.to.name}`);
-}
 let busLines = generateBusLines(mainNodes);
 drawBusLines(busLines);
-
   </script>
 </body>
 </html>
