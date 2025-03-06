@@ -307,7 +307,9 @@ document.body.appendChild(resumeButton);
 let busStops = []; // Globální pole pro všechny zastávky
 let unlockedStops = []; // Seznam odemčených zastávek
 
-// Funkce pro načtení zastávek z Overpass API
+let mainNodes = [];  // Globální proměnná pro zastávky
+
+// Funkce pro načtení zastávek
 function loadBusStops(bounds) {
     let query = `
         [out:json];
@@ -327,12 +329,16 @@ function loadBusStops(bounds) {
                 name: node.tags.name || "Neznámá zastávka"
             }));
 
-            busStops = mergeCloseStops(rawStops, 100); // Uložíme zastávky globálně
-            displayBusStops(busStops);
+            let mergedStops = mergeCloseStops(rawStops, 100);
+            mainNodes = mergedStops;  // Uložíme zastávky do globální proměnné
+            displayBusStops(mainNodes);
+
+            // Po načtení zastávek vygenerujeme linky
+            let busLines = generateBusLines(mainNodes);
+            drawBusLines(busLines);
         })
         .catch(error => console.error("Chyba při načítání zastávek:", error));
 }
-
 
 // Funkce pro sloučení zastávek blíže než X metrů
 function mergeCloseStops(stops, maxDistance) {
