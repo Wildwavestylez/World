@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+už se<!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -438,6 +438,29 @@ function findMainNodes(stops, maxDistance = 500) {
     console.log("Hlavní uzly:", mainNodes);
     return mainNodes;
 }
-    </script>
+
+
+ function generateBusLines(mainNodes) {
+    let busLines = { local: [], regional: [], longDistance: [] };
+
+    mainNodes.forEach(node => {
+        mainNodes.forEach(otherNode => {
+            if (node.id !== otherNode.id) {
+                let distance = getDistance(node.lat, node.lon, otherNode.lat, otherNode.lon);
+
+                if (distance < 3000) {
+                    busLines.local.push({ from: node, to: otherNode, type: "local" });
+                } else if (distance >= 10000 && distance <= 30000) {
+                    busLines.regional.push({ from: node, to: otherNode, type: "regional" });
+                } else if (distance > 30000) {
+                    busLines.longDistance.push({ from: node, to: otherNode, type: "longDistance" });
+                }
+            }
+        });
+    });
+
+    console.log("Vygenerované linky:", busLines);
+    return busLines;
+}   </script>
 </body>
 </html>
