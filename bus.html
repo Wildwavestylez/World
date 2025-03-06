@@ -446,27 +446,87 @@ function findMainNodes(stops, maxDistance = 500) {
 }
 
 
- function generateBusLines(mainNodes) {
-    let busLines = { local: [], regional: [], longDistance: [] };
+ // Funkce pro načítání obcí s poštou z Overpass API
+function loadPostOffices(bounds) {
+    let query = `
+        [out:json];
+        node["amenity"="post_office"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+        out body;
+    `;
 
-    mainNodes.forEach(node => {
-        mainNodes.forEach(otherNode => {
-            if (node.id !== otherNode.id) {
-                let distance = getDistance(node.lat, node.lon, otherNode.lat, otherNode.lon);
+    let url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
 
-                if (distance < 3000) {
-                    busLines.local.push({ from: node, to: otherNode, type: "local" });
-                } else if (distance >= 10000 && distance <= 30000) {
-                    busLines.regional.push({ from: node, to: otherNode, type: "regional" });
-                } else if (distance > 30000) {
-                    busLines.longDistance.push({ from: node, to: otherNode, type: "longDistance" });
-                }
-            }
-        });
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            let postOffices = data.elements.map(node => ({
+                id: node.id,
+                lat: node.lat,
+                lon: node.lon,
+                name: node.tags.name || "Neznámá pošta"
+            }));
+
+            // Spojíme pošty a vytvoříme linky
+            createPostOfficeLines(postOffices);
+        })
+        .catch(error => console.error("Chyba při načítání pošt:", error));
+}
+
+// Funkce pro generování linek mezi obcemi s poštou
+function createPostOfficeLines(postOffices) {
+    let lines = [];
+
+    for (let i = 0; i < postOffices.length - 1; i++) {
+        let fromPost = postOffices[i];
+        let toPost = postOffices[i + 1];
+        
+        // Spojíme obce s poštou do linky
+        let line = createLineBetweenPosts(fromPost, toPost);
+        lines.push(line);
+    }
+
+    // Vytvoření autobusů a zastávek pro každou linku
+    lines.forEach(line => {
+        createBusRoute(line);
+    });
+}
+
+// Funkce pro vytvoření linky mezi dvěma poštami
+function createLineBetweenPosts(fromPost, toPost) {
+    // Vytvoříme trasu mezi těmito poštami
+    let line = {
+        from: fromPost,
+        to: toPost,
+        stops: [fromPost, toPost]  // Představuje zastávky na začátku a konci
+    };
+
+    // Přidáme zastávky po cestě (mohou být vyhledány na základě silnic nebo vzdálenosti)
+    line.stops = addIntermediateStops(line.from, line.to);
+
+    return line;
+}
+
+// Funkce pro přidání zastávek mezi poštami (například na základě vzdálenosti nebo silnice)
+function addIntermediateStops(fromPost, toPost) {
+    // Tento krok by měl vytvořit zastávky mezi těmito poštami, pokud jsou k dispozici
+    // Zde můžeme implementovat logiku pro hledání zastávek mezi obcemi
+
+    let stops = []; 
+    // Přidáme náhodné zastávky mezi dvěma poštami pro tento příklad
+    stops.push({
+        lat: (fromPost.lat + toPost.lat) / 2,
+        lon: (fromPost.lon + toPost.lon) / 2,
+        name: "Mezizastávka"
     });
 
-    console.log("Vygenerované linky:", busLines);
-    return busLines;
+    return stops;
+}
+
+// Funkce pro vytvoření autobusové linky
+function createBusRoute(line) {
+    // Tento krok by měl vytvořit trasu autobusu na základě linek
+    console.log(`Vytvoření autobusové linky z ${line.from.name} do ${line.to.name}`);
+    // Můžeme zde přidat vizualizaci na mapě, autobusy atd.
 } 
 
 function drawBusLines(busLines) {
