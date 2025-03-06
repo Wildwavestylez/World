@@ -376,6 +376,61 @@ loadBusStops();
 setInterval(checkUnlockedBusStops, 10000);
 
 
+// Funkce pro výpočet vzdálenosti mezi dvěma souřadnicemi (Haversinova formule)
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Poloměr Země v metrech
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Výsledek v metrech
+}
+
+// Funkce pro sloučení blízkých zastávek
+function mergeCloseStops(stops, threshold = 100) {
+    let mergedStops = [];
+
+    stops.forEach(stop => {
+        let foundCluster = mergedStops.find(cluster => 
+            getDistance(cluster.lat, cluster.lon, stop.lat, stop.lon) < threshold
+        );
+
+        if (foundCluster) {
+            // Přidáme nové jméno a zprůměrujeme polohu
+            foundCluster.names.push(stop.name);
+            foundCluster.lat = (foundCluster.lat + stop.lat) / 2;
+            foundCluster.lon = (foundCluster.lon + stop.lon) / 2;
+        } else {
+            // Vytvoříme novou skupinu
+            mergedStops.push({ 
+                lat: stop.lat, 
+                lon: stop.lon, 
+                names: [stop.name] 
+            });
+        }
+    });
+
+    return mergedStops;
+}
+
+// Funkce pro vykreslení zastávek na mapu
+function displayStopsOnMap(stops) {
+    let mergedStops = mergeCloseStops(stops);
+
+    mergedStops.forEach(stop => {
+        let marker = L.marker([stop.lat, stop.lon], { icon: stopIcon }).addTo(map);
+        
+        // Zobrazení jmen všech sloučených zastávek v popupu
+        marker.bindPopup(`<b>Zastávky:</b><br>${stop.names.join(", ")}`);
+    });
+}
+
     </script>
 </body>
 </html>
