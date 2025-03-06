@@ -303,80 +303,59 @@ document.body.appendChild(resumeButton);
             }
         }, 1000);
 
-// Pole pro ukládání zastávek
-let busStops = [];
+// URL na ikonu zastávky
+const busStopIcon = L.icon({
+    iconUrl: "https://i.imgur.com/ByUDLOI.png",
+    iconSize: [20, 20]
+});
 
 // Funkce pro načtení autobusových zastávek z Overpass API
 function loadBusStops() {
-    let bounds = map.getBounds();
-    let query = `
+    let overpassQuery = `
         [out:json];
-        node["highway"="bus_stop"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-        out;
+        node["highway"="bus_stop"](bbox);
+        out body;
     `;
 
-    let url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+    let bbox = map.getBounds();
+    let queryURL = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery.replace("bbox", `${bbox.getSouth()},${bbox.getWest()},${bbox.getNorth()},${bbox.getEast()}`))}`;
 
-    fetch(url)
+    fetch(queryURL)
         .then(response => response.json())
         .then(data => {
-            data.elements.forEach(stop => {
-                let stopMarker = L.marker([stop.lat, stop.lon], {
-                    icon: L.icon({
-                        iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/76/Bus-stop-icon.svg',
-                        iconSize: [20, 20]
-                    })
-                }).addTo(map)
-                  .bindPopup(`Autobusová zastávka: ${stop.tags.name || "Neznámá"}`);
-                
-                // Přidáme zastávku do seznamu, abychom ji mohli později odemykat
-                busStops.push({
-                    lat: stop.lat,
-                    lon: stop.lon,
-                    name: stop.tags.name || "Neznámá",
-                    unlocked: false, // Zastávka je na začátku uzamčená
-                    marker: stopMarker
-                });
+            data.elements.forEach(busStop => {
+                let lat = busStop.lat;
+                let lon = busStop.lon;
 
-                // Skryjeme zastávky, které jsou mimo polygon
-                checkStopVisibility();
+                let marker = L.marker([lat, lon], { icon: busStopIcon }).addTo(map);
+                marker.bindPopup("Autobusová zastávka");
+
+                // Přidáme zastávku do pole pro další kontrolu odemčení
+                busStops.push({ lat, lon, marker, unlocked: false });
             });
         })
         .catch(error => console.error("Chyba při načítání zastávek:", error));
 }
 
-// Funkce pro kontrolu, zda se zastávka nachází v odemčeném území
-function checkStopVisibility() {
+// Funkce pro kontrolu, zda jsou zastávky v odemčeném území
+function checkUnlockedBusStops() {
     busStops.forEach(stop => {
-        let inside = isPointInsidePolygon([stop.lat, stop.lon], polygonPoints);
-        if (inside && !stop.unlocked) {
+        if (!stop.unlocked && isPointInPolygon([stop.lat, stop.lon], polygonPoints)) {
             stop.unlocked = true;
-            alert(`Odemkl jsi zastávku: ${stop.name}`);
+            stop.marker.setOpacity(1); // Zviditelnění zastávky
+            alert("Odemknuta nová autobusová zastávka!");
         }
-        stop.marker.setOpacity(inside ? 1 : 0);
     });
 }
 
-// Pomocná funkce pro kontrolu, zda bod leží uvnitř polygonu
-function isPointInsidePolygon(point, polygon) {
-    let x = point[0], y = point[1];
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        let xi = polygon[i][0], yi = polygon[i][1];
-        let xj = polygon[j][0], yj = polygon[j][1];
+// Inicializujeme pole zastávek
+let busStops = [];
 
-        let intersect = ((yi > y) !== (yj > y)) &&
-                        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
-
-// Načteme zastávky při startu hry
+// Spustíme načítání zastávek
 loadBusStops();
 
-// Po každém rozšíření polygonu zkontrolujeme nové zastávky
-setInterval(checkStopVisibility, 10000);
+// Pravidelně kontrolujeme, zda jsou nějaké zastávky nově odemčeny
+setInterval(checkUnlockedBusStops, 2000);10000);
 
 
     </script>
