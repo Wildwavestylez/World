@@ -420,7 +420,24 @@ setInterval(() => {
         unlockBlockedPoints();
         updateUnlockedStops(); // Aktualizace seznamu zastávek
     }
-}, 1000);
+}, 10000);
+
+function findMainNodes(stops, maxDistance = 500) {
+    let mainNodes = [];
+
+    stops.forEach(stop => {
+        let nearbyStops = stops.filter(otherStop =>
+            stop.id !== otherStop.id && getDistance(stop.lat, stop.lon, otherStop.lat, otherStop.lon) < maxDistance
+        );
+
+        if (nearbyStops.length >= 3) {  // Pokud jsou v okolí aspoň 3 další zastávky
+            mainNodes.push(stop);
+        }
+    });
+
+    console.log("Hlavní uzly:", mainNodes);
+    return mainNodes;
+}
     </script>
 </body>
 </html>
