@@ -155,6 +155,61 @@
         document.getElementById('expandLineBtn').addEventListener('click', function () {
             alert("Funkce pro rozšíření linky bude brzy přidána!");
         });
+
+let selectedStops = [];
+let busStops = [];
+
+// Kliknutí na zastávku → přidání do linky
+function selectStop(marker, stop) {
+    if (selectedStops.includes(stop)) {
+        selectedStops = selectedStops.filter(s => s !== stop);
+        marker.setIcon(defaultIcon);
+    } else {
+        selectedStops.push(stop);
+        marker.setIcon(selectedIcon);
+    }
+
+    updateStartLineButton();
+}
+
+// Aktualizace tlačítka "Spustit linku"
+function updateStartLineButton() {
+    let btn = document.getElementById('startLineBtn');
+    if (selectedStops.length >= 2) {
+        btn.style.display = "inline-block";
+    } else {
+        btn.style.display = "none";
+    }
+}
+
+// Přidání zastávek do mapy
+function loadBusStops(data) {
+    data.elements.forEach(busStop => {
+        if (busStop.lat && busStop.lon) {
+            let stop = {
+                lat: busStop.lat,
+                lon: busStop.lon,
+                name: busStop.tags.name || "Zastávka bez názvu"
+            };
+
+            let marker = L.marker([stop.lat, stop.lon], { icon: defaultIcon })
+                .addTo(map)
+                .bindPopup(stop.name)
+                .on('click', () => selectStop(marker, stop));
+
+            busStops.push({ marker, stop });
+        }
+    });
+}
+
+// Spuštění nové linky
+document.getElementById('startLineBtn').addEventListener('click', function () {
+    alert("Linka spuštěna mezi vybranými zastávkami!");
+});
+
+// Ikony
+let defaultIcon = L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] });
+let selectedIcon = L.icon({ iconUrl: "https://i.imgur.com/z4dG2Jq.png", iconSize: [20, 20] });
     </script>
 </body>
 </html>
