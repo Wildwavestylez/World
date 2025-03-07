@@ -41,8 +41,12 @@
             height: 100%;
         }
 
-        button {
+        .btn-container {
             margin-top: 10px;
+        }
+
+        button {
+            margin: 5px;
             padding: 10px 20px;
             font-size: 16px;
             background-color: #007bff;
@@ -75,7 +79,11 @@
     <div id="map-container">
         <div id="map"></div>
     </div>
-    <button id="confirmBtn" disabled>Potvrdit výběr</button>
+    <div class="btn-container">
+        <button id="confirmBtn" disabled>Potvrdit výběr</button>
+        <button id="newLineBtn" style="display: none;">Vytvořit novou linku</button>
+        <button id="expandLineBtn" style="display: none;">Rozšiř linku</button>
+    </div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
@@ -108,6 +116,11 @@
 
             alert("Vybraná oblast: " + lat.toFixed(5) + ", " + lon.toFixed(5));
 
+            // Skrytí tlačítka "Potvrdit výběr", zobrazení nových tlačítek
+            document.getElementById('confirmBtn').style.display = "none";
+            document.getElementById('newLineBtn').style.display = "inline-block";
+            document.getElementById('expandLineBtn').style.display = "inline-block";
+
             let overpassQuery = `
                 [out:json];
                 node(around:5000, ${lat}, ${lon})["highway"="bus_stop"];
@@ -131,6 +144,16 @@
                     });
                 })
                 .catch(error => console.error("Chyba při načítání zastávek:", error));
+        });
+
+        // Event pro vytvoření nové linky
+        document.getElementById('newLineBtn').addEventListener('click', function () {
+            alert("Funkce pro vytvoření nové linky bude brzy přidána!");
+        });
+
+        // Event pro rozšíření linky
+        document.getElementById('expandLineBtn').addEventListener('click', function () {
+            alert("Funkce pro rozšíření linky bude brzy přidána!");
         });
     </script>
 </body>
