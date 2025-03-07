@@ -6,186 +6,131 @@
     <title>Autobusová hra</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f4f4f4;
-            padding: 20px;
-        }
-
-        h1 {
-            margin-bottom: 10px;
-            font-size: 22px;
-            color: #333;
-        }
-
-        #map-container {
-            width: 90%;
-            max-width: 600px;
-            height: 450px;
-            margin: 10px auto;
-            border-radius: 15px;
-            overflow: hidden;
-            border: 3px solid #333;
-            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
-        }
-
-        #map {
-            width: 100%;
-            height: 100%;
-        }
-
-        .btn-container {
-            margin-top: 10px;
-        }
-
-        button {
-            margin: 5px;
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-
-        button:hover:not(:disabled) {
-            background-color: #0056b3;
-        }
-
-        @media (max-width: 600px) {
-            #map-container {
-                width: 100%;
-                height: 400px;
-            }
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f4; padding: 20px; }
+        h1 { margin-bottom: 10px; font-size: 22px; color: #333; }
+        #map-container { width: 90%; max-width: 600px; height: 450px; margin: 10px auto; border-radius: 15px; overflow: hidden; border: 3px solid #333; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2); }
+        #map { width: 100%; height: 100%; }
+        .btn-container { margin-top: 10px; }
+        button { margin: 5px; padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background 0.3s; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        button:hover:not(:disabled) { background-color: #0056b3; }
+        #linesList { margin-top: 15px; text-align: left; display: inline-block; }
+        .line-item { padding: 5px 10px; background: white; border: 1px solid #ddd; border-radius: 5px; margin: 5px 0; font-size: 14px; }
+        @media (max-width: 600px) { #map-container { width: 100%; height: 400px; } }
     </style>
 </head>
 <body>
     <h1>Vyberte startovní oblast</h1>
-    <div id="map-container">
-        <div id="map"></div>
-    </div>
+    <div id="map-container"><div id="map"></div></div>
     <div class="btn-container">
         <button id="confirmBtn" disabled>Potvrdit výběr</button>
         <button id="newLineBtn" style="display: none;">Vytvořit novou linku</button>
         <button id="expandLineBtn" style="display: none;">Rozšiř linku</button>
-<button id="startLineBtn" style="display: none;">Spustit linku</button>
     </div>
+    <div id="linesList"></div>
 
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-let busLines = []; // Uložené linky
-let currentBalance = 1000; // Počáteční peníze hráče
-let nextLineCost = 0; // Cena první linky = 0
-let selectedStops = [];
-let busStops = [];
-let busLine = null;
+        let map = L.map('map').setView([50.0755, 14.4378], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+        
+        let marker;
+        let busStops = [];
+        let currentStops = [];
+        let currentRoute;
+        let lines = [];
+        let lineCounter = 1;
 
-document.getElementById('newLineBtn').addEventListener('click', function () {
-    if (currentBalance >= nextLineCost) {
-        startCreatingLine();
-    } else {
-        alert("Nemáš dostatek peněz na vytvoření nové linky!");
-    }
-});
-
-document.getElementById('expandLineBtn').addEventListener('click', function () {
-    expandExistingLine();
-});
-
-document.getElementById('startLineBtn').addEventListener('click', function () {
-    if (selectedStops.length >= 2) {
-        createBusLine();
-    } else {
-        alert("Vyber alespoň dvě zastávky pro linku.");
-    }
-});
-
-// Aktivuje výběr zastávek pro novou linku
-function startCreatingLine() {
-    selectedStops = [];
-    alert("Klikni na zastávky pro vytvoření nové linky.");
-}
-
-// Přidává zastávku do linky
-function selectStop(marker, stop) {
-    if (selectedStops.includes(stop)) {
-        selectedStops = selectedStops.filter(s => s !== stop);
-        marker.setIcon(defaultIcon);
-    } else {
-        selectedStops.push(stop);
-        marker.setIcon(selectedIcon);
-    }
-
-    document.getElementById('startLineBtn').style.display = selectedStops.length >= 2 ? "inline-block" : "none";
-}
-
-// Vytvoří novou linku
-function createBusLine() {
-    let latlngs = selectedStops.map(stop => [stop.lat, stop.lon]);
-    let newLine = L.polyline(latlngs, { color: 'blue', weight: 4 }).addTo(map);
-    
-    busLines.push({ line: newLine, stops: [...selectedStops] });
-
-    currentBalance -= nextLineCost; // Odečtení ceny linky
-    nextLineCost = Math.ceil(nextLineCost * 1.1) || 500; // Zvýšení ceny další linky
-    
-    alert(`Linka vytvořena! Zůstatek: ${currentBalance} Kč, cena další linky: ${nextLineCost} Kč`);
-
-    selectedStops = [];
-    document.getElementById('startLineBtn').style.display = "none";
-}
-
-// Rozšiřuje existující linku
-function expandExistingLine() {
-    if (busLines.length === 0) {
-        alert("Nejdřív vytvoř aspoň jednu linku.");
-        return;
-    }
-
-    alert("Klikni na zastávky, které chceš přidat do existující linky.");
-    
-    map.on('click', function (e) {
-        let nearestLine = findNearestLine(e.latlng);
-        if (nearestLine) {
-            nearestLine.stops.push({ lat: e.latlng.lat, lon: e.latlng.lng });
-            nearestLine.line.setLatLngs(nearestLine.stops.map(s => [s.lat, s.lon]));
-            alert("Zastávka přidána do linky!");
-        }
-    });
-}
-
-// Najde nejbližší linku pro přidání zastávky
-function findNearestLine(latlng) {
-    let minDist = Infinity;
-    let nearest = null;
-    
-    busLines.forEach(line => {
-        line.stops.forEach(stop => {
-            let dist = map.distance(latlng, L.latLng(stop.lat, stop.lon));
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = line;
-            }
+        map.on('click', function (e) {
+            if (marker) marker.setLatLng(e.latlng);
+            else marker = L.marker(e.latlng).addTo(map);
+            document.getElementById('confirmBtn').disabled = false;
         });
-    });
 
-    return nearest;
-}
+        document.getElementById('confirmBtn').addEventListener('click', function () {
+            if (!marker) return;
+            let lat = marker.getLatLng().lat;
+            let lon = marker.getLatLng().lng;
 
+            this.style.display = "none";
+            document.getElementById('newLineBtn').style.display = "inline-block";
+            document.getElementById('expandLineBtn').style.display = "inline-block";
+
+            let overpassQuery = `[out:json]; node(around:5000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
+
+            fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`)
+                .then(response => response.json())
+                .then(data => {
+                    data.elements.forEach(busStop => {
+                        if (busStop.lat && busStop.lon) {
+                            let stopMarker = L.marker([busStop.lat, busStop.lon], {
+                                icon: L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20], iconAnchor: [10, 10] })
+                            }).addTo(map).bindPopup(busStop.tags.name || "Zastávka bez názvu");
+
+                            stopMarker.on('click', () => selectBusStop(busStop.lat, busStop.lon, stopMarker));
+
+                            busStops.push({ lat: busStop.lat, lon: busStop.lon, name: busStop.tags.name || "Neznámá zastávka", marker: stopMarker });
+                        }
+                    });
+                });
+        });
+
+        function selectBusStop(lat, lon, marker) {
+            if (currentStops.includes(marker)) return;
+            currentStops.push(marker);
+            marker.setIcon(L.icon({ iconUrl: "https://i.imgur.com/bnKjqNX.png", iconSize: [25, 25], iconAnchor: [12, 12] }));
+
+            if (currentStops.length >= 2) {
+                updateRoute();
+            }
+        }
+
+        function updateRoute() {
+            if (currentRoute) map.removeLayer(currentRoute);
+            let latlngs = currentStops.map(stop => stop.getLatLng());
+            currentRoute = L.polyline(latlngs, { color: getRandomColor(), weight: 4 }).addTo(map);
+        }
+
+        function createRoute() {
+            if (currentStops.length < 2) return alert("Musíte vybrat alespoň dvě zastávky!");
+            
+            let startStop = busStops.find(stop => stop.marker === currentStops[0]);
+            let endStop = busStops.find(stop => stop.marker === currentStops[currentStops.length - 1]);
+
+            let lineName = `Linka ${lineCounter}: ${startStop.name} → ${endStop.name}`;
+            lines.push({ id: lineCounter, route: currentRoute, start: startStop, end: endStop });
+
+            updateLinesList();
+            lineCounter++;
+
+            currentStops = [];
+            currentRoute = null;
+        }
+
+        function updateLinesList() {
+            let listContainer = document.getElementById("linesList");
+            listContainer.innerHTML = "";
+            lines.forEach(line => {
+                let item = document.createElement("div");
+                item.className = "line-item";
+                item.textContent = line.id + ". " + line.start.name + " → " + line.end.name;
+                listContainer.appendChild(item);
+            });
+        }
+
+        function getRandomColor() {
+            let colors = ["blue", "red", "green", "purple", "orange"];
+            return colors[lines.length % colors.length];
+        }
+
+        document.getElementById('newLineBtn').addEventListener('click', function () {
+            createRoute();
+        });
+
+        document.getElementById('expandLineBtn').addEventListener('click', function () {
+            alert("Rozšíření linky bude přidáno později.");
+        });
     </script>
 </body>
 </html>
