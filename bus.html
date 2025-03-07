@@ -159,8 +159,13 @@
 
 let selectedStops = [];
 let busStops = [];
+let busLine = null; // Trasa linky
 
-// Kliknutí na zastávku → přidání do linky
+// Ikony zastávek
+let defaultIcon = L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] });
+let selectedIcon = L.icon({ iconUrl: "https://i.imgur.com/z4dG2Jq.png", iconSize: [20, 20] });
+
+// Přidání zastávky do linky
 function selectStop(marker, stop) {
     if (selectedStops.includes(stop)) {
         selectedStops = selectedStops.filter(s => s !== stop);
@@ -173,17 +178,13 @@ function selectStop(marker, stop) {
     updateStartLineButton();
 }
 
-// Aktualizace tlačítka "Spustit linku"
+// Aktivace tlačítka "Spustit linku"
 function updateStartLineButton() {
     let btn = document.getElementById('startLineBtn');
-    if (selectedStops.length >= 2) {
-        btn.style.display = "inline-block";
-    } else {
-        btn.style.display = "none";
-    }
+    btn.style.display = selectedStops.length >= 2 ? "inline-block" : "none";
 }
 
-// Přidání zastávek do mapy
+// Načtení zastávek do mapy
 function loadBusStops(data) {
     data.elements.forEach(busStop => {
         if (busStop.lat && busStop.lon) {
@@ -203,6 +204,42 @@ function loadBusStops(data) {
     });
 }
 
+// Spustíme linku = vytvoříme trasu
+function startBusLine() {
+    if (busLine) {
+        map.removeLayer(busLine);
+    }
+
+    let latlngs = selectedStops.map(stop => [stop.lat, stop.lon]);
+    busLine = L.polyline(latlngs, { color: 'blue', weight: 4 }).addTo(map);
+    
+    moveBus(latlngs); // 🚍 Spustíme autobus
+}
+
+// Přesun autobusu mezi zastávkami
+function moveBus(stops) {
+    let busMarker = L.marker(stops[0], { icon: selectedIcon }).addTo(map);
+    let index = 0;
+
+    function move() {
+        if (index < stops.length - 1) {
+            let nextStop = stops[index + 1];
+            busMarker.setLatLng(nextStop);
+            index++;
+            setTimeout(move, 2000); // Každé 2 sekundy pohyb na další zastávku
+        }
+    }
+    
+    move();
+}
+
+// Přidání event listeneru na tlačítko
+document.addEventListener("DOMContentLoaded", function () {
+    let startLineBtn = document.getElementById('startLineBtn');
+    if (startLineBtn) {
+        startLineBtn.addEventListener('click', startBusLine);
+    }
+});
 // Spuštění nové linky
 document.getElementById('startLineBtn').addEventListener('click', function () {
     alert("Linka spuštěna mezi vybranými zastávkami!");
