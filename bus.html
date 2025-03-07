@@ -113,11 +113,11 @@
         }
 
 
-let activeRoute = null; // Uchovává právě rozšiřovanou linku
+let activeRoute = null; // Proměnná pro uložení indexu aktivní linky
 
 function selectRouteToExtend(index) {
-    activeRoute = index; // Nastavíme aktivní linku podle kliknutí
-    updateLinesList(); // Aktualizujeme seznam linek a zvýrazníme aktivní linku
+    activeRoute = index; // Nastavíme aktivní linku
+    updateLinesList(); // Aktualizujeme seznam linek, aby byla linka zvýrazněna
 }
 
     document.querySelectorAll('.route-item').forEach(el => el.classList.remove('selected'));
@@ -126,7 +126,7 @@ function selectRouteToExtend(index) {
 
         function updateLinesList() {
     let listContainer = document.getElementById("linesList");
-    listContainer.innerHTML = ""; // Vymažeme seznam před přidáním nových položek
+    listContainer.innerHTML = ""; // Vymažeme seznam
 
     lines.forEach((line, index) => {
         let item = document.createElement("div");
@@ -134,7 +134,7 @@ function selectRouteToExtend(index) {
         item.id = `line-${index}`;
         item.textContent = `Linka ${index + 1}: ${line.start.name} → ${line.end.name}`;
 
-        // Kliknutím nastavíme linku jako aktivní pro rozšíření
+        // Kliknutím na linku ji nastavíme jako aktivní pro rozšíření
         item.onclick = () => selectRouteToExtend(index);
 
         // Zvýrazníme aktivní linku
@@ -142,7 +142,7 @@ function selectRouteToExtend(index) {
             item.classList.add("selected");
         }
 
-        listContainer.appendChild(item); // Přidáme položku do seznamu
+        listContainer.appendChild(item);
     });
 }
         function getRandomColor() {
@@ -171,8 +171,8 @@ function addStopToRoute(stop) {
     }
 
     let line = lines[activeRoute]; // Používáme aktivní linku
-    line.stops.push(stop); // Přidáme novou zastávku k vybrané lince
-    line.end = stop; // Aktualizujeme konečnou zastávku
+    line.stops.push(stop); // Přidáme zastávku k vybrané lince
+    line.end = stop; // Nastavíme novou konečnou zastávku
 
     updateLinesList(); // Opět aktualizujeme seznam linek
 }
