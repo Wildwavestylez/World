@@ -115,9 +115,10 @@
 
 let activeRoute = null; // Uchovává právě rozšiřovanou linku
 
-// Funkce pro výběr linky k rozšíření
-function selectRouteToExtend(routeIndex) {
-    activeRoute = routeIndex; // Nastavíme aktivní linku
+function selectRouteToExtend(index) {
+    activeRoute = index; // Nastavíme aktivní linku
+    updateLinesList(); // Aktualizujeme seznam linek (vizuálně zvýrazníme)
+}
     document.querySelectorAll('.route-item').forEach(el => el.classList.remove('selected'));
     document.getElementById(`route-${routeIndex}`).classList.add('selected');
 }
@@ -132,11 +133,11 @@ function selectRouteToExtend(routeIndex) {
         item.id = `line-${index}`;
         item.textContent = `Linka ${index + 1}: ${line.start.name} → ${line.end.name}`;
 
-        // Kliknutím nastavíme aktivní linku pro rozšíření
+        // Kliknutím se linka nastaví jako aktivní pro rozšíření
         item.onclick = () => selectRouteToExtend(index);
 
-        // Pokud je linka aktivní, zvýrazníme ji
-        if (activeRoute === index) {
+        // Zvýrazníme aktivní linku
+        if (index === activeRoute) {
             item.classList.add("selected");
         }
 
@@ -160,6 +161,19 @@ function extendRoute(stopName, lat, lng) {
         // Aktualizujeme seznam linek
         updateRoutesList();
     }
+}
+
+function addStopToRoute(stop) {
+    if (activeRoute === null) {
+        alert("Nejdříve vyberte linku, kterou chcete rozšířit.");
+        return;
+    }
+
+    let line = lines[activeRoute];
+    line.stops.push(stop); // Přidáme zastávku do vybrané linky
+    line.end = stop; // Konečná zastávka se aktualizuje
+
+    updateLinesList(); // Aktualizujeme seznam, aby se změnila konečná zastávka
 }
 
         document.getElementById('newLineBtn').addEventListener('click', function () {
