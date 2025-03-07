@@ -112,29 +112,65 @@
             currentRoute = null;
         }
 
+
+let activeRoute = null; // Uchovává právě rozšiřovanou linku
+
+// Funkce pro výběr linky k rozšíření
+function selectRouteToExtend(routeIndex) {
+    activeRoute = routeIndex; // Nastavíme aktivní linku
+    document.querySelectorAll('.route-item').forEach(el => el.classList.remove('selected'));
+    document.getElementById(`route-${routeIndex}`).classList.add('selected');
+}
+
         function updateLinesList() {
-            let listContainer = document.getElementById("linesList");
-            listContainer.innerHTML = "";
-            lines.forEach(line => {
-                let item = document.createElement("div");
-                item.className = "line-item";
-                item.textContent = line.id + ". " + line.start.name + " → " + line.end.name;
-                listContainer.appendChild(item);
-            });
+    let listContainer = document.getElementById("linesList");
+    listContainer.innerHTML = "";
+
+    lines.forEach((line, index) => {
+        let item = document.createElement("div");
+        item.className = "line-item";
+        item.id = `line-${index}`;
+        item.textContent = `Linka ${index + 1}: ${line.start.name} → ${line.end.name}`;
+
+        // Kliknutím nastavíme aktivní linku pro rozšíření
+        item.onclick = () => selectRouteToExtend(index);
+
+        // Pokud je linka aktivní, zvýrazníme ji
+        if (activeRoute === index) {
+            item.classList.add("selected");
         }
 
+        listContainer.appendChild(item);
+    });
+}
         function getRandomColor() {
             let colors = ["blue", "red", "green", "purple", "orange"];
             return colors[lines.length % colors.length];
         }
 
+// Přidání nové zastávky k vybrané lince
+function extendRoute(stopName, lat, lng) {
+    if (activeRoute !== null) {
+        routes[activeRoute].stops.push(stopName);
+        routes[activeRoute].coords.push({ lat, lng });
+
+        // Aktualizujeme trasu na mapě
+        updateRouteOnMap(activeRoute);
+
+        // Aktualizujeme seznam linek
+        updateRoutesList();
+    }
+}
+
         document.getElementById('newLineBtn').addEventListener('click', function () {
             createRoute();
         });
 
-        document.getElementById('expandLineBtn').addEventListener('click', function () {
-            alert("Rozšíření linky bude přidáno později.");
-        });
+        // Přidání logiky pro tlačítko "Rozšířit linku"
+document.getElementById("extendRouteButton").addEventListener("click", () => {
+    alert("Vyberte linku ze seznamu a poté přidejte nové zastávky.");
+});
+
     </script>
 </body>
 </html>
