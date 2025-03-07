@@ -3,472 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rozšiřující se polygon</title>
+    <title>Autobusová hra</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        body, html {
+        * {
             margin: 0;
             padding: 0;
-            height: 100%;
+            box-sizing: border-box;
         }
+
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 22px;
+            color: #333;
+        }
+
+        #map-container {
+            width: 90%;
+            max-width: 600px;
+            height: 450px;
+            margin: 10px auto;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 3px solid #333;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
         #map {
             width: 100%;
-            height: 78vh;
+            height: 100%;
         }
-        #info {
-            padding: 16px;
-            background: white;
-            border-top: 1px solid #ccc;
-            font-family: Arial, sans-serif;
+
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
             font-size: 16px;
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+
+        @media (max-width: 600px) {
+            #map-container {
+                width: 100%;
+                height: 400px;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="map"></div>  
-    <div id="info">
-        Peníze: <span id="money">20000</span> Kč | 
-        Rozloha: <span id="area">0</span> km² | 
-        Počet obyvatel: <span id="population">0</span>
+    <h1>Vyberte startovní oblast</h1>
+    <div id="map-container">
+        <div id="map"></div>
     </div>
+    <button id="confirmBtn" disabled>Potvrdit výběr</button>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         // Inicializace mapy
-        let map = L.map('map').setView([49.1151400, 13.8285094], 13);
+        let map = L.map('map').setView([50.0755, 14.4378], 12); // Praha jako výchozí bod
 
+        // Přidání dlaždic OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        let polygonPoints = [];
-        let center = [0, 0];  // Výchozí střed bude 0, 0, ale změní se po výběru hráče
-        let polygon = L.polygon([], { color: 'blue' }).addTo(map);
+        let marker;
 
-        let blockedPoints = {};
-        let moveTracker = [];
-
-        let populationDensity = 130; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
-        let money = 20000; // Počáteční peníze
-
-        // Funkce pro výpočet vzdálenosti mezi dvěma body
-        function distance(coord1, coord2) {
-            let latDiff = coord1[0] - coord2[0];
-            let lonDiff = coord1[1] - coord2[1];
-            return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
-        }
-
-        // Funkce pro získání těžiště polygonu
-        function getCentroid(points) {
-            let latSum = 0, lngSum = 0;
-            points.forEach(p => { latSum += p[0]; lngSum += p[1]; });
-            return [latSum / points.length, lngSum / points.length];
-        }
-
-        // Funkce pro posun bodu od středu
-        function movePointAway(point, center, distance) {
-            let latDiff = point[0] - center[0];
-            let lngDiff = point[1] - center[1];
-            let length = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-            let scale = distance / length;
-            return [point[0] + latDiff * scale, point[1] + lngDiff * scale];
-        }
-
-        // Funkce pro výpočet plochy polygonu (v km²)
-        function calculatePolygonArea(points) {
-            let earthRadius = 6371; // Poloměr Země v km
-            let area = 0;
-            let n = points.length;
-
-            for (let i = 0; i < n; i++) {
-                let p1 = points[i];
-                let p2 = points[(i + 1) % n];
-
-                let lat1 = p1[0] * Math.PI / 180;
-                let lon1 = p1[1] * Math.PI / 180;
-                let lat2 = p2[0] * Math.PI / 180;
-                let lon2 = p2[1] * Math.PI / 180;
-
-                area += (lon2 - lon1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+        // Kliknutí na mapu → umístění markeru
+        map.on('click', function (e) {
+            if (marker) {
+                marker.setLatLng(e.latlng);
+            } else {
+                marker = L.marker(e.latlng).addTo(map);
             }
-
-            area = Math.abs(area * earthRadius * earthRadius / 2);
-            return area;
-        }
-
-        // Funkce pro rozšiřování polygonu
-        // Funkce pro rozšiřování polygonu
-function expandPolygon() {
-    if (money >= 100) { // Pokud hráč má dost peněz, může rozšiřovat
-        let center = getCentroid(polygonPoints);
-        let totalPoints = polygonPoints.length;
-        let maxWaitTurns = Math.floor(1.5 * totalPoints);
-
-        let availablePoints = polygonPoints
-            .map((point, index) => ({ point, index }))
-            .filter(({ index }) => !blockedPoints[index]);
-
-        if (availablePoints.length === 0) return;
-
-        let forcedMoveIndex = moveTracker.indexOf(Math.max(...moveTracker));
-        let mustMove = moveTracker[forcedMoveIndex] >= maxWaitTurns;
-
-        let selectedIndex;
-        if (mustMove) {
-            selectedIndex = forcedMoveIndex;
-        } else {
-            let randomPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
-            selectedIndex = randomPoint.index;
-        }
-
-        polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0015);
-
-        moveTracker[selectedIndex] = 0;
-        blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
-
-        for (let i = 0; i < moveTracker.length; i++) {
-            if (i !== selectedIndex) moveTracker[i]++;
-        }
-
-        polygon.setLatLngs(polygonPoints);
-
-        let area = calculatePolygonArea(polygonPoints);
-        let population = Math.round(area * populationDensity);
-
-        document.getElementById("area").textContent = area.toFixed(2);
-        document.getElementById("population").textContent = population.toLocaleString();
-        document.getElementById("money").textContent = money;
-
-        // Odečteme 100 Kč za každý pohyb polygonu
-        money -= 100;
-        document.getElementById("money").textContent = money;
-    } else {
-        // Pokud dojdou peníze, zastavíme rozšiřování
-        alert("Nemáte dostatek peněz na rozšiřování území.");
-    }
-}
-
-// Funkce pro obnovení rozšiřování po získání peněz
-function resumeExpansion() {
-    if (money >= 100) {
-        // Začne opět rozšiřování
-        setInterval(() => {
-            if (polygonPoints.length > 0) {  // Pokud je polygon inicializován
-                expandPolygon();
-                unlockBlockedPoints();
-            }
-        }, 1000);
-    }
-}
-
-// // Funkce pro rozšiřování polygonu
-function expandPolygon() {
-    if (money >= 100) { // Pokud hráč má dost peněz, může rozšiřovat
-        let center = getCentroid(polygonPoints);
-        let totalPoints = polygonPoints.length;
-        let maxWaitTurns = Math.floor(1.5 * totalPoints);
-
-        let availablePoints = polygonPoints
-            .map((point, index) => ({ point, index }))
-            .filter(({ index }) => !blockedPoints[index]);
-
-        if (availablePoints.length === 0) return;
-
-        let forcedMoveIndex = moveTracker.indexOf(Math.max(...moveTracker));
-        let mustMove = moveTracker[forcedMoveIndex] >= maxWaitTurns;
-
-        let selectedIndex;
-        if (mustMove) {
-            selectedIndex = forcedMoveIndex;
-        } else {
-            let randomPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
-            selectedIndex = randomPoint.index;
-        }
-
-        polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0015);
-
-        moveTracker[selectedIndex] = 0;
-        blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
-
-        for (let i = 0; i < moveTracker.length; i++) {
-            if (i !== selectedIndex) moveTracker[i]++;
-        }
-
-        polygon.setLatLngs(polygonPoints);
-
-        let area = calculatePolygonArea(polygonPoints);
-        let population = Math.round(area * populationDensity);
-
-        document.getElementById("area").textContent = area.toFixed(2);
-        document.getElementById("population").textContent = population.toLocaleString();
-        document.getElementById("money").textContent = money;
-
-        // Odečteme 100 Kč za každý pohyb polygonu
-        money -= 100;
-        document.getElementById("money").textContent = money;
-    } else {
-        // Pokud dojdou peníze, zastavíme rozšiřování
-        alert("Nemáte dostatek peněz na rozšiřování území.");
-    }
-}
-
-// Funkce pro obnovení rozšiřování po získání peněz
-function resumeExpansion() {
-    if (money >= 100) {
-        // Začne opět rozšiřování
-        setInterval(() => {
-            if (polygonPoints.length > 0) {  // Pokud je polygon inicializován
-                expandPolygon();
-                unlockBlockedPoints();
-            }
-        }, 1000);
-    }
-}
-
-// Tlačítko pro obnovení rozšiřování
-let resumeButton = document.createElement("button");
-resumeButton.innerHTML = "Pokračovat v rozšiřování";
-resumeButton.style.position = "absolute";
-resumeButton.style.bottom = "60px";
-resumeButton.style.left = "50%";
-resumeButton.style.transform = "translateX(-50%)";
-resumeButton.style.padding = "10px";
-resumeButton.style.backgroundColor = "#4CAF50";
-resumeButton.style.color = "white";
-resumeButton.style.border = "none";
-resumeButton.style.cursor = "pointer";
-
-// Akce po kliknutí na tlačítko
-resumeButton.addEventListener("click", function() {
-    if (money >= 100) {
-        resumeExpansion();
-        this.disabled = true; // Po kliknutí tlačítko zmizí
-    } else {
-        alert("Nemáte dostatek peněz na pokračování v rozšiřování.");
-    }
-});
-
-// Přidáme tlačítko na stránku
-document.body.appendChild(resumeButton);
-// Akce po kliknutí na tlačítko
-resumeButton.addEventListener("click", function() {
-    if (money >= 100) {
-        resumeExpansion();
-        this.disabled = true; // Po kliknutí tlačítko zmizí
-    } else {
-        alert("Nemáte dostatek peněz na pokračování v rozšiřování.");
-    }
-});
-
-// Přidáme tlačítko na stránku
-document.body.appendChild(resumeButton);
-
-        // Funkce pro odemknutí zablokovaných bodů
-        function unlockBlockedPoints() {
-            let currentTime = Date.now();
-            for (let index in blockedPoints) {
-                if (currentTime >= blockedPoints[index]) {
-                    delete blockedPoints[index];
-                }
-            }
-        }
-
-        // Funkce pro začátek hry – kliknutí na mapu a potvrzení
-        map.on('click', function(event) {
-            if (polygonPoints.length === 0) {  // Umožní výběr místa pouze jednou
-                let latlng = event.latlng;
-                if (confirm("Chcete začít hru v tomto místě?")) {
-                    center = [latlng.lat, latlng.lng];
-                    polygonPoints = [
-                        [center[0] + 0.002, center[1] - 0.002],
-                        [center[0] + 0.002, center[1] + 0.002],
-                        [center[0] - 0.002, center[1] + 0.002],
-                        [center[0] - 0.002, center[1] - 0.002]
-                    ];
-                    polygon.setLatLngs(polygonPoints);
-                    expandPolygon();  // Začne rozšiřování polygonu
-                }
-            }
+            document.getElementById('confirmBtn').disabled = false;
         });
 
-        // Startovací funkce pro rozšiřování
-        setInterval(() => {
-            if (polygonPoints.length > 0) {  // Pokud je polygon inicializován
-                expandPolygon();
-                unlockBlockedPoints();
-            }
-        }, 1000);
+        // Potvrzení výběru a načtení zastávek z Overpass API
+        document.getElementById('confirmBtn').addEventListener('click', function () {
+            if (!marker) return;
+            
+            let lat = marker.getLatLng().lat;
+            let lon = marker.getLatLng().lng;
 
-//
-let busStops = []; // Globální pole pro všechny zastávky
-let unlockedStops = []; // Seznam odemčených zastávek
+            alert("Vybraná oblast: " + lat.toFixed(5) + ", " + lon.toFixed(5));
 
-let mainNodes = [];  // Globální proměnná pro zastávky
+            let overpassQuery = `
+                [out:json];
+                node(around:5000, ${lat}, ${lon})["highway"="bus_stop"];
+                out;
+            `;
 
-// Funkce pro načtení zastávek
-function loadBusStops(bounds) {
-    let query = `
-        [out:json];
-        node["highway"="bus_stop"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-        out;
-    `;
-
-    let url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
-
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            let rawStops = data.elements.map(node => ({
-                id: node.id,
-                lat: node.lat,
-                lon: node.lon,
-                name: node.tags.name || "Neznámá zastávka"
-            }));
-
-            let mergedStops = mergeCloseStops(rawStops, 100);
-            mainNodes = mergedStops;  // Uložíme zastávky do globální proměnné
-            displayBusStops(mainNodes);
-
-            // Po načtení zastávek vygenerujeme linky
-            let busLines = generateBusLines(mainNodes);
-            drawBusLines(busLines);
-        })
-        .catch(error => console.error("Chyba při načítání zastávek:", error));
-}
-
-// Funkce pro sloučení zastávek blíže než X metrů
-function mergeCloseStops(stops, maxDistance) {
-    let merged = [];
-
-    stops.forEach(stop => {
-        let foundCluster = merged.find(cluster =>
-            getDistance(cluster.lat, cluster.lon, stop.lat, stop.lon) < maxDistance
-        );
-
-        if (foundCluster) {
-            foundCluster.count++;
-            if (!foundCluster.name.includes(stop.name)) {
-                foundCluster.name += ` / ${stop.name}`;
-            }
-        } else {
-            merged.push({ ...stop, count: 1 });
-        }
-    });
-
-    return merged;
-}
-
-// Funkce pro zobrazení zastávek na mapě
-function displayBusStops(stops) {
-    stops.forEach(stop => {
-        let marker = L.marker([stop.lat, stop.lon], {
-            icon: L.icon({
-                iconUrl: "https://i.imgur.com/ByUDLOI.png",
-                iconSize: [25, 25]
-            })
-        }).addTo(map);
-
-        marker.bindPopup(`<b>${stop.name}</b>`);
-    });
-}
-
-let creatingRoute = false;
-let currentRoute = [];
-let busRoutes = [];
-let routeCost = 0;
-let baseRoutePrice = 1000;
-let baseStopPrice = 100;
-let firstRouteFree = true;
-
-// Tlačítko pro vytváření linky
-let createRouteButton = document.createElement("button");
-createRouteButton.innerHTML = "Vytvořit linku";
-createRouteButton.style.position = "absolute";
-createRouteButton.style.top = "10px";
-createRouteButton.style.left = "10px";
-createRouteButton.style.padding = "10px";
-createRouteButton.style.backgroundColor = "#2196F3";
-createRouteButton.style.color = "white";
-createRouteButton.style.border = "none";
-createRouteButton.style.cursor = "pointer";
-document.body.appendChild(createRouteButton);
-
-// Tlačítko pro dokončení linky
-let finishRouteButton = document.createElement("button");
-finishRouteButton.innerHTML = "Dokončit linku";
-finishRouteButton.style.position = "absolute";
-finishRouteButton.style.top = "50px";
-finishRouteButton.style.left = "10px";
-finishRouteButton.style.padding = "10px";
-finishRouteButton.style.backgroundColor = "#4CAF50";
-finishRouteButton.style.color = "white";
-finishRouteButton.style.border = "none";
-finishRouteButton.style.cursor = "pointer";
-finishRouteButton.style.display = "none"; // Skryté, dokud hráč nezačne tvořit linku
-document.body.appendChild(finishRouteButton);
-
-// Spustí režim vytváření linky
-createRouteButton.addEventListener("click", () => {
-    if (!firstRouteFree && money < baseRoutePrice) {
-        alert("Nemáte dostatek peněz na vytvoření linky.");
-        return;
-    }
-    creatingRoute = true;
-    currentRoute = [];
-    routeCost = firstRouteFree ? 0 : baseRoutePrice;
-    createRouteButton.disabled = true;
-    finishRouteButton.style.display = "block";
-    alert("Klikněte na zastávky v pořadí, ve kterém je chcete přidat do linky.");
-});
-
-// Přidá zastávku do linky
-function addStopToRoute(stop) {
-    if (!creatingRoute) return;
-
-    let stopName = stop.feature.properties.name || "Neznámá zastávka";
-
-    if (currentRoute.length >= 2) {
-        routeCost += baseStopPrice + (currentRoute.length - 2) * 100;
-    }
-
-    if (money < routeCost) {
-        alert("Nemáte dostatek peněz na přidání další zastávky.");
-        return;
-    }
-
-    let confirmAdd = confirm(`Přidat zastávku ${stopName} k lince?`);
-    if (confirmAdd) {
-        currentRoute.push(stop);
-        alert(`Zastávka ${stopName} byla přidána k lince.`);
-    }
-}
-
-// Dokončí tvorbu linky
-finishRouteButton.addEventListener("click", () => {
-    if (currentRoute.length < 2) {
-        alert("Linka musí obsahovat alespoň dvě zastávky!");
-        return;
-    }
-
-    busRoutes.push({ stops: currentRoute });
-    money -= routeCost;
-    firstRouteFree = false;
-
-    alert("Linka byla vytvořena!");
-    creatingRoute = false;
-    createRouteButton.disabled = false;
-    finishRouteButton.style.display = "none";
-});
-
-// Přiřazení klikací akce zastávkám
-stopsLayer.eachLayer((layer) => {
-    layer.on("click", () => addStopToRoute(layer));
-});
-
-  </script>
+            fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Zastávky:", data);
+                    data.elements.forEach(busStop => {
+                        if (busStop.lat && busStop.lon) {
+                            L.marker([busStop.lat, busStop.lon], {
+                                icon: L.icon({
+                                    iconUrl: "https://i.imgur.com/ByUDLOI.png",
+                                    iconSize: [20, 20],
+                                    iconAnchor: [10, 10]
+                                })
+                            }).addTo(map).bindPopup(busStop.tags.name || "Zastávka bez názvu");
+                        }
+                    });
+                })
+                .catch(error => console.error("Chyba při načítání zastávek:", error));
+        });
+    </script>
 </body>
 </html>
