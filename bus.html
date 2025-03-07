@@ -57,7 +57,7 @@
             document.getElementById('newLineBtn').style.display = "inline-block";
             document.getElementById('expandLineBtn').style.display = "inline-block";
 
-            let overpassQuery = `[out:json]; node(around:5000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
+            let overpassQuery = `[out:json]; node(around:25000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
 
             fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`)
                 .then(response => response.json())
