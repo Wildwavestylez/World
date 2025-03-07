@@ -208,6 +208,15 @@ document.getElementById('startLineBtn').addEventListener('click', function () {
     alert("Linka spuštěna mezi vybranými zastávkami!");
 });
 
+document.addEventListener("DOMContentLoaded", function () {
+    let startLineBtn = document.getElementById('startLineBtn');
+    if (startLineBtn) {
+        startLineBtn.addEventListener('click', function () {
+            alert("Linka spuštěna mezi vybranými zastávkami!");
+        });
+    }
+});
+
 // Ikony
 let defaultIcon = L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] });
 let selectedIcon = L.icon({ iconUrl: "https://i.imgur.com/z4dG2Jq.png", iconSize: [20, 20] });
