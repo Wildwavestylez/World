@@ -116,16 +116,17 @@
 let activeRoute = null; // Uchovává právě rozšiřovanou linku
 
 function selectRouteToExtend(index) {
-    activeRoute = index; // Nastavíme aktivní linku
-    updateLinesList(); // Aktualizujeme seznam linek (vizuálně zvýrazníme)
+    activeRoute = index; // Nastavíme aktivní linku podle kliknutí
+    updateLinesList(); // Aktualizujeme seznam linek a zvýrazníme aktivní linku
 }
+
     document.querySelectorAll('.route-item').forEach(el => el.classList.remove('selected'));
     document.getElementById(`route-${routeIndex}`).classList.add('selected');
 }
 
         function updateLinesList() {
     let listContainer = document.getElementById("linesList");
-    listContainer.innerHTML = "";
+    listContainer.innerHTML = ""; // Vymažeme seznam před přidáním nových položek
 
     lines.forEach((line, index) => {
         let item = document.createElement("div");
@@ -133,7 +134,7 @@ function selectRouteToExtend(index) {
         item.id = `line-${index}`;
         item.textContent = `Linka ${index + 1}: ${line.start.name} → ${line.end.name}`;
 
-        // Kliknutím se linka nastaví jako aktivní pro rozšíření
+        // Kliknutím nastavíme linku jako aktivní pro rozšíření
         item.onclick = () => selectRouteToExtend(index);
 
         // Zvýrazníme aktivní linku
@@ -141,7 +142,7 @@ function selectRouteToExtend(index) {
             item.classList.add("selected");
         }
 
-        listContainer.appendChild(item);
+        listContainer.appendChild(item); // Přidáme položku do seznamu
     });
 }
         function getRandomColor() {
@@ -169,13 +170,12 @@ function addStopToRoute(stop) {
         return;
     }
 
-    let line = lines[activeRoute];
-    line.stops.push(stop); // Přidáme zastávku do vybrané linky
-    line.end = stop; // Konečná zastávka se aktualizuje
+    let line = lines[activeRoute]; // Používáme aktivní linku
+    line.stops.push(stop); // Přidáme novou zastávku k vybrané lince
+    line.end = stop; // Aktualizujeme konečnou zastávku
 
-    updateLinesList(); // Aktualizujeme seznam, aby se změnila konečná zastávka
+    updateLinesList(); // Opět aktualizujeme seznam linek
 }
-
         document.getElementById('newLineBtn').addEventListener('click', function () {
             createRoute();
         });
