@@ -91,7 +91,7 @@ map.on('zoomend', function() {
 
 // Funkce pro načítání zastávek
 function fetchBusStops(lat, lon) {
-    let query = `[out:json]; node(around:300000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
+    let query = `[out:json]; node(around:75000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
         .then(data => {
