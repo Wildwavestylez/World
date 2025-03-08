@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -93,18 +93,27 @@
         }
 
         function createRoute() {
-            if (currentStops.length < 2) return alert("Musíte vybrat alespoň dvě zastávky!");
-            let start = currentStops[0];
-            let end = currentStops[currentStops.length - 1];
+    if (currentStops.length < 2) return alert("Musíte vybrat alespoň dvě zastávky!");
 
-            let line = { id: lineCounter, route: currentRoute, stops: [...currentStops], name: `Linka ${lineCounter}: ${start.getPopup().getContent()} → ${end.getPopup().getContent()}` };
-            lines.push(line);
-            lineCounter++;
+    let start = currentStops[0];
+    let end = currentStops[currentStops.length - 1];
 
-            updateLinesList();
-            currentStops = [];
-            currentRoute = null;
-        }
+    // Vytvoření nové linky s náhodnou barvou
+    let line = { 
+        id: lineCounter, 
+        route: currentRoute, 
+        stops: [...currentStops], 
+        name: `Linka ${lineCounter}: ${start.getPopup().getContent()} → ${end.getPopup().getContent()}`, 
+        color: getRandomColor() // Přidání barvy
+    };
+
+    lines.push(line);
+    lineCounter++;
+
+    updateLinesList();
+    currentStops = [];
+    currentRoute = null;
+}
 
         function extendRoute(lat, lon, marker) {
     let selectedLine = lines.find(line => line.id === expandingLine);
@@ -126,9 +135,14 @@
 }
 
         function redrawLine(line) {
-            if (line.route) map.removeLayer(line.route);
-            line.route = L.polyline(line.stops.map(stop => stop.getLatLng()), { color: getRandomColor(), weight: 4 }).addTo(map);
-        }
+    if (line.route) map.removeLayer(line.route);
+
+    // Použijeme barvu linky, pokud je nastavena
+    line.route = L.polyline(line.stops.map(stop => stop.getLatLng()), { 
+        color: line.color || getRandomColor(), // Pokud není barva, použijeme náhodnou
+        weight: 4 
+    }).addTo(map);
+}
 
         function updateLinesList() {
             let list = document.getElementById("linesList");
@@ -142,7 +156,14 @@
             });
         }
 
-        function getRandomColor() { return ["blue", "red", "green", "purple", "orange"][lines.length % 5]; }
+        function getRandomColor() {
+    const colors = [
+        "blue", "red", "green", "purple", "orange", "pink", "cyan", "brown", "grey", "yellow",
+        "lime", "teal", "indigo", "violet", "gold", "aqua", "salmon", "coral", "turquoise",
+        "magenta", "darkgreen", "darkblue", "periwinkle", "crimson", "chartreuse"
+    ];
+    return colors[lines.length % colors.length]; // Vybere barvu podle počtu linek
+}
 
         document.getElementById('newLineBtn').addEventListener('click', createRoute);
         document.getElementById('expandLineBtn').addEventListener('click', () => expandingLine = null);
