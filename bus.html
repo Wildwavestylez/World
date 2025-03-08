@@ -91,7 +91,7 @@ map.on('zoomend', function() {
 
 // Funkce pro načítání zastávek
 function fetchBusStops(lat, lon) {
-    let query = `[out:json]; node(around:8000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
+    let query = `[out:json]; node(around:300000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
         .then(data => {
@@ -143,7 +143,7 @@ function updateRoute() {
     currentRoute = L.polyline(currentStops.map(stop => stop.getLatLng()), { color: getRandomColor(), weight: 4 }).addTo(map);
 }
     // Herní bilance a ceny
-let balance = 10000;
+let balance = 3000;
 let busSpeed = 13.89; // 50 km/h v metrech za sekundu
 let earningsPerKm = 10;
 let costPerNewRoute = 1000; // Cena za vytvoření nové linky
