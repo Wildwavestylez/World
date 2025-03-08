@@ -57,29 +57,53 @@
 
             fetchBusStops(marker.getLatLng().lat, marker.getLatLng().lng);
         });
+    
+    // Funkce pro výpočet vzdálenosti mezi dvěma souřadnicemi (v metrech)
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Poloměr Země v km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c * 1000; // Vzdálenost v metrech
+    return distance;
+}
 
-        function fetchBusStops(lat, lon) {
-            let query = `[out:json]; node(around:5000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
-            fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
-                .then(response => response.json())
-                .then(data => {
-                    data.elements.forEach(busStop => {
-                        let stopMarker = L.marker([busStop.lat, busStop.lon], {
-                            icon: L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] })
-                        }).addTo(map).bindPopup(busStop.tags.name || "Zastávka bez názvu");
 
-                        stopMarker.on('click', () => {
-                            if (expandingLine) {
-                                extendRoute(busStop.lat, busStop.lon, stopMarker);
-                            } else {
-                                selectBusStop(busStop.lat, busStop.lon, stopMarker);
-                            }
-                        });
+function fetchBusStops(lat, lon) {
+    let query = `[out:json]; node(around:5000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
+    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            data.elements.forEach(busStop => {
+                // Zkontrolujeme, zda již existuje zastávka se stejným názvem a v okruhu 100m
+                let existingStop = busStops.find(stop => 
+                    stop.name === busStop.tags.name && 
+                    getDistance(stop.lat, stop.lon, busStop.lat, busStop.lon) <= 100
+                );
 
-                        busStops.push({ lat: busStop.lat, lon: busStop.lon, name: busStop.tags.name || "Neznámá zastávka", marker: stopMarker });
+                // Pokud zastávka neexistuje, přidáme ji
+                if (!existingStop) {
+                    let stopMarker = L.marker([busStop.lat, busStop.lon], {
+                        icon: L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] })
+                    }).addTo(map).bindPopup(busStop.tags.name || "Zastávka bez názvu");
+
+                    stopMarker.on('click', () => {
+                        if (expandingLine) {
+                            extendRoute(busStop.lat, busStop.lon, stopMarker);
+                        } else {
+                            selectBusStop(busStop.lat, busStop.lon, stopMarker);
+                        }
                     });
-                });
-        }
+
+                    // Přidáme novou zastávku do seznamu
+                    busStops.push({ lat: busStop.lat, lon: busStop.lon, name: busStop.tags.name || "Neznámá zastávka", marker: stopMarker });
+                }
+            });
+        });
+}
 
         function selectBusStop(lat, lon, marker) {
             if (currentStops.includes(marker)) return;
