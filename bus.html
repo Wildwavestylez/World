@@ -71,7 +71,25 @@ function getDistance(lat1, lon1, lat2, lon2) {
     return distance;
 }
 
+// Sledování zoomu
+map.on('zoomend', function() {
+    let currentZoom = map.getZoom();
+    if (currentZoom < 14) {
+        // Skrytí všech zastávek, pokud je zoom větší než úroveň města (např. na úroveň okresu nebo širší)
+        busStops.forEach(stop => {
+            stop.marker.remove(); // Skrytí markeru
+        });
+    } else {
+        // Zobrazení všech zastávek při dostatečně detailním zoomu
+        busStops.forEach(stop => {
+            if (!map.hasLayer(stop.marker)) {
+                stop.marker.addTo(map); // Přidání markeru na mapu
+            }
+        });
+    }
+});
 
+// Funkce pro načítání zastávek
 function fetchBusStops(lat, lon) {
     let query = `[out:json]; node(around:8000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
@@ -88,7 +106,7 @@ function fetchBusStops(lat, lon) {
                 if (!existingStop) {
                     let stopMarker = L.marker([busStop.lat, busStop.lon], {
                         icon: L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] })
-                    }).addTo(map).bindPopup(busStop.tags.name || "Zastávka bez názvu");
+                    }).bindPopup(busStop.tags.name || "Zastávka bez názvu");
 
                     stopMarker.on('click', () => {
                         if (expandingLine) {
@@ -100,22 +118,31 @@ function fetchBusStops(lat, lon) {
 
                     // Přidáme novou zastávku do seznamu
                     busStops.push({ lat: busStop.lat, lon: busStop.lon, name: busStop.tags.name || "Neznámá zastávka", marker: stopMarker });
+
+                    // Zobrazíme zastávku, pokud je zoom dostatečně detailní
+                    let currentZoom = map.getZoom();
+                    if (currentZoom >= 12) {
+                        stopMarker.addTo(map); // Zobrazíme marker
+                    }
                 }
             });
         });
 }
 
-        function selectBusStop(lat, lon, marker) {
-            if (currentStops.includes(marker)) return;
-            currentStops.push(marker);
-            if (currentStops.length >= 2) updateRoute();
-        }
 
-        function updateRoute() {
-            if (currentRoute) map.removeLayer(currentRoute);
-            currentRoute = L.polyline(currentStops.map(stop => stop.getLatLng()), { color: getRandomColor(), weight: 4 }).addTo(map);
-        }
-// Herní bilance a ceny
+// Funkce pro přidání nové zastávky k lince
+function selectBusStop(lat, lon, marker) {
+    if (currentStops.includes(marker)) return;
+    currentStops.push(marker);
+    if (currentStops.length >= 2) updateRoute();
+}
+
+// Funkce pro aktualizaci trasy
+function updateRoute() {
+    if (currentRoute) map.removeLayer(currentRoute);
+    currentRoute = L.polyline(currentStops.map(stop => stop.getLatLng()), { color: getRandomColor(), weight: 4 }).addTo(map);
+}
+    // Herní bilance a ceny
 let balance = 10000;
 let busSpeed = 13.89; // 50 km/h v metrech za sekundu
 let earningsPerKm = 10;
