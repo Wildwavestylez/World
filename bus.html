@@ -115,26 +115,80 @@ function fetchBusStops(lat, lon) {
             if (currentRoute) map.removeLayer(currentRoute);
             currentRoute = L.polyline(currentStops.map(stop => stop.getLatLng()), { color: getRandomColor(), weight: 4 }).addTo(map);
         }
-
-        // Herní bilance
+// Herní bilance a ceny
 let balance = 10000;
-let lineCreationCost = 500;
-let stopAdditionCost = 100;
+let busSpeed = 13.89; // 50 km/h v metrech za sekundu
+let earningsPerKm = 10;
+let costPerNewRoute = 1000; // Cena za vytvoření nové linky
+let costPerNewStop = 500; // Cena za přidání nové zastávky
+let busIcon = L.icon({ iconUrl: "https://i.imgur.com/SWlnHG2.jpg", iconSize: [30, 30] });
+
+// Přidání autobusu na linku
+function addBusToRoute(line) {
+    if (line.stops.length < 2) return;
+
+    let busMarker = L.marker(line.stops[0].getLatLng(), { icon: busIcon }).addTo(map);
+    line.bus = { marker: busMarker, currentStopIndex: 0, direction: 1 }; // Směr: 1 = vpřed, -1 = zpět
+
+    moveBus(line);
+}
+
+// Pohyb autobusu mezi zastávkami
+function moveBus(line) {
+    let bus = line.bus;
+    if (!bus) return;
+
+    let nextStopIndex = bus.currentStopIndex + bus.direction;
+    if (nextStopIndex >= line.stops.length || nextStopIndex < 0) {
+        bus.direction *= -1; // Otočení směru jízdy
+        nextStopIndex = bus.currentStopIndex + bus.direction;
+    }
+
+    let startLatLng = line.stops[bus.currentStopIndex].getLatLng();
+    let endLatLng = line.stops[nextStopIndex].getLatLng();
+    let distance = map.distance(startLatLng, endLatLng); // Vzdálenost v metrech
+    let travelTime = distance / busSpeed; // Čas v sekundách
+
+    let startTime = Date.now();
+    
+    function animateBus() {
+        let elapsed = (Date.now() - startTime) / 1000;
+        if (elapsed >= travelTime) {
+            bus.marker.setLatLng(endLatLng);
+            bus.currentStopIndex = nextStopIndex;
+
+            // Přičtení zisku za ujetou vzdálenost
+            let earnings = Math.round((distance / 1000) * earningsPerKm);
+            balance += earnings;
+            updateBalanceDisplay();
+
+            // Pokračování k další zastávce
+            setTimeout(() => moveBus(line), 1000);
+            return;
+        }
+
+        let lat = startLatLng.lat + (endLatLng.lat - startLatLng.lat) * (elapsed / travelTime);
+        let lng = startLatLng.lng + (endLatLng.lng - startLatLng.lng) * (elapsed / travelTime);
+        bus.marker.setLatLng([lat, lng]);
+
+        requestAnimationFrame(animateBus);
+    }
+
+    animateBus();
+}
 
 // Aktualizace zůstatku na obrazovce
 function updateBalanceDisplay() {
     document.getElementById("balance").textContent = `Zůstatek: ${balance} Kč`;
 }
-
-// Vytvoření nové linky (s poplatkem)
+// Funkce pro vytvoření nové linky
 function createRoute() {
     if (currentStops.length < 2) return alert("Musíte vybrat alespoň dvě zastávky!");
 
-    // První linka zdarma, další s poplatkem
-    let cost = lines.length === 0 ? 0 : lineCreationCost;
-    if (balance < cost) return alert("Nedostatek financí!");
-    balance -= cost;
-    lineCreationCost = Math.ceil(lineCreationCost * 1.1); // Další linka bude o 10 % dražší
+    // Kontrola, jestli máme dostatek peněz na vytvoření nové linky
+    if (balance < costPerNewRoute) {
+        return alert("Nemáte dostatek peněz na vytvoření nové linky!");
+    }
 
     let start = currentStops[0];
     let end = currentStops[currentStops.length - 1];
@@ -150,49 +204,44 @@ function createRoute() {
     lines.push(line);
     lineCounter++;
 
+    balance -= costPerNewRoute; // Odečteme cenu za vytvoření nové linky
+    updateBalanceDisplay();
+
     updateLinesList();
-    updateBalanceDisplay(); // Aktualizace peněz
+    addBusToRoute(line); // Přidání autobusu na linku
+
     currentStops = [];
     currentRoute = null;
 }
 
-        // Rozšíření linky (s poplatkem)
+// Funkce pro přidání nové zastávky k existující lince
 function extendRoute(lat, lon, marker) {
     let selectedLine = lines.find(line => line.id === expandingLine);
     if (!selectedLine) return;
 
-    // První dvě zastávky jsou zdarma, další stojí peníze
-    let cost = selectedLine.stops.length < 2 ? 0 : stopAdditionCost;
-    if (balance < cost) return alert("Nedostatek financí!");
-    balance -= cost;
-    stopAdditionCost = Math.ceil(stopAdditionCost * 1.1); // Další přidání zastávky bude o 10 % dražší
+    // Kontrola, jestli máme dostatek peněz na přidání nové zastávky
+    if (balance < costPerNewStop) {
+        return alert("Nemáte dostatek peněz na přidání nové zastávky!");
+    }
 
+    // Přidání nové zastávky
     selectedLine.stops.push(marker);
+
+    // Aktualizace názvu linky podle poslední přidané zastávky
     selectedLine.name = `${selectedLine.name.split(" → ")[0]} → ${marker.getPopup().getContent()}`;
 
+    balance -= costPerNewStop; // Odečteme cenu za přidání nové zastávky
+    updateBalanceDisplay();
+
+    // Aktualizace seznamu linek a vykreslení linky
     updateLinesList();
     redrawLine(selectedLine);
-    updateBalanceDisplay(); // Aktualizace peněz
 
+    // Po přidání jedné zastávky deaktivujeme režim rozšíření
     expandingLine = null;
     document.querySelectorAll('.line-item').forEach(i => i.classList.remove('selected'));
 }
-
-// Výdělek z linek každou minutu
-setInterval(() => {
-    let earnings = 0;
-    lines.forEach(line => {
-        let distance = 0;
-        for (let i = 1; i < line.stops.length; i++) {
-            distance += map.distance(line.stops[i - 1].getLatLng(), line.stops[i].getLatLng()) / 1000; // vzdálenost v km
-        }
-        earnings += distance * 10; // 10 Kč/km
-    });
-
-    balance += Math.floor(earnings);
-    updateBalanceDisplay();
-}, 20000); // Každou minutu
-    
+   
     // Přidáme do HTML element pro zůstatek
 document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="position:absolute; top:10px; left:10px; background:white; padding:5px 10px; border-radius:5px; font-weight:bold;">Zůstatek: 10000 Kč</div>');
 
