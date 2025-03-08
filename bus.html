@@ -73,7 +73,7 @@ function getDistance(lat1, lon1, lat2, lon2) {
 
 
 function fetchBusStops(lat, lon) {
-    let query = `[out:json]; node(around:5000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
+    let query = `[out:json]; node(around:85000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
         .then(data => {
