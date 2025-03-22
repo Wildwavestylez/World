@@ -28,6 +28,8 @@
         <button id="confirmBtn" disabled>Potvrdit výběr</button>
         <button id="newLineBtn" style="display: none;">Vytvořit novou linku</button>
         <button id="expandLineBtn" style="display: none;">Rozšiř linku</button>
+        <button id="cancelRouteButton" style="position: absolute; top: 10px; left: 10px; z-index: 1000; display: none;">
+    Zrušit linku</button>
     </div>
     <div id="linesList"></div>
 
@@ -137,10 +139,53 @@ function selectBusStop(lat, lon, marker) {
     if (currentStops.length >= 2) updateRoute();
 }
 
-// Funkce pro aktualizaci trasy
+
+
+
+// Přidání event listeneru pro tlačítko
+document.getElementById('cancelRouteButton').addEventListener('click', function() {
+    cancelRoute();
+});
+
+// Funkce pro reset linky
+function cancelRoute() {
+    if (currentRoute) {
+        map.removeLayer(currentRoute); // Odstranění linky z mapy
+        currentRoute = null;
+    }
+
+    // Reset označených zastávek
+    currentStops.forEach(stop => stop.setOpacity(1)); // Reset opacity, pokud chceme vizuální změnu
+    currentStops = [];
+
+    // Skryjeme tlačítko "Zrušit linku"
+    document.getElementById('cancelRouteButton').style.display = 'none';
+}
+
+// Funkce pro výběr zastávky do linky
+function selectBusStop(lat, lon, marker) {
+    if (currentStops.includes(marker)) return;
+
+    currentStops.push(marker);
+
+    // Zobrazíme tlačítko "Zrušit linku"
+    document.getElementById('cancelRouteButton').style.display = 'block';
+
+    if (currentStops.length >= 2) {
+        updateRoute();
+    }
+}
+
+// Funkce pro vykreslení linky mezi zastávkami
 function updateRoute() {
-    if (currentRoute) map.removeLayer(currentRoute);
-    currentRoute = L.polyline(currentStops.map(stop => stop.getLatLng()), { color: getRandomColor(), weight: 4 }).addTo(map);
+    if (currentRoute) {
+        map.removeLayer(currentRoute);
+    }
+    
+    currentRoute = L.polyline(
+        currentStops.map(stop => stop.getLatLng()),
+        { color: getRandomColor(), weight: 4 }
+    ).addTo(map);
 }
     // Herní bilance a ceny
 let balance = 3000;
@@ -177,7 +222,7 @@ function moveBus(line) {
     let travelTime = distance / busSpeed; // Čas v sekundách
 
     let startTime = Date.now();
-    
+
     function animateBus() {
         let elapsed = (Date.now() - startTime) / 1000;
         if (elapsed >= travelTime) {
@@ -268,7 +313,7 @@ function extendRoute(lat, lon, marker) {
     expandingLine = null;
     document.querySelectorAll('.line-item').forEach(i => i.classList.remove('selected'));
 }
-   
+
     // Přidáme do HTML element pro zůstatek
 document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="position:absolute; top:10px; left:10px; background:white; padding:5px 10px; border-radius:5px; font-weight:bold;">Zůstatek: 10000 Kč</div>');
 
@@ -294,6 +339,66 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
                 list.appendChild(item);
             });
         }
+    
+    let routeCache = {}; // Ukládání již načtených tras pro optimalizaci
+let buses = [];
+
+function fetchRouteBetweenStops(start, end, lineId) {
+    let query = `[out:json]; way(around:1000, ${start.lat}, ${start.lon})["highway"]; out geom;`;
+    
+    if (routeCache[`${start.lat},${start.lon}-${end.lat},${end.lon}`]) {
+        moveBusOnRoute(routeCache[`${start.lat},${start.lon}-${end.lat},${end.lon}`], lineId);
+        return;
+    }
+
+    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            let route = [];
+            
+            data.elements.forEach(way => {
+                way.geometry.forEach(point => {
+                    route.push([point.lat, point.lon]);
+                });
+            });
+
+            if (route.length > 0) {
+                routeCache[`${start.lat},${start.lon}-${end.lat},${end.lon}`] = route;
+                moveBusOnRoute(route, lineId);
+            }
+        });
+}
+
+function moveBusOnRoute(route, lineId) {
+    let busIcon = L.icon({ iconUrl: "https://i.imgur.com/SWlnHG2.jpg", iconSize: [25, 25] });
+    let busMarker = L.marker(route[0], { icon: busIcon }).addTo(map);
+
+    buses.push({ id: lineId, marker: busMarker });
+
+    let index = 0;
+    function move() {
+        if (index < route.length) {
+            busMarker.setLatLng(route[index]);
+            index++;
+            setTimeout(move, 200); // Každých 200ms se autobus posune
+        } else {
+            setTimeout(() => moveBusOnRoute(route, lineId), 3000); // Po dojezdu chvilku počká a jede znovu
+        }
+    }
+    move();
+}
+
+// Spuštění autobusů na linkách
+function startBuses() {
+    lines.forEach(line => {
+        for (let i = 0; i < line.stops.length - 1; i++) {
+            fetchRouteBetweenStops(line.stops[i].getLatLng(), line.stops[i + 1].getLatLng(), line.id);
+        }
+    });
+}
+
+// Spustíme autobusy po načtení hry
+startBuses();
 
         function getRandomColor() {
     const colors = [
