@@ -61,6 +61,10 @@
             else marker = L.marker(e.latlng).addTo(map);
             document.getElementById('confirmBtn').disabled = false;
         });
+    
+    map.on('click', function(e) {
+    fetchAdditionalBusStops(e.latlng.lat, e.latlng.lng);
+});
 
         document.getElementById('confirmBtn').addEventListener('click', function () {
             this.style.display = "none";
@@ -82,7 +86,37 @@ function getDistance(lat1, lon1, lat2, lon2) {
     const distance = R * c * 1000; // Vzdálenost v metrech
     return distance;
 }
+    
+function fetchAdditionalBusStops(lat, lon) {
+    let query = `[out:json]; node(around:5000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
+    
+    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            data.elements.forEach(busStop => {
+                let existingStop = busStops.find(stop => 
+                    stop.name === busStop.tags.name && 
+                    getDistance(stop.lat, stop.lon, busStop.lat, busStop.lon) <= 100
+                );
 
+                if (!existingStop) {
+                    let stopMarker = L.marker([busStop.lat, busStop.lon], {
+                        icon: L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] })
+                    }).addTo(map).bindPopup(busStop.tags.name || "Zastávka bez názvu");
+
+                    stopMarker.on('click', () => {
+                        if (expandingLine) {
+                            extendRoute(busStop.lat, busStop.lon, stopMarker);
+                        } else {
+                            selectBusStop(busStop.lat, busStop.lon, stopMarker);
+                        }
+                    });
+
+                    busStops.push({ lat: busStop.lat, lon: busStop.lon, name: busStop.tags.name || "Neznámá zastávka", marker: stopMarker });
+                }
+            });
+        });
+}
 // Sledování zoomu
 map.on('zoomend', function() {
     let currentZoom = map.getZoom();
@@ -103,7 +137,7 @@ map.on('zoomend', function() {
 
 // Funkce pro načítání zastávek
 function fetchBusStops(lat, lon) {
-    let query = `[out:json]; node(around:65000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
+    let query = `[out:json]; node(around:8000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
         .then(data => {
@@ -191,19 +225,21 @@ function updateRoute() {
     if (currentRoute) {
         map.removeLayer(currentRoute);
     }
-    
+
     currentRoute = L.polyline(
         currentStops.map(stop => stop.getLatLng()),
         { color: getRandomColor(), weight: 4 }
     ).addTo(map);
 }
-    // Herní bilance a ceny
-let balance = 8000;
+// Herní bilance a ceny
+let balance = localStorage.getItem("balance") ? parseInt(localStorage.getItem("balance")) : 8000;
 let busSpeed = 13.89; // 50 km/h v metrech za sekundu
 let earningsPerKm = 100;
 let costPerNewRoute = 1000; // Cena za vytvoření nové linky
 let costPerNewStop = 300; // Cena za přidání nové zastávky
+let costForNewArea = 2000; // Cena za odkrytí nového území
 let busIcon = L.icon({ iconUrl: "https://i.imgur.com/SWlnHG2.jpg", iconSize: [30, 30] });
+let stops = JSON.parse(localStorage.getItem("stops")) || [];
 
 // Přidání autobusu na linku
 function addBusToRoute(line) {
@@ -349,13 +385,13 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
                 list.appendChild(item);
             });
         }
-    
+
     let routeCache = {}; // Ukládání již načtených tras pro optimalizaci
 let buses = [];
 
 function fetchRouteBetweenStops(start, end, lineId) {
     let query = `[out:json]; way(around:1000, ${start.lat}, ${start.lon})["highway"]; out geom;`;
-    
+
     if (routeCache[`${start.lat},${start.lon}-${end.lat},${end.lon}`]) {
         moveBusOnRoute(routeCache[`${start.lat},${start.lon}-${end.lat},${end.lon}`], lineId);
         return;
@@ -365,7 +401,7 @@ function fetchRouteBetweenStops(start, end, lineId) {
         .then(response => response.json())
         .then(data => {
             let route = [];
-            
+
             data.elements.forEach(way => {
                 way.geometry.forEach(point => {
                     route.push([point.lat, point.lon]);
@@ -380,7 +416,7 @@ function fetchRouteBetweenStops(start, end, lineId) {
 }
 
 function moveBusOnRoute(route, lineId) {
-    let busIcon = L.icon({ iconUrl: "https://i.imgur.com/SWlnHG2.jpg", iconSize: [25, 25] });
+    let busIcon = L.icon({ iconUrl: "https://i.imgur.com/41OPNQH.png", iconSize: [25, 25] });
     let busMarker = L.marker(route[0], { icon: busIcon }).addTo(map);
 
     buses.push({ id: lineId, marker: busMarker });
