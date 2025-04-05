@@ -770,8 +770,8 @@ function updateMoneyDisplay() {
 setInterval(updateMoney, 60000); // Každých 60 sekund
 
 // Periodické fetchování firem a žádostí o licenci
-setInterval(() => fetchBusinessesInPolygon(polygonPoints), 120000); // Každé 2 minuty
-setInterval(() => requestBusinessLicense(), 120000); // Každé 2 minuty
+setInterval(() => fetchBusinessesInPolygon(polygonPoints), 20000); // Každé 2 minuty
+setInterval(() => requestBusinessLicense(), 20000); // Každé 2 minuty
 </script>
 </body>
 </html>
