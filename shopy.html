@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skladová hra</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%;
+            height: 95%;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        #controls button {
+            margin: 4px 0;
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+        }
+/* Styly pro modal */
+.modal {
+    display: none; /* Skrytý modal */
+    position: fixed; /* Fixní pozice nad mapou */
+    z-index: 9999; /* Zajistíme, že bude nad mapou */
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%); /* Centrování modalu */
+    width: 80%;
+    max-width: 600px; /* Můžete upravit šířku modálního okna dle potřeby */
+    height: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+    overflow: auto;
+}
+
+/* Styly pro obsah modalu */
+.modal-content {
+    background-color: #fff;
+    padding: 20px;
+    border: 1px solid #888;
+    border-radius: 8px;
+    max-height: 70vh; /* Omezí maximální výšku modalu */
+    overflow-y: auto; /* Pokud je obsah delší, zobrazí se posuvník */
+}
+
+/* Tlačítko pro zavření */
+#closeModalBtn {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 15px;
+    cursor: pointer;
+    float: right;
+}
+
+#closeModalBtn:hover {
+    background-color: #d32f2f;
+}
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <button onclick="setMode('warehouse')">➕ Přidat sklad</button>
+    <button onclick="setMode('store')">➕ Přidat prodejnu</button>
+</div>
+
+<!-- Okno pro zobrazení obsahu skladu -->
+<div id="warehouseModal" class="modal">
+    <div class="modal-content">
+        <h2>Obsah skladu</h2>
+        <ul id="warehouseContent">
+            <!-- Seznam palet bude generován dynamicky -->
+        </ul>
+        <button id="closeModalBtn">Zavřít</button>
+    </div>
+</div>
+<div id="map"></div>
+    
+<div id="balanceDisplay">Zůstatek: 50000 Kč</div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+    const map = L.map('map').setView([49.8, 15.4], 8); // Česká republika
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    let warehouses = [];
+    let stores = [];
+    let mode = 'warehouse';
+
+    function setMode(newMode) {
+        mode = newMode;
+        alert('Režim přepnut: ' + (mode === 'warehouse' ? 'Přidávání skladů' : 'Přidávání prodejen'));
+    }
+
+    map.on('click', function(e) {
+        if (mode === 'warehouse') {
+            addWarehouse(e);
+        } else {
+            addStore(e);
+        }
+    });
+
+    // Funkce pro přidání skladu
+function addWarehouse(e) {
+    const marker = L.marker(e.latlng, { icon: createIcon('blue') }).addTo(map);
+    marker.bindPopup('<b>Sklad</b><br>Odsud můžeš rozvážet do 80 km.');
+
+    // Uložení skladu do seznamu
+    const newWarehouse = {
+        latlng: e.latlng,
+        marker: marker,
+        pallets: []  // Tento sklad má seznam palet
+    };
+    warehouses.push(newWarehouse);
+
+    // Přidání event listeneru pro otevření modalu při kliknutí na marker
+    marker.on('click', function() {
+        openWarehouseModal(newWarehouse);  // Zavoláme funkci pro otevření modálního okna
+    });
+
+    // Generování zboží pro obchody v dosahu 80 km
+    generateGoodsForNearbyStores(e.latlng);
+
+    console.log('Sklad přidán:', e.latlng);
+}
+
+// Funkce pro generování zboží pro obchody v dosahu 80 km
+function generateGoodsForNearbyStores(warehouseLocation) {
+    stores.forEach(store => {
+        const distance = getDistance(warehouseLocation, store.latlng);
+        
+        // Pokud je obchod v dosahu 80 km
+        if (distance <= 80) {
+            // Vytvoříme zboží pro tento obchod
+            const pallet = createPallet(store);
+            addPalletToWarehouse(warehouseLocation, pallet);
+        }
+    });
+}
+
+// Funkce pro přidání palety do skladu
+function addPalletToWarehouse(warehouseLocation, pallet) {
+    const warehouse = warehouses.find(w => getDistance(w.latlng, warehouseLocation) <= 80);
+    if (warehouse) {
+        warehouse.pallets.push(pallet); // Přidáme paletu do skladu
+    }
+}
+
+// Funkce pro vytvoření palety zboží pro prodejnu
+function createPallet(store) {
+    return {
+        id: generateRandomId(),
+        quantity: Math.floor(Math.random() * 100) + 1,  // Počet kusů na paletě
+        destinationStore: store,
+        createdAt: new Date()
+    };
+}
+
+// Funkce pro získání vzdálenosti mezi dvěma body (sklad a prodejna)
+function getDistance(latlng1, latlng2) {
+    const lat1 = latlng1.lat;
+    const lon1 = latlng1.lng;
+    const lat2 = latlng2.lat;
+    const lon2 = latlng2.lng;
+
+    const R = 6371; // Poloměr Země v km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Vzdálenost v km
+}
+
+// Funkce pro generování náhodného ID palety
+function generateRandomId() {
+    return 'P' + Math.floor(Math.random() * 10000);
+}
+
+
+// Funkce pro přidání prodejny
+function addStore(e) {
+    const distance = getDistanceFromClosestWarehouse(e.latlng);  // získání vzdálenosti od nejbližšího skladu
+    const cost = 10000 + (distance * 1);  // cena prodejny podle vzdálenosti
+    const name = prompt(`Zadej název nové prodejny Lidl (cena: ${cost} Kč):`);
+
+    if (!name) return;
+
+    if (balance >= cost) {
+        balance -= cost;  // odečteme cenu prodejny
+        updateBalanceDisplay();  // aktualizujeme zůstatek
+
+        // Přidáme novou prodejnu do mapy a seznamu
+        const marker = L.marker(e.latlng, { icon: createIcon('green') }).addTo(map);
+        marker.bindPopup(`<b>${name}</b><br>Čeká na zásilku.`);
+        stores.push({ name: name, latlng: e.latlng, marker: marker });
+
+        console.log('Prodejna přidána:', name, e.latlng);
+    } else {
+        alert("Nemáš dostatek peněz na postavení prodejny.");
+    }
+}
+    
+    
+let currentTruckLoad = 5;  // počet palet k doručení, pro test
+let currentTruckLocation = { lat: 50.0, lng: 15.0 };  // příklad aktuální lokace kamionu
+
+// Funkce pro doručení palet
+function deliverGoods() {
+    if (currentTruckLoad > 0 && balance >= 200) {  // musíme mít alespoň 200 Kč na naftu
+        const deliveryProfit = 1000 + getDistanceFromClosestStore(currentTruckLocation) * 10;  // zisk z doručení
+        balance += deliveryProfit;  // přidáme výdělek za doručení
+        currentTruckLoad--;  // odečteme jednu paletu z nákladu
+        balance -= 200;  // náklady na palivo
+        updateBalanceDisplay();  // aktualizujeme zůstatek
+
+        console.log(`Rozvoz dokončen, zisk: ${deliveryProfit} Kč, zůstatek: ${balance} Kč.`);
+    } else {
+        alert("Nemáš dost peněz na pohonné hmoty, nebo žádné palety k rozvozu.");
+    }
+}
+    
+let balance = 50000;  // startovní zůstatek
+
+// Funkce pro aktualizaci zůstatku s zaokrouhlením
+function updateBalanceDisplay() {
+    const balanceDisplay = document.getElementById('balanceDisplay');
+    balance = Math.round(balance);  // Zaokrouhlíme na celé koruny
+    if (balanceDisplay) {
+        balanceDisplay.innerText = `Zůstatek: ${balance} Kč`;
+    } else {
+        console.error("Balance display element not found!");
+    }
+}
+
+// Můžeme to volat vždy po změně peněz
+updateBalanceDisplay();
+    
+function getDistanceFromClosestWarehouse(latlng) {
+    let minDistance = Infinity;
+    for (let i = 0; i < warehouses.length; i++) {
+        let warehouse = warehouses[i];
+        let distance = map.distance(latlng, warehouse.latlng);  // použije funkci distance z Leaflet
+        if (distance < minDistance) {
+            minDistance = distance;
+        }
+    }
+    return minDistance;
+}
+    
+    // Funkce pro generování palet zboží ve skladu
+function generatePalletsInWarehouse(warehouse, numberOfPallets) {
+    for (let i = 0; i < numberOfPallets; i++) {
+        let pallet = {
+            id: `pallet-${Date.now()}-${i}`, // Unikátní ID palety
+            type: "Zboží",
+            quantity: Math.floor(Math.random() * 10) + 1, // Množství na paletě (mezi 1 a 10)
+            destinationStore: findNearestStore(warehouse),
+        };
+        warehouse.pallets.push(pallet); // Přidání palety do skladu
+    }
+    updateWarehouseDisplay(warehouse); // Aktualizuj zobrazení skladu na mapě
+}
+
+// Funkce pro nalezení nejbližší prodejny
+function findNearestStore(warehouse) {
+    const storesInRange = getStoresInRange(warehouse, 80); // Najde prodejny do 80 km
+    const nearestStore = storesInRange[0]; // V tomto případě bereme první prodejnu jako nejbližší
+    return nearestStore;
+}
+
+// Funkce pro získání prodejen v okruhu 80 km
+function getStoresInRange(warehouse, range) {
+    const stores = getAllStores(); // Získáme všechny prodejny
+    const storesInRange = stores.filter(store => getDistance(warehouse, store) <= range);
+    return storesInRange;
+}
+
+// Funkce pro výpočet vzdálenosti mezi dvěma místy (používáme Haversine formula)
+function getDistance(store1, store2) {
+    const lat1 = store1.lat;
+    const lon1 = store1.lon;
+    const lat2 = store2.lat;
+    const lon2 = store2.lon;
+    
+    const R = 6371; // Poloměr Země v km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+    return distance; // Vzdálenost v km
+}
+    // Funkce pro otevření modalu skladu
+// Funkce pro otevření modalu skladu
+function openWarehouseModal(warehouse) {
+    const modal = document.getElementById("warehouseModal");
+    const warehouseContent = document.getElementById("warehouseContent");
+
+    // Vyčistíme předchozí obsah
+    warehouseContent.innerHTML = "";
+
+    // Přidáme všechny palety do seznamu
+    warehouse.pallets.forEach(pallet => {
+        const listItem = document.createElement("li");
+        listItem.textContent = `Paleta: ${pallet.id}, Zboží: ${pallet.quantity} kusů, Cíl: ${pallet.destinationStore.name}`;
+
+        // Tlačítko pro přepravu palety do prodejny
+        const transportButton = document.createElement("button");
+        transportButton.textContent = "Přepravit";
+        transportButton.onclick = () => transportPalletToStore(pallet);
+
+        listItem.appendChild(transportButton);
+        warehouseContent.appendChild(listItem);
+    });
+
+    // Ukázat modal
+    modal.style.display = "block";
+}
+
+// Funkce pro zavření modalu
+document.getElementById("closeModalBtn").onclick = function() {
+    document.getElementById("warehouseModal").style.display = "none";
+}
+
+// Funkce pro přepravu palety do prodejny
+function transportPalletToStore(pallet) {
+    // Zde přidáme logiku pro přepravu palety na prodejnu (např. update skladu a prodejny)
+    alert(`Paleta ${pallet.id} byla přepravena do prodejny ${pallet.destinationStore.name}`);
+
+    // Po přepravě můžeme paletu odstranit ze skladu
+    palletArr = palletArr.filter(p => p.id !== pallet.id); // Odstraníme paletu ze skladu
+    updateWarehouseDisplay(); // Aktualizujeme sklad na mapě
+}
+    
+    function createIcon(color) {
+        return new L.Icon({
+            iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
+            shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+    }
+    
+    
+</script>
+
+</body>
+</html>
