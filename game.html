@@ -242,7 +242,7 @@ function distance(coord1, coord2) {
                 selectedIndex = randomPoint.index;
             }
 
-            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0035);
+            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0335);
 
             moveTracker[selectedIndex] = 0;
             blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
