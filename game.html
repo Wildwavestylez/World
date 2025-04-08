@@ -642,7 +642,7 @@ function clearLocalStorage() {
 
 /// Seznam firem čekajících na licenci
 let waitingBusinesses = [];
-let approvedBusinesses = [];
+let approvedBusinessCount = 0;
 
 // Funkce pro získání firem v polygonu přes Overpass API
 function fetchBusinessesInPolygon(polygonPoints) {
@@ -725,12 +725,13 @@ function requestBusinessLicense() {
     let confirmation = confirm(`Firma "${business.name}" (${business.type}) žádá o licenci k podnikání. Udělit licenci?`);
 
     if (confirmation) {
-        approvedBusinesses.push(business);
+        approvedBusinessCount++; // Zvýšíme počet schválených firem
         console.log(`Firma ${business.name} schválena, začne platit daně.`);
     } else {
         console.log(`Firma ${business.name} zamítnuta.`);
     }
 }
+
 
 let totalTaxes = 0;  // Celkové daně
 
@@ -745,20 +746,16 @@ function updateMoney() {
     let taxes = calculateTaxes(population);
 
     // Přičteme daně z firem
-    approvedBusinesses.forEach(business => {
-        taxes += 20; // Každá schválená firma platí 20 Kč daň za minutu
-    });
+    taxes += approvedBusinessCount * 20; // Každá schválená firma platí 20 Kč daň za minutu
 
-    money += taxes;  // Přičítáme daně do pokladny
+    money += taxes;
     totalTaxes += taxes;
 
     console.log(`Daně za tuto minutu: ${taxes.toLocaleString()} Kč`);
     console.log(`Celkové daně: ${totalTaxes.toLocaleString()} Kč`);
 
-    // Aktualizace zobrazení peněz
     updateMoneyDisplay();
 }
-
 
 
 // Funkce pro aktualizaci zobrazení stavu pokladny
