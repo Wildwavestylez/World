@@ -72,7 +72,13 @@ const maintenanceVehicleIcon = L.icon({
 });
 
 function fetchRoads(bounds) {
-    let query = `[out:json];way["highway"]( ${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out geom;`;
+    let query = `
+[out:json];
+way["highway"]
+  ["highway"!~"^track|path|footway|bridleway|cycleway|service$"]
+  (${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+out geom;
+`;
 
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
