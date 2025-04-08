@@ -686,22 +686,22 @@ function fetchBusinessesInPolygon(polygonPoints) {
 
         let newBusinesses = data.elements
             .filter(element => element.tags.name) // Filtrujeme jen firmy, které mají jméno
-            .map(element => ({
-                id: element.id,
-                name: element.tags.name,
-                type: element.tags.shop || element.tags.amenity || element.tags.craft || "Jiné",
-                lat: element.lat,
-                lon: element.lon
-            }));
+           .map(element => ({
+    id: element.id,
+    name: element.tags.name,
+    type: element.tags.shop || element.tags.amenity || element.tags.craft || "Jiné",
+    city: element.tags["addr:city"] || element.tags["addr:town"] || element.tags["addr:village"] || "neznámé místo",
+    lat: element.lat,
+    lon: element.lon
+}));
 
         let addedNewBusiness = false;
 
         newBusinesses.forEach(business => {
-            if (!waitingBusinesses.some(b => b.id === business.id) &&
-                !approvedBusinesses.some(b => b.id === business.id)) {
-                waitingBusinesses.push(business);
-                addedNewBusiness = true; // Označíme, že jsme přidali novou firmu
-            }
+            if (!waitingBusinesses.some(b => b.id === business.id)) {
+    waitingBusinesses.push(business);
+    addedNewBusiness = true;
+}
         });
 
         console.log("Čekací listina firem:", waitingBusinesses);
@@ -722,8 +722,7 @@ function requestBusinessLicense() {
     let randomIndex = Math.floor(Math.random() * waitingBusinesses.length);
     let business = waitingBusinesses.splice(randomIndex, 1)[0];
 
-    let confirmation = confirm(`Firma "${business.name}" (${business.type}) žádá o licenci k podnikání. Udělit licenci?`);
-
+    let confirmation = confirm(`Firma "${business.name}" (${business.type}) z ${business.city} žádá o licenci k podnikání. Udělit licenci?`);
     if (confirmation) {
         approvedBusinessCount++; // Zvýšíme počet schválených firem
         console.log(`Firma ${business.name} schválena, začne platit daně.`);
