@@ -37,12 +37,12 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        let map = L.map('map').setView([49.0563202, 13.7828583], 15); // Lčovice jako start
+        let map = L.map('map').setView([48.9227636, 13.7986350], 15); // Lčovice jako start
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        let center = [49.0563202, 13.7828583];
+        let center = [48.9227636, 13.7986350];
 
         let polygonPoints = [
             [center[0] + 0.002, center[1] - 0.002],
