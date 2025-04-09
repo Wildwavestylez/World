@@ -226,58 +226,72 @@ function distance(coord1, coord2) {
             return area;
         }
 
-        function expandPolygon() {
-            let center = getCentroid(polygonPoints);
-            let totalPoints = polygonPoints.length;
-            let maxWaitTurns = Math.floor(1.8 * totalPoints);
+        let turn = 0; // Přidáme proměnnou pro sledování počtu tahů
 
-            let availablePoints = polygonPoints
-                .map((point, index) => ({ point, index }))
-                .filter(({ index }) => !blockedPoints[index]);
+function expandPolygon() {
+    turn++; // Každý tah zvýší počet 'turn'
+    
+    let center = getCentroid(polygonPoints);
+    let totalPoints = polygonPoints.length;
+    let maxWaitTurns = Math.floor(0.5 * totalPoints);
 
-            if (availablePoints.length === 0) return;
+    let availablePoints = polygonPoints
+        .map((point, index) => ({ point, index }))
+        .filter(({ index }) => !blockedPoints[index]);
 
-            let forcedMoveIndex = moveTracker.indexOf(Math.max(...moveTracker));
-            let mustMove = moveTracker[forcedMoveIndex] >= maxWaitTurns;
+    if (availablePoints.length === 0) return;
 
-            let selectedIndex;
-            if (mustMove) {
-                selectedIndex = forcedMoveIndex;
-            } else {
-                let randomPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
-                selectedIndex = randomPoint.index;
-            }
+    let forcedMoveIndex = moveTracker.indexOf(Math.max(...moveTracker));
+    let mustMove = moveTracker[forcedMoveIndex] >= maxWaitTurns;
 
-            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0033);
+    let selectedIndex;
+    if (mustMove) {
+        selectedIndex = forcedMoveIndex;
+    } else {
+        let randomPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
+        selectedIndex = randomPoint.index;
+    }
 
-            moveTracker[selectedIndex] = 0;
-            blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
+    // Náhodná vzdálenost mezi 150 a 300 metry (přibližně) nebo větší pro každý 50. tah
+    let distance;
+    if (turn % 10 === 0) {
+        // Výběžkový růst: každý 50. tah výrazně delší
+        distance = 0.0095 + Math.random() * 0.0048; // cca 600–900 m
+    } else {
+        // Normální růst
+        distance = 0.00135 + Math.random() * 0.0015; // cca 150–300 m
+    }
 
-            for (let i = 0; i < moveTracker.length; i++) {
-                if (i !== selectedIndex) moveTracker[i]++;
-            }
+    polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, distance);
 
-            for (let i = 0; i < polygonPoints.length; i++) {
-                let p1 = polygonPoints[i];
-                let p2 = polygonPoints[(i + 1) % polygonPoints.length];
+    moveTracker[selectedIndex] = 0;
+    blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
-                let distance = Math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2);
-                if (distance > 0.043) {
-                    let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
-                    polygonPoints.splice(i + 1, 0, midPoint);
-                    moveTracker.splice(i + 1, 0, 0);
-                    break;
-                }
-            }
+    for (let i = 0; i < moveTracker.length; i++) {
+        if (i !== selectedIndex) moveTracker[i]++;
+    }
 
-            polygon.setLatLngs(polygonPoints);
+    for (let i = 0; i < polygonPoints.length; i++) {
+        let p1 = polygonPoints[i];
+        let p2 = polygonPoints[(i + 1) % polygonPoints.length];
 
-            let area = calculatePolygonArea(polygonPoints);
-            let population = Math.round(area * populationDensity);
-
-            document.getElementById("area").textContent = area.toFixed(2);
-            document.getElementById("population").textContent = population.toLocaleString();
+        let distance = Math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2);
+        if (distance > 0.023) {
+            let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+            polygonPoints.splice(i + 1, 0, midPoint);
+            moveTracker.splice(i + 1, 0, 0);
+            break;
         }
+    }
+
+    polygon.setLatLngs(polygonPoints);
+
+    let area = calculatePolygonArea(polygonPoints);
+    let population = Math.round(area * populationDensity);
+
+    document.getElementById("area").textContent = area.toFixed(2);
+    document.getElementById("population").textContent = population.toLocaleString();
+}
 
         function unlockBlockedPoints() {
             let currentTime = Date.now();
