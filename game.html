@@ -229,7 +229,7 @@ function distance(coord1, coord2) {
         function expandPolygon() {
             let center = getCentroid(polygonPoints);
             let totalPoints = polygonPoints.length;
-            let maxWaitTurns = Math.floor(1.2 * totalPoints);
+            let maxWaitTurns = Math.floor(1.8 * totalPoints);
 
             let availablePoints = polygonPoints
                 .map((point, index) => ({ point, index }))
