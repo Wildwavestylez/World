@@ -229,7 +229,7 @@ function distance(coord1, coord2) {
         function expandPolygon() {
             let center = getCentroid(polygonPoints);
             let totalPoints = polygonPoints.length;
-            let maxWaitTurns = Math.floor(1.5 * totalPoints);
+            let maxWaitTurns = Math.floor(1.2 * totalPoints);
 
             let availablePoints = polygonPoints
                 .map((point, index) => ({ point, index }))
@@ -248,7 +248,7 @@ function distance(coord1, coord2) {
                 selectedIndex = randomPoint.index;
             }
 
-            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0023);
+            polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, 0.0033);
 
             moveTracker[selectedIndex] = 0;
             blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
