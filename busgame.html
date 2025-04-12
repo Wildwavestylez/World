@@ -341,12 +341,8 @@ function updateBalanceDisplay() {
 // Funkce pro vytvoření nové linky
 function createRoute() {
     if (currentStops.length < 2) return alert("Musíte vybrat alespoň dvě zastávky!");
-
-    // Kontrola, jestli máme dostatek peněz na vytvoření nové linky
-    if (balance < costPerNewRoute) {
-        return alert("Nemáte dostatek peněz na vytvoření nové linky!");
-    }
-
+    if (balance < costPerNewRoute) return alert("Nemáte dostatek peněz na vytvoření nové linky!");
+    
     let start = currentStops[0];
     let end = currentStops[currentStops.length - 1];
 
@@ -360,18 +356,17 @@ function createRoute() {
 
     lines.push(line);
     lineCounter++;
-
-    balance -= costPerNewRoute; // Odečteme cenu za vytvoření nové linky
+    balance -= costPerNewRoute;
     updateBalanceDisplay();
-
     updateLinesList();
-    addBusToRoute(line); // Přidání autobusu na linku
+    addBusToRoute(line); 
 
     saveLinesToLocalStorage(); // Uložení linek do localStorage
 
     currentStops = [];
     currentRoute = null;
 }
+
 
 // Funkce pro přidání nové zastávky k existující lince
 function extendRoute(lat, lon, marker) {
