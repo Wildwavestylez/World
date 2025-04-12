@@ -50,7 +50,7 @@
     </style>
 </head>
 <body>
-    <h1>BUSGAME 339</h1>
+    <h1>BUSGAME 123</h1>
     <div class="layout-wrapper">
     <div id="map-container"><div id="map"></div></div>
 
@@ -79,7 +79,7 @@
         let lineCounter = 1;
         let expandingLine = null;
         
-          loadLinesFromLocalStorage(); 
+          
 
         map.on('click', function (e) {
             if (marker) marker.setLatLng(e.latlng);
@@ -98,6 +98,8 @@
 
             fetchBusStops(marker.getLatLng().lat, marker.getLatLng().lng);
         });
+
+        loadLinesFromLocalStorage(); 
 
     // Funkce pro výpočet vzdálenosti mezi dvěma souřadnicemi (v metrech)
 function getDistance(lat1, lon1, lat2, lon2) {
