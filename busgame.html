@@ -50,7 +50,7 @@
     </style>
 </head>
 <body>
-    <h1>BUSGAME 333</h1>
+    <h1>BUSGAME  444</h1>
     <div class="layout-wrapper">
     <div id="map-container"><div id="map"></div></div>
 
@@ -461,7 +461,6 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
 
 
         function loadLinesFromLocalStorage() {
-            console.log("Načítám linky z localStorage...");
     const saved = localStorage.getItem('savedLines');
     if (!saved) return;
 
@@ -469,7 +468,9 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
 
     savedLines.forEach(lineData => {
         const stops = lineData.stops.map(stop => {
-            const marker = L.marker([stop.lat, stop.lng]).addTo(map);
+            const marker = L.marker([stop.lat, stop.lng], {
+                icon: L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] }) // Používáme původní ikonu zastávky
+            }).addTo(map);
             marker.bindPopup(stop.name);
             return marker;
         });
@@ -485,10 +486,10 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
         };
 
         lines.push(line);
-        addBusToRoute(line); // Pokud chceš hned přidat autobus
+        addBusToRoute(line); // Volání addBusToRoute po načtení
     });
 
-    // Obnovíme ID počítadlo, aby nepřepisovalo existující linky
+    // Obnovíme ID počítadlo
     if (savedLines.length > 0) {
         lineCounter = Math.max(...savedLines.map(l => l.id)) + 1;
     }
