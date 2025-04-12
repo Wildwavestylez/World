@@ -50,7 +50,7 @@
     </style>
 </head>
 <body>
-    <h1>BUSGAME 111</h1>
+    <h1>BUSGAME 222</h1>
     <div class="layout-wrapper">
     <div id="map-container"><div id="map"></div></div>
 
@@ -68,6 +68,11 @@
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
+
+          const busIcon = L.icon({
+        iconUrl: 'https://i.imgur.com/41OPNQH.png', // nebo jiný obrázek
+        iconSize: [25, 25]
+    });
         let map = L.map('map').setView([50.0755, 14.4378], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
 
