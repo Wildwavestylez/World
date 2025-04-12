@@ -78,6 +78,8 @@
         let lines = [];
         let lineCounter = 1;
         let expandingLine = null;
+        
+          loadLinesFromLocalStorage(); 
 
         map.on('click', function (e) {
             if (marker) marker.setLatLng(e.latlng);
@@ -353,6 +355,8 @@ function createRoute() {
 
     currentStops = [];
     currentRoute = null;
+
+     saveLinesToLocalStorage(); 
 }
 
 // Funkce pro přidání nové zastávky k existující lince
@@ -381,6 +385,8 @@ function extendRoute(lat, lon, marker) {
     // Po přidání jedné zastávky deaktivujeme režim rozšíření
     expandingLine = null;
     document.querySelectorAll('.line-item').forEach(i => i.classList.remove('selected'));
+
+     saveLinesToLocalStorage(); 
 }
 
     // Přidáme do HTML element pro zůstatek
@@ -408,6 +414,42 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
                 list.appendChild(item);
             });
         }
+
+
+        function loadLinesFromLocalStorage() {
+    const saved = localStorage.getItem('savedLines');
+    if (!saved) return;
+
+    const savedLines = JSON.parse(saved);
+
+    savedLines.forEach(lineData => {
+        const stops = lineData.stops.map(stop => {
+            const marker = L.marker([stop.lat, stop.lng]).addTo(map);
+            marker.bindPopup(stop.name);
+            return marker;
+        });
+
+        const route = L.polyline(stops.map(m => m.getLatLng()), { color: lineData.color }).addTo(map);
+
+        let line = {
+            id: lineData.id,
+            route: route,
+            stops: stops,
+            name: lineData.name,
+            color: lineData.color
+        };
+
+        lines.push(line);
+        addBusToRoute(line); // Pokud chceš hned přidat autobus
+    });
+
+    // Obnovíme ID počítadlo, aby nepřepisovalo existující linky
+    if (savedLines.length > 0) {
+        lineCounter = Math.max(...savedLines.map(l => l.id)) + 1;
+    }
+
+    updateLinesList(); // Obnoví seznam linek v UI
+}
 
     let routeCache = {}; // Ukládání již načtených tras pro optimalizaci
 let buses = [];
