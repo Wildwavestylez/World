@@ -29,33 +29,32 @@
         .line-item { padding: 5px 10px; background: white; border: 1px solid #ddd; border-radius: 5px; margin: 5px 0; font-size: 14px; cursor: pointer; }
         .line-item.selected { background-color: #007bff; color: white; }
         @media (min-width: 768px) {
+    .layout-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 20px;
+    }
+
     #map-container {
         width: 70%;
         height: 500px;
-        float: left;
     }
 
     #linesList {
         width: 25%;
         max-height: 500px;
-        float: left;
-        margin-top: 0;
         font-size: 16px;
-    }
-
-    .btn-container {
-        clear: both;
-        text-align: center;
-        margin-top: 20px;
     }
 }
     </style>
 </head>
 <body>
     <h1>BUSGAME</h1>
-    <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 20px;">
-   <div id="map-container"><div id="map"></div></div>
-<div id="linesList"></div></div>
+    <div class="layout-wrapper">
+    <div id="map-container"><div id="map"></div></div>
+    <div id="linesList"></div>
+</div>
 
 <div class="btn-container">
     <button id="confirmBtn" disabled>Potvrdit výběr</button>
