@@ -83,6 +83,15 @@
         let lines = [];
         let lineCounter = 1;
         let expandingLine = null;
+        // Herní bilance a ceny
+let balance = localStorage.getItem("balance") ? parseInt(localStorage.getItem("balance")) : 8000;
+let busSpeed = 13.89; // 50 km/h v metrech za sekundu
+let earningsPerKm = 100;
+let costPerNewRoute = 1000; // Cena za vytvoření nové linky
+let costPerNewStop = 300; // Cena za přidání nové zastávky
+let costForNewArea = 2000; // Cena za odkrytí nového území
+let stops = JSON.parse(localStorage.getItem("stops")) || [];
+
         
           
 
@@ -263,14 +272,6 @@ function updateRoute() {
         { color: getRandomColor(), weight: 4 }
     ).addTo(map);
 }
-// Herní bilance a ceny
-let balance = localStorage.getItem("balance") ? parseInt(localStorage.getItem("balance")) : 8000;
-let busSpeed = 13.89; // 50 km/h v metrech za sekundu
-let earningsPerKm = 100;
-let costPerNewRoute = 1000; // Cena za vytvoření nové linky
-let costPerNewStop = 300; // Cena za přidání nové zastávky
-let costForNewArea = 2000; // Cena za odkrytí nového území
-let stops = JSON.parse(localStorage.getItem("stops")) || [];
 
           function moveBusOnRoute(route, lineId) {
     let busIcon = L.icon({ iconUrl: "https://i.imgur.com/41OPNQH.png", iconSize: [25, 25] });
