@@ -71,7 +71,7 @@
 
           const busIcon = L.icon({
         iconUrl: 'https://i.imgur.com/41OPNQH.png', // nebo jiný obrázek
-        iconSize: [25, 25]
+        iconSize: [50, 50]
     });
         let map = L.map('map').setView([50.0755, 14.4378], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
@@ -270,7 +270,6 @@ let earningsPerKm = 100;
 let costPerNewRoute = 1000; // Cena za vytvoření nové linky
 let costPerNewStop = 300; // Cena za přidání nové zastávky
 let costForNewArea = 2000; // Cena za odkrytí nového území
-let busIcon = L.icon({ iconUrl: "https://i.imgur.com/41OPNQH.png", iconSize: [30, 30] });
 let stops = JSON.parse(localStorage.getItem("stops")) || [];
 
           function moveBusOnRoute(route, lineId) {
