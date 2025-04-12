@@ -50,7 +50,7 @@
     </style>
 </head>
 <body>
-    <h1>BUSGAME 664</h1>
+    <h1>BUSGAME 111</h1>
     <div class="layout-wrapper">
     <div id="map-container"><div id="map"></div></div>
 
@@ -268,6 +268,26 @@ let costForNewArea = 2000; // Cena za odkrytí nového území
 let busIcon = L.icon({ iconUrl: "https://i.imgur.com/41OPNQH.png", iconSize: [30, 30] });
 let stops = JSON.parse(localStorage.getItem("stops")) || [];
 
+          function moveBusOnRoute(route, lineId) {
+    let busIcon = L.icon({ iconUrl: "https://i.imgur.com/41OPNQH.png", iconSize: [25, 25] });
+    let busMarker = L.marker(route[0], { icon: busIcon }).addTo(map);
+
+    buses.push({ id: lineId, marker: busMarker });
+
+    let index = 0;
+    function move() {
+        if (index < route.length) {
+            busMarker.setLatLng(route[index]);
+            index++;
+            setTimeout(move, 200); // Každých 200ms se autobus posune
+        } else {
+            setTimeout(() => moveBusOnRoute(route, lineId), 3000); // Po dojezdu chvilku počká a jede znovu
+        }
+    }
+    move();
+}
+
+
 // Přidání autobusu na linku
 function addBusToRoute(line) {
     if (line.stops.length < 2) return;
@@ -405,25 +425,7 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
     }).addTo(map);
 }
 
-        function moveBusOnRoute(route, lineId) {
-    let busIcon = L.icon({ iconUrl: "https://i.imgur.com/41OPNQH.png", iconSize: [25, 25] });
-    let busMarker = L.marker(route[0], { icon: busIcon }).addTo(map);
-
-    buses.push({ id: lineId, marker: busMarker });
-
-    let index = 0;
-    function move() {
-        if (index < route.length) {
-            busMarker.setLatLng(route[index]);
-            index++;
-            setTimeout(move, 200); // Každých 200ms se autobus posune
-        } else {
-            setTimeout(() => moveBusOnRoute(route, lineId), 3000); // Po dojezdu chvilku počká a jede znovu
-        }
-    }
-    move();
-}
-
+      
         function updateLinesList() {
             let list = document.getElementById("linesList");
             list.innerHTML = "";
