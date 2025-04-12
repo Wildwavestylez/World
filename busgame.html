@@ -50,7 +50,7 @@
     </style>
 </head>
 <body>
-    <h1>BUSGAME 123</h1>
+    <h1>BUSGAME 456</h1>
     <div class="layout-wrapper">
     <div id="map-container"><div id="map"></div></div>
 
@@ -419,6 +419,7 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
 
 
         function loadLinesFromLocalStorage() {
+            console.log("Načítám linky z localStorage...");
     const saved = localStorage.getItem('savedLines');
     if (!saved) return;
 
