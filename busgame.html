@@ -97,6 +97,22 @@
             fetchBusStops(marker.getLatLng().lat, marker.getLatLng().lng);
         });
 
+        function loadLinesFromLocalStorage() {
+    const savedLines = localStorage.getItem("lines");
+    if (savedLines) {
+        lines = JSON.parse(savedLines);
+        lines.forEach(line => {
+            line.route.addTo(map); // Přidání polyline na mapu
+            addBusToRoute(line); // Přidání autobusu na linku
+            updateLinesList(); // Aktualizace seznamu linek
+        });
+    }
+}
+
+// Zavolej tuto funkci při načítání hry
+loadLinesFromLocalStorage();
+
+
     // Funkce pro výpočet vzdálenosti mezi dvěma souřadnicemi (v metrech)
 function getDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Poloměr Země v km
@@ -351,6 +367,8 @@ function createRoute() {
     updateLinesList();
     addBusToRoute(line); // Přidání autobusu na linku
 
+    saveLinesToLocalStorage(); // Uložení linek do localStorage
+
     currentStops = [];
     currentRoute = null;
 }
@@ -381,6 +399,7 @@ function extendRoute(lat, lon, marker) {
     // Po přidání jedné zastávky deaktivujeme režim rozšíření
     expandingLine = null;
     document.querySelectorAll('.line-item').forEach(i => i.classList.remove('selected'));
+     saveLinesToLocalStorage(); // Uložení linek po rozšíření
 }
 
     // Přidáme do HTML element pro zůstatek
@@ -465,6 +484,11 @@ function startBuses() {
         }
     });
 }
+
+        function saveLinesToLocalStorage() {
+    localStorage.setItem("lines", JSON.stringify(lines));
+}
+
 
 // Spustíme autobusy po načtení hry
 startBuses();
