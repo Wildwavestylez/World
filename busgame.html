@@ -50,7 +50,7 @@
     </style>
 </head>
 <body>
-    <h1>BUSGAME 123</h1>
+    <h1>BUSGAME 224</h1>
     <div class="layout-wrapper">
     <div id="map-container"><div id="map"></div></div>
 
@@ -417,17 +417,21 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
             });
         }
 
-        function saveLinesToLocalStorage() {
+       function saveLinesToLocalStorage() {
     const linesToSave = lines.map(line => ({
-        ...line,
+        id: line.id,
+        name: line.name,
+        color: line.color,
         stops: line.stops.map(marker => ({
             lat: marker.getLatLng().lat,
             lng: marker.getLatLng().lng,
             name: marker.getPopup().getContent()
         }))
     }));
+
     localStorage.setItem('savedLines', JSON.stringify(linesToSave));
 }
+
 
 
         function loadLinesFromLocalStorage() {
