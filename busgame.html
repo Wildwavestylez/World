@@ -84,6 +84,24 @@
             else marker = L.marker(e.latlng).addTo(map);
             document.getElementById('confirmBtn').disabled = false;
         });
+
+        window.onload = function() {
+    // Načítání uložených linek z localStorage
+    let savedLines = JSON.parse(localStorage.getItem("lines"));
+    if (savedLines) {
+        lines = savedLines;
+
+        // Načteme a zobrazíme všechny linky
+        lines.forEach(line => {
+            line.stops.forEach(stop => stop.addTo(map)); // Přidání zastávek zpět na mapu
+            redrawLine(line); // Zobrazení trasy linky
+            addBusToRoute(line); // Přidání autobusu na linku
+        });
+
+        updateLinesList(); // Aktualizace seznamu linek
+    }
+};
+
     
     map.on('click', function(e) {
     fetchAdditionalBusStops(e.latlng.lat, e.latlng.lng);
@@ -353,6 +371,7 @@ function createRoute() {
 
     currentStops = [];
     currentRoute = null;
+    localStorage.setItem("lines", JSON.stringify(lines));
 }
 
 // Funkce pro přidání nové zastávky k existující lince
@@ -360,19 +379,11 @@ function extendRoute(lat, lon, marker) {
     let selectedLine = lines.find(line => line.id === expandingLine);
     if (!selectedLine) return;
 
-    // Kontrola, jestli máme dostatek peněz na přidání nové zastávky
-    if (balance < costPerNewStop) {
-        return alert("Nemáte dostatek peněz na přidání nové zastávky!");
-    }
-
     // Přidání nové zastávky
     selectedLine.stops.push(marker);
 
-    // Aktualizace názvu linky podle poslední přidané zastávky
-    selectedLine.name = `${selectedLine.name.split(" → ")[0]} → ${marker.getPopup().getContent()}`;
-
-    balance -= costPerNewStop; // Odečteme cenu za přidání nové zastávky
-    updateBalanceDisplay();
+    // Uložení změn do localStorage
+    localStorage.setItem("lines", JSON.stringify(lines));
 
     // Aktualizace seznamu linek a vykreslení linky
     updateLinesList();
@@ -382,6 +393,7 @@ function extendRoute(lat, lon, marker) {
     expandingLine = null;
     document.querySelectorAll('.line-item').forEach(i => i.classList.remove('selected'));
 }
+
 
     // Přidáme do HTML element pro zůstatek
 document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="position:absolute; top:10px; left:10px; background:white; padding:5px 10px; border-radius:5px; font-weight:bold;">Zůstatek: 10000 Kč</div>');
