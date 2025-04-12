@@ -50,7 +50,7 @@
     </style>
 </head>
 <body>
-    <h1>BUSGAME</h1>
+    <h1>BUSGAME  225</h1>
     <div class="layout-wrapper">
     <div id="map-container"><div id="map"></div></div>
 
@@ -373,28 +373,20 @@ function extendRoute(lat, lon, marker) {
     let selectedLine = lines.find(line => line.id === expandingLine);
     if (!selectedLine) return;
 
-    // Kontrola, jestli máme dostatek peněz na přidání nové zastávky
-    if (balance < costPerNewStop) {
-        return alert("Nemáte dostatek peněz na přidání nové zastávky!");
-    }
+    if (balance < costPerNewStop) return alert("Nemáte dostatek peněz na přidání nové zastávky!");
 
-    // Přidání nové zastávky
     selectedLine.stops.push(marker);
-
-    // Aktualizace názvu linky podle poslední přidané zastávky
     selectedLine.name = `${selectedLine.name.split(" → ")[0]} → ${marker.getPopup().getContent()}`;
 
-    balance -= costPerNewStop; // Odečteme cenu za přidání nové zastávky
+    balance -= costPerNewStop;
     updateBalanceDisplay();
-
-    // Aktualizace seznamu linek a vykreslení linky
     updateLinesList();
     redrawLine(selectedLine);
 
-    // Po přidání jedné zastávky deaktivujeme režim rozšíření
     expandingLine = null;
     document.querySelectorAll('.line-item').forEach(i => i.classList.remove('selected'));
-     saveLinesToLocalStorage(); // Uložení linek po rozšíření
+
+    saveLinesToLocalStorage(); // Uložení linek po rozšíření
 }
 
     // Přidáme do HTML element pro zůstatek
