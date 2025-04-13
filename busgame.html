@@ -92,15 +92,15 @@ let costPerNewStop = 300; // Cena za přidání nové zastávky
 let costForNewArea = 2000; // Cena za odkrytí nového území
 let stops = JSON.parse(localStorage.getItem("stops")) || [];
 
-        
-          
+
+
 
         map.on('click', function (e) {
             if (marker) marker.setLatLng(e.latlng);
             else marker = L.marker(e.latlng).addTo(map);
             document.getElementById('confirmBtn').disabled = false;
         });
-    
+
     map.on('click', function(e) {
     fetchAdditionalBusStops(e.latlng.lat, e.latlng.lng);
 });
@@ -127,10 +127,10 @@ function getDistance(lat1, lon1, lat2, lon2) {
     const distance = R * c * 1000; // Vzdálenost v metrech
     return distance;
 }
-    
+
 function fetchAdditionalBusStops(lat, lon) {
     let query = `[out:json]; node(around:5000, ${lat}, ${lon})["highway"="bus_stop"]; out;`;
-    
+
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
         .then(response => response.json())
         .then(data => {
@@ -430,7 +430,7 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
     }).addTo(map);
 }
 
-      
+
         function updateLinesList() {
             let list = document.getElementById("linesList");
             list.innerHTML = "";
@@ -468,12 +468,27 @@ document.body.insertAdjacentHTML('afterbegin', '<div id="balance" style="positio
 
     savedLines.forEach(lineData => {
         const stops = lineData.stops.map(stop => {
-            const marker = L.marker([stop.lat, stop.lng], {
-                icon: L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] }) // Používáme původní ikonu zastávky
-            }).addTo(map);
-            marker.bindPopup(stop.name);
-            return marker;
-        });
+    const marker = L.marker([stop.lat, stop.lng], {
+        icon: L.icon({ iconUrl: "https://i.imgur.com/ByUDLOI.png", iconSize: [20, 20] })
+    });
+
+    marker.bindPopup(stop.name);
+
+    // Přidáme marker do mapy jen pokud zoom >= 14
+    if (map.getZoom() >= 14) {
+        marker.addTo(map);
+    }
+
+    // Uložíme ho do pole busStops pro správu zobrazení podle zoomu
+    busStops.push({
+        lat: stop.lat,
+        lon: stop.lng,
+        name: stop.name,
+        marker: marker
+    });
+
+    return marker;
+});
 
         const route = L.polyline(stops.map(m => m.getLatLng()), { color: lineData.color }).addTo(map);
 
