@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Dopravní Terminál</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+    #main-container { display: flex; flex-direction: column; height: 100%; }
+    #map { flex: 1 1 70%; }
+    #panel {
+      flex: 1 1 30%;
+      background: #f4f4f4;
+      display: flex;
+      flex-direction: column;
+      border-top: 2px solid #ccc;
+    }
+    #tabs { display: flex; border-bottom: 1px solid #ddd; }
+    .tab {
+      flex: 1; padding: 10px; background: #eee;
+      border: none; cursor: pointer;
+    }
+    .tab.active { background: #fff; font-weight: bold; }
+    #tab-content { padding: 10px; overflow-y: auto; flex: 1; }
+  </style>
+</head>
+<body>
+  <div id="main-container">
+    <div id="map"></div>
+    <div id="panel">
+      <div id="tabs">
+        <button class="tab active" data-tab="dispatch">Dispečink</button>
+        <button class="tab" data-tab="vehicles">Vozidla</button>
+        <button class="tab" data-tab="economy">Ekonomika</button>
+        <button class="tab" data-tab="progress">Vývoj</button>
+      </div>
+      <div id="tab-content">
+        <h3>Dispečink</h3>
+        <p>Zde budou skupiny cestujících podle cíle.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Výchozí pozice terminálu v Pošumaví
+    const terminalLat = 49.1088664;
+    const terminalLon = 13.8663668;
+
+    const map = L.map('map').setView([terminalLat, terminalLon], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OSM',
+      maxZoom: 18,
+    }).addTo(map);
+
+    // Ikona terminálu
+    const terminalIcon = L.icon({
+      iconUrl: 'https://i.imgur.com/puN4S0i.jpeg',
+      iconSize: [40, 40],
+      iconAnchor: [20, 40],
+      popupAnchor: [0, -40]
+    });
+
+    L.marker([terminalLat, terminalLon], { icon: terminalIcon })
+      .addTo(map)
+      .bindPopup("Váš dopravní terminál – Pošumaví")
+      .openPopup();
+
+    let fetchedVillages = [];
+const passengerGroups = {}; // { název obce: počet cestujících }
+
+// Fetch nearby villages – už jsme měli
+async function fetchNearbyVillages() {
+  const overpassUrl = "https://overpass-api.de/api/interpreter";
+  const query = `
+    [out:json][timeout:25];
+    (
+      node["place"~"village|town|hamlet"](around:10000,${terminalLat},${terminalLon});
+    );
+    out body;
+  `;
+  const response = await fetch(overpassUrl, {
+    method: "POST",
+    body: query
+  });
+  const data = await response.json();
+  fetchedVillages = data.elements.map(el => ({
+    name: el.tags.name || "Neznámá obec",
+    lat: el.lat,
+    lon: el.lon
+  }));
+  console.log("Nalezené obce:", fetchedVillages);
+  startGeneratingPassengers();
+}
+
+// Spuštění generování cestujících
+function startGeneratingPassengers() {
+  setInterval(() => {
+    if (fetchedVillages.length === 0) return;
+
+    const randomIndex = Math.floor(Math.random() * fetchedVillages.length);
+    const destination = fetchedVillages[randomIndex].name;
+
+    if (!passengerGroups[destination]) {
+      passengerGroups[destination] = 1;
+    } else {
+      passengerGroups[destination]++;
+    }
+
+    renderDispatchTab(); // vykreslí se jen když dispečink je aktivní
+  }, 3000);
+}
+
+// Přepis vykreslování obsahu Dispečinku
+function renderDispatchTab() {
+  // Ověříme, že aktivní tab je opravdu "dispatch"
+  const activeTab = document.querySelector('.tab.active')?.dataset.tab;
+  if (activeTab !== 'dispatch') return;
+
+  const entries = Object.entries(passengerGroups);
+  entries.sort((a, b) => b[1] - a[1]);
+
+  let html = `<h3>Dispečink</h3>`;
+  if (entries.length === 0) {
+    html += `<p>Žádní cestující zatím nečekají.</p>`;
+  } else {
+    html += `
+      <div style="max-height: 170px; overflow-y: auto; border: 1px solid #ccc; border-radius: 8px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="text-align: left; padding: 5px;">Cíl</th>
+              <th style="text-align: right; padding: 5px;">Počet cestujících</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    entries.forEach(([destination, count]) => {
+      html += `
+        <tr>
+          <td style="padding: 5px;">${destination}</td>
+          <td style="padding: 5px; text-align: right;">${count}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  tabContent.innerHTML = html;
+}
+  
+  fetchNearbyVillages();
+
+    // Přepínání záložek
+    const tabs = document.querySelectorAll('.tab');
+    const tabContent = document.getElementById('tab-content');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const tabName = tab.dataset.tab;
+        renderTab(tabName);
+      });
+    });
+
+function renderTab(tabName) {
+  if (tabName === 'dispatch') {
+    renderDispatchTab();
+  } else if (tabName === 'vehicles') {
+    tabContent.innerHTML = '<h3>Vozidla</h3><p>Seznam autobusů a mikrobusů.</p>';
+  } else if (tabName === 'economy') {
+    tabContent.innerHTML = '<h3>Ekonomika</h3><p>Peníze, výnosy, náklady.</p>';
+  } else if (tabName === 'progress') {
+    tabContent.innerHTML = '<h3>Vývoj</h3><p>Milníky a odemykání nových doprav.</p>';
+  }
+}
+  </script>
+</body>
+</html>
