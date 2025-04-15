@@ -23,6 +23,38 @@
     }
     .tab.active { background: #fff; font-weight: bold; }
     #tab-content { padding: 10px; overflow-y: auto; flex: 1; }
+  
+  /* Modal základní styl */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 300px;
+  max-width: 90%;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.close-btn {
+  float: right;
+  cursor: pointer;
+  font-weight: bold;
+}
+  
+  
+  
   </style>
 </head>
 <body>
@@ -38,7 +70,41 @@
       <div id="tab-content">
         <h3>Dispečink</h3>
         <p>Zde budou skupiny cestujících podle cíle.</p>
+        
+        
       </div>
+<!-- VOZIDLA – výpis vlastněných autobusů -->
+<div id="tab-content-vehicles" class="tab-section" style="display: none;">
+  <h3>Vozidla</h3>
+  <div id="vehicle-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; border-radius: 8px; padding: 8px;"></div>
+</div>
+
+<!-- MODÁLNÍ OKNO pro detail autobusu -->
+<div id="vehicle-modal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeVehicleModal()">&times;</span>
+    <h3 id="modal-vehicle-name"></h3>
+    <p><strong>Typ:</strong> <span id="modal-vehicle-type"></span></p>
+    <p><strong>Kapacita:</strong> <span id="modal-vehicle-capacity"></span></p>
+    <p><strong>Stav:</strong> <span id="modal-vehicle-status"></span></p>
+    <p><strong>Ujeto:</strong> <span id="modal-vehicle-km"></span> km</p>
+    <p><strong>Zbývá do servisu:</strong> <span id="modal-vehicle-service"></span> km</p>
+    <button onclick="serviceVehicle()">Servis</button>
+    <button onclick="sellVehicle()">Prodat</button>
+  </div>
+</div>
+      
+<!-- EKONOMIKA -->
+<div id="tab-content-economy" class="tab-section" style="display: none;">
+  <h3>Ekonomika</h3>
+  <p>Zde budou přehledy výdělků, nákladů a stavu účtu.</p>
+</div>
+
+<!-- VÝVOJ -->
+<div id="tab-content-progress" class="tab-section" style="display: none;">
+  <h3>Vývoj</h3>
+  <p>Zde bude postupné odemykání nových funkcí (vlaky, letadla...)</p>
+</div>
     </div>
   </div>
 
@@ -156,7 +222,7 @@ function renderDispatchTab() {
 
   tabContent.innerHTML = html;
 }
-  
+
   fetchNearbyVillages();
 
     // Přepínání záložek
@@ -176,13 +242,80 @@ function renderTab(tabName) {
   if (tabName === 'dispatch') {
     renderDispatchTab();
   } else if (tabName === 'vehicles') {
-    tabContent.innerHTML = '<h3>Vozidla</h3><p>Seznam autobusů a mikrobusů.</p>';
+    tabContent.innerHTML = '<h3>Vozidla</h3><div id="vehicle-list"></div>';
+    renderVehicleList(); // << přidáno
   } else if (tabName === 'economy') {
     tabContent.innerHTML = '<h3>Ekonomika</h3><p>Peníze, výnosy, náklady.</p>';
   } else if (tabName === 'progress') {
     tabContent.innerHTML = '<h3>Vývoj</h3><p>Milníky a odemykání nových doprav.</p>';
   }
 }
+  
+  // Příkladová datová struktura autobusů
+const ownedBuses = [
+  {
+    id: 1,
+    name: "Mikroš 1",
+    type: "mikrobus",
+    capacity: 6,
+    status: "volný",
+    kmDriven: 1200,
+    kmToService: 800
+  },
+  {
+    id: 2,
+    name: "Miník",
+    type: "minibus",
+    capacity: 15,
+    status: "na cestě do Volyně",
+    kmDriven: 450,
+    kmToService: 1550
+  }
+];
+
+// Funkce pro vykreslení seznamu vozidel
+function renderVehicleList() {
+  const list = document.getElementById('vehicle-list');
+  list.innerHTML = "";
+
+  ownedBuses.forEach(bus => {
+    const item = document.createElement("div");
+    item.style.padding = "6px";
+    item.style.borderBottom = "1px solid #ddd";
+    item.style.cursor = "pointer";
+    item.textContent = `${bus.name} – ${bus.status}`;
+    item.onclick = () => openVehicleModal(bus);
+    list.appendChild(item);
+  });
+}
+
+// Otevření modálního okna pro detail autobusu
+function openVehicleModal(bus) {
+  document.getElementById("modal-vehicle-name").textContent = bus.name;
+  document.getElementById("modal-vehicle-type").textContent = bus.type;
+  document.getElementById("modal-vehicle-capacity").textContent = bus.capacity;
+  document.getElementById("modal-vehicle-status").textContent = bus.status;
+  document.getElementById("modal-vehicle-km").textContent = bus.kmDriven;
+  document.getElementById("modal-vehicle-service").textContent = bus.kmToService;
+  document.getElementById("vehicle-modal").style.display = "flex";
+}
+
+// Zavření modálu
+function closeVehicleModal() {
+  document.getElementById("vehicle-modal").style.display = "none";
+}
+
+// Základní funkce pro servis a prodej (zatím jen log do konzole)
+function serviceVehicle() {
+  console.log("Servisováno vozidlo");
+  closeVehicleModal();
+}
+
+function sellVehicle() {
+  console.log("Prodáno vozidlo");
+  closeVehicleModal();
+}
+  
   </script>
 </body>
 </html>
