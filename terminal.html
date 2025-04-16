@@ -148,6 +148,30 @@
       .addTo(map)
       .bindPopup("tady štěká pes")
       .openPopup();
+  
+  const busTypes = {
+  mikrobus: {
+    name: "Mikrobus",
+    capacity: 6,
+    speed: 670,
+    price: 20000,
+    iconUrl: "https://i.imgur.com/FUu2lsY.png"
+  },
+  minibus: {
+    name: "Minibus",
+    capacity: 15,
+    speed: 670,
+    price: 50000,
+    iconUrl: "https://i.imgur.com/nNvmMA8.jpeg"
+  },
+  autobus: {
+    name: "Autobus",
+    capacity: 40,
+    speed: 670,
+    price: 100000,
+    iconUrl: "https://i.imgur.com/41OPNQH.png"
+  }
+};
 
   
     
@@ -195,12 +219,11 @@ function startGeneratingPassengers() {
     }
 
     renderDispatchTab(); // vykreslí se jen když dispečink je aktivní
-  }, 3500);
+  }, 700);
 }
 
 // Přepis vykreslování obsahu Dispečinku
 function renderDispatchTab() {
-  // Ověříme, že aktivní tab je opravdu "dispatch"
   const activeTab = document.querySelector('.tab.active')?.dataset.tab;
   if (activeTab !== 'dispatch') return;
 
@@ -208,41 +231,54 @@ function renderDispatchTab() {
   entries.sort((a, b) => b[1] - a[1]);
 
   let html = `<h3>Dispečink</h3>`;
+
   if (entries.length === 0) {
     html += `<p>Žádní cestující zatím nečekají.</p>`;
-  } else {
-    html += `
-      <div style="max-height: 170px; overflow-y: auto; border: 1px solid #ccc; border-radius: 8px;">
-        <table style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr>
-              <th style="text-align: left; padding: 5px;">Cíl</th>
-              <th style="text-align: right; padding: 5px;">Počet cestujících</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
-entries.forEach(([destination, count]) => {
-    html += `
-  <tr>
-    <td style="padding: 5px;">
-      ${destination}
-      <button onclick="openDispatchModal('${destination}', ${count})" style="margin-left: 10px;">Vypravit autobus</button>
-    </td>
-    <td style="padding: 5px; text-align: right;">${count}</td>
-  </tr>
-`;
-    
-    });
-
-    html += `
-          </tbody>
-        </table>
-      </div>
-    `;
+    tabContent.innerHTML = html;
+    return;
   }
 
+  // Pokusíme se zachovat scroll pokud existuje
+  const existingScrollBox = tabContent.querySelector('.dispatch-scroll');
+  const savedScrollTop = existingScrollBox ? existingScrollBox.scrollTop : 0;
+
+  html += `
+    <div class="dispatch-scroll" style="max-height: 170px; overflow-y: auto; border: 1px solid #ccc; border-radius: 8px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 5px;">Cíl</th>
+            <th style="text-align: right; padding: 5px;">Počet cestujících</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  entries.forEach(([destination, count]) => {
+    html += `
+      <tr>
+        <td style="padding: 5px;">
+          ${destination}
+          <button onclick="openDispatchModal('${destination}', ${count})" style="margin-left: 10px;">Vypravit autobus</button>
+        </td>
+        <td style="padding: 5px; text-align: right;">${count}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
   tabContent.innerHTML = html;
+
+  // Po přepsání obsahu vrátíme scroll zpět
+  const newScrollBox = tabContent.querySelector('.dispatch-scroll');
+  if (newScrollBox) {
+    newScrollBox.scrollTop = savedScrollTop;
+  }
 }
 
   fetchNearbyVillages();
@@ -351,18 +387,19 @@ function createInitialVehicle() {
   const initialMicrobus = {
     id: Date.now(),
     type: 'mikrobus',
-    name: 'Věrka 1', // default name
+    name: 'Věrka 1',
     capacity: 6,
-    speed: 650,
-    status: 'volný', // nebo „čeká na úkol“
-    kilometersDriven: 0,
-    maintenanceDue: 1000,
-    destination: null
+    speed: 650, // měla by být 70, ne 650
+    status: 'volný',
+    kmDriven: 0,
+    kmToService: 1000,
+    destination: null,
+    iconUrl: busTypes['mikrobus'].iconUrl
   };
 
   ownedVehicles.push(initialMicrobus);
 }
-  createInitialVehicle();
+  createInitialVehicle() 
   
   function openDispatchModal(destination, passengerCount) {
   const availableVehicles = ownedVehicles.filter(v => v.status === 'volný' && v.capacity >= passengerCount);
@@ -405,24 +442,50 @@ function openDispatchModal(destination, passengerCount) {
   
 }
   
-  function dispatchVehicle(vehicleId, destination, passengerCount) {
+  function dispatchVehicle(vehicleId, destination, requestedPassengerCount) {
   const vehicle = ownedVehicles.find(v => v.id === vehicleId);
   if (!vehicle) return;
+
+  const actualPassengerCount = Math.min(requestedPassengerCount, vehicle.capacity);
 
   vehicle.status = 'na cestě';
   vehicle.destination = destination;
 
-  passengerGroups[destination] -= passengerCount;
+  // Odečteme jen skutečně nastoupené cestující
+  passengerGroups[destination] -= actualPassengerCount;
   if (passengerGroups[destination] <= 0) {
     delete passengerGroups[destination];
   }
 
   closeModal();
-    closeDispatchModal()
   renderVehicleList();
   renderDispatchTab();
+
+  // Vyděláme peníze za cestu tam
+  const distance = getDistanceBetweenPoints(terminalCoordinates, destinationCoordinates[destination]);
+  const earnings = actualPassengerCount * distance * 10;
+  money += earnings;
+  renderMoney();
+
+  // Vykreslit trasu
+  drawRouteTo(destination, vehicleId);
+
+  // Simulace cesty tam a zpět
+  const travelTime = distance / vehicle.speed * 3600 * 1000; // v ms
+
+  setTimeout(() => {
+    // Cesta zpět – autobus vždy plný
+    const returnEarnings = vehicle.capacity * distance * 10;
+    money += returnEarnings;
+    renderMoney();
+
+    vehicle.status = 'volný';
+    vehicle.destination = null;
+    renderVehicleList();
+    renderDispatchTab();
+    removeRoute(vehicleId);
+  }, travelTime + 10000); // 20 sekund na zastávce
 }
-  
   
 function renderMoney() {
   const moneyDisplay = document.getElementById('money-display');
@@ -473,101 +536,87 @@ function assignBusToDestination(destination, passengerCount) {
   }).addTo(map);
 
   routeControl.on('routesfound', e => {
-    const route = e.routes[0];
-    const coords = route.coordinates;
-    const distanceKm = Math.round(route.summary.totalDistance / 1000);
-    const travelTime = (distanceKm / availableBus.speed) * 3600 * 1000; // ms
+  const route = e.routes[0];
+  const coords = route.coordinates;
+  const distanceKm = Math.round(route.summary.totalDistance / 1000);
+  const travelTime = (distanceKm / availableBus.speed) * 3600 * 1000;
 
-    // Ikona autobusu
-    const busIcon = L.icon({
-      iconUrl: 'https://i.imgur.com/FUu2lsY.png',
-      iconSize: [32, 32],
-      iconAnchor: [16, 16]
-    });
+  const actualPassengerCount = Math.min(passengerCount, availableBus.capacity); // <<< důležité
 
-    const marker = L.marker(coords[0], { icon: busIcon }).addTo(map);
-    const line = L.polyline(coords, { color: 'blue' }).addTo(map);
+  // Ikona autobusu – dynamická podle typu
+const busIcon = L.icon({
+  iconUrl: busTypes[availableBus.type].iconUrl,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16]
+});
 
-    let index = 0;
-    const interval = travelTime / coords.length;
+  const marker = L.marker(coords[0], { icon: busIcon }).addTo(map);
+  const line = L.polyline(coords, { color: 'blue' }).addTo(map);
 
-    const intervalId = setInterval(() => {
-      index++;
-      if (index >= coords.length) {
-        clearInterval(intervalId);
+  let index = 0;
+  const interval = travelTime / coords.length;
 
-        // Výdělek za cestu TAM
-        const incomeTo = passengerCount * distanceKm * 10;
-        money += incomeTo;
-        renderMoney();
+  const intervalId = setInterval(() => {
+    index++;
+    if (index >= coords.length) {
+      clearInterval(intervalId);
 
-        setTimeout(() => {
-          // ZPÁTEČNÍ CESTA
-          let backIndex = coords.length - 1;
-          const backInterval = setInterval(() => {
-            backIndex--;
-            if (backIndex < 0) {
-              clearInterval(backInterval);
+      // Výdělek za cestu TAM
+      const incomeTo = actualPassengerCount * distanceKm * 10;
+      money += incomeTo;
+      renderMoney();
 
-              // Výdělek za cestu ZPĚT – plný autobus
-              const incomeBack = availableBus.capacity * distanceKm * 10;
-              money += incomeBack;
-              renderMoney();
+      setTimeout(() => {
+        // ZPÁTEČNÍ CESTA
+        let backIndex = coords.length - 1;
+        const backInterval = setInterval(() => {
+          backIndex--;
+          if (backIndex < 0) {
+            clearInterval(backInterval);
 
-              availableBus.status = 'volný';
-              availableBus.destination = null;
+            // Výdělek za cestu ZPĚT – plný autobus
+            const incomeBack = availableBus.capacity * distanceKm * 10;
+            money += incomeBack;
+            renderMoney();
 
-              map.removeLayer(marker);
-map.removeLayer(line);
-map.removeControl(routeControl); // <<< tohle je klíčový!
+            availableBus.status = 'volný';
+            availableBus.destination = null;
+            // Přičítání kilometrů a odečítání do servisu
+availableBus.kmDriven += distanceKm * 2;
+availableBus.kmToService -= distanceKm * 2;
 
-              renderVehicleList();
-            } else {
-              marker.setLatLng(coords[backIndex]);
-            }
-          }, interval);
-        }, 20000); // pauza 20s
+// Pokud už potřebuje servis, změníme status
+if (availableBus.kmToService <= 0) {
+  availableBus.status = 'potřebuje servis';
+}
 
-      } else {
-        marker.setLatLng(coords[index]);
-      }
-    }, interval);
+            map.removeLayer(marker);
+            map.removeLayer(line);
+            map.removeControl(routeControl);
 
-    // Odečítáme cestující z cíle
-    passengerGroups[destination] -= passengerCount;
-    if (passengerGroups[destination] <= 0) {
-      delete passengerGroups[destination];
+            renderVehicleList();
+          } else {
+            marker.setLatLng(coords[backIndex]);
+          }
+        }, interval);
+      }, 20000); // 20s pauza
+
+    } else {
+      marker.setLatLng(coords[index]);
     }
+  }, interval);
 
-    renderDispatchTab();
-  });
+  // Tohle je teď správně
+  passengerGroups[destination] -= actualPassengerCount;
+  if (passengerGroups[destination] <= 0) {
+    delete passengerGroups[destination];
+  }
+
+  renderDispatchTab();
+});
 }
   renderMoney();
-  
-// Typy autobusů
-const busTypes = {
-  mikrobus: {
-    name: "Mikrobus",
-    capacity: 6,
-    speed: 70,
-    price: 20000,
-    iconUrl: "https://i.imgur.com/FUu2lsY.png"
-  },
-  minibus: {
-    name: "Minibus",
-    capacity: 15,
-    speed: 70,
-    price: 50000,
-    iconUrl: "https://i.imgur.com/nNvmMA8.jpeg"
-  },
-  autobus: {
-    name: "Autobus",
-    capacity: 40,
-    speed: 70,
-    price: 100000,
-    iconUrl: "https://i.imgur.com/41OPNQH.png"
-  }
-};
+ 
 
 // Funkce pro nákup autobusu
 function buyBus(type) {
@@ -599,7 +648,7 @@ function buyBus(type) {
 function createBus(type) {
   const busDetails = busTypes[type];
 
-  const busName = `Nový autobus ${ownedVehicles.length + 1}`; // Generování názvu
+  const busName = `1C0 0001  ${ownedVehicles.length + 1}`; // Generování názvu
   const newBus = {
     id: Date.now(),
     type: type,
