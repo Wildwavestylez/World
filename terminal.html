@@ -184,7 +184,7 @@ async function fetchNearbyVillages() {
   const query = `
     [out:json][timeout:25];
     (
-      node["place"~"village|town|hamlet"](around:10000,${terminalLat},${terminalLon});
+      node["place"~"village|town|hamlet"](around:20000,${terminalLat},${terminalLon});
     );
     out body;
   `;
@@ -657,7 +657,7 @@ function createBus(type) {
     speed: busDetails.speed,
     status: 'volný',
     kmDriven: 0,
-    kmToService: 1000,
+    kmToService: 20000,
     destination: null,
     iconUrl: busDetails.iconUrl
   };
