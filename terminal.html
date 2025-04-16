@@ -154,7 +154,7 @@
     name: "Mikrobus",
     capacity: 6,
     speed: 670,
-    price: 20000,
+    price: 10000,
     iconUrl: "https://i.imgur.com/FUu2lsY.png"
   },
   minibus: {
@@ -184,7 +184,7 @@ async function fetchNearbyVillages() {
   const query = `
     [out:json][timeout:25];
     (
-      node["place"~"village|town|hamlet"](around:20000,${terminalLat},${terminalLon});
+      node["place"~"village|town|hamlet"](around:50000,${terminalLat},${terminalLon});
     );
     out body;
   `;
@@ -202,7 +202,7 @@ async function fetchNearbyVillages() {
   startGeneratingPassengers();
 }
 
-let money = 0;
+let money = 50000;
   
 // Spuštění generování cestujících
 function startGeneratingPassengers() {
