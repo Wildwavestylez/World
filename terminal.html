@@ -195,7 +195,7 @@ function startGeneratingPassengers() {
     }
 
     renderDispatchTab(); // vykreslí se jen když dispečink je aktivní
-  }, 3000);
+  }, 3500);
 }
 
 // Přepis vykreslování obsahu Dispečinku
@@ -259,6 +259,8 @@ entries.forEach(([destination, count]) => {
         renderTab(tabName);
       });
     });
+  
+  let ownedVehicles = [];
 
 function renderTab(tabName) {
   if (tabName === 'dispatch') {
@@ -288,24 +290,32 @@ function renderVehicleList() {
 
   if (ownedVehicles.length === 0) {
     listContainer.innerHTML = '<p>Nemáte žádná vozidla.</p>';
-    return;
+  } else {
+    const list = document.createElement('ul');
+    list.style.maxHeight = '300px';
+    list.style.overflowY = 'auto';
+
+    ownedVehicles.forEach(vehicle => {
+      const item = document.createElement('li');
+      item.textContent = `${vehicle.name} (${vehicle.type}) – ${vehicle.status}`;
+      item.style.cursor = 'pointer';
+      item.addEventListener('click', () => {
+        openVehicleModal(vehicle);
+      });
+      list.appendChild(item);
+    });
+
+    listContainer.appendChild(list);
   }
 
-  const list = document.createElement('ul');
-  list.style.maxHeight = '300px';
-  list.style.overflowY = 'auto';
-
-  ownedVehicles.forEach(vehicle => {
-    const item = document.createElement('li');
-    item.textContent = `${vehicle.name} (${vehicle.type}) – ${vehicle.status}`;
-    item.style.cursor = 'pointer';
-    item.addEventListener('click', () => {
-      openVehicleModal(vehicle);
-    });
-    list.appendChild(item);
-  });
-
-  listContainer.appendChild(list);
+  // Tlačítka pro nákup autobusů
+  const purchaseButtons = document.createElement('div');
+  purchaseButtons.innerHTML = `
+    <button onclick="buyBus('mikrobus')">Koupit Mikrobus (20 000 Kč)</button>
+    <button onclick="buyBus('minibus')">Koupit Minibus (50 000 Kč)</button>
+    <button onclick="buyBus('autobus')">Koupit Autobus (100 000 Kč)</button>
+  `;
+  listContainer.appendChild(purchaseButtons);
 }
 
 // Otevření modálního okna pro detail autobusu
@@ -335,7 +345,7 @@ function sellVehicle() {
   closeVehicleModal();
 }
   
-  const ownedVehicles = [];
+
 
 function createInitialVehicle() {
   const initialMicrobus = {
@@ -533,6 +543,77 @@ map.removeControl(routeControl); // <<< tohle je klíčový!
   });
 }
   renderMoney();
+  
+// Typy autobusů
+const busTypes = {
+  mikrobus: {
+    name: "Mikrobus",
+    capacity: 6,
+    speed: 70,
+    price: 20000,
+    iconUrl: "https://i.imgur.com/FUu2lsY.png"
+  },
+  minibus: {
+    name: "Minibus",
+    capacity: 15,
+    speed: 70,
+    price: 50000,
+    iconUrl: "https://i.imgur.com/nNvmMA8.jpeg"
+  },
+  autobus: {
+    name: "Autobus",
+    capacity: 40,
+    speed: 70,
+    price: 100000,
+    iconUrl: "https://i.imgur.com/41OPNQH.png"
+  }
+};
+
+// Funkce pro nákup autobusu
+function buyBus(type) {
+  // Získáme cenu autobusu z objektu busTypes
+  const busPrice = busTypes[type]?.price;
+  
+  if (!busPrice) {
+    alert('Neplatný typ autobusu!');
+    return;
+  }
+
+  if (money < busPrice) {
+    alert('Nemáte dostatek peněz na koupi tohoto autobusu!');
+    return;
+  }
+
+  // Odečteme cenu autobusu od peněz
+  money -= busPrice;
+  renderMoney();
+
+  // Vytvoříme nový autobus podle typu
+  const newBus = createBus(type);
+  ownedVehicles.push(newBus);
+
+  renderVehicleList(); // Aktualizujeme seznam vozidel
+}
+
+// Funkce pro vytvoření nového autobusu
+function createBus(type) {
+  const busDetails = busTypes[type];
+
+  const busName = `Nový autobus ${ownedVehicles.length + 1}`; // Generování názvu
+  const newBus = {
+    id: Date.now(),
+    type: type,
+    name: busName,
+    capacity: busDetails.capacity,
+    speed: busDetails.speed,
+    status: 'volný',
+    kmDriven: 0,
+    kmToService: 1000,
+    destination: null,
+    iconUrl: busDetails.iconUrl
+  };
+  return newBus;
+}
   </script>
 </body>
 </html>
