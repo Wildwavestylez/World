@@ -713,15 +713,19 @@ function openDB() {
   });
 }
 
-// Uložení stavu hry
 async function saveGameState() {
   const db = await openDB();
   const tx = db.transaction(storeName, "readwrite");
   const store = tx.objectStore(storeName);
 
+  // Uložíme všechny potřebné informace včetně správného stavu vozidel a pasažérů
   const gameState = {
     money,
-    ownedVehicles,
+    ownedVehicles: ownedVehicles.map(vehicle => ({
+      ...vehicle,
+      status: vehicle.status === 'na cestě' ? 'volný' : vehicle.status, // Resetujeme status vozidel
+      destination: null // Resetujeme destinaci pro vozidla na cestě
+    })),
     fetchedVillages,
     passengerGroups,
     searchRadiusKm
@@ -732,7 +736,6 @@ async function saveGameState() {
   console.log("Uložen herní stav");
 }
 
-// Načtení stavu hry
 async function loadGameState() {
   const db = await openDB();
   const tx = db.transaction(storeName, "readonly");
@@ -745,18 +748,18 @@ async function loadGameState() {
         const state = request.result;
         money = state.money || 0;
         ownedVehicles = state.ownedVehicles || [];
+        // Resetujeme vozidla na "volný" stav, aby se neukazovalo na cestě
+        ownedVehicles.forEach(vehicle => {
+          if (vehicle.status === 'na cestě') {
+            vehicle.status = 'volný';
+            vehicle.destination = null; // Resetujeme destinaci
+          }
+        });
         fetchedVillages = state.fetchedVillages || [];
         passengerGroups = state.passengerGroups || {};
         searchRadiusKm = state.searchRadiusKm || 5;
-        console.log("Načten herní stav", state);
-        
-        // Reset všech autobusů na "volný" stav
-        ownedVehicles.forEach(bus => {
-          if (bus.status.startsWith("jede do") || bus.status === "potřebuje servis") return;
-          bus.status = "volný";
-          bus.destination = null;
-        });
 
+        console.log("Načten herní stav", state);
         renderMoney();
         renderVehicleList();
         renderDispatchTab();
