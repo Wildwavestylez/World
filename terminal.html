@@ -149,12 +149,19 @@
       .bindPopup("tady štěká pes")
       .openPopup();
   
+  window.onload = async () => {
+  const loaded = await loadGameState();
+  if (!loaded) {
+    await fetchNearbyVillages(); // První fetch pokud není uložen stav
+  }
+};
+  
   const busTypes = {
   mikrobus: {
     name: "Mikrobus",
     capacity: 6,
     speed: 670,
-    price: 20000,
+    price: 2000,
     iconUrl: "https://i.imgur.com/FUu2lsY.png"
   },
   minibus: {
@@ -174,17 +181,17 @@
 };
 
   
-    
+   let searchRadiusKm = 5; // začínáme na 5 km 
     let fetchedVillages = [];
 const passengerGroups = {}; // { název obce: počet cestujících }
 
 // Fetch nearby villages – už jsme měli
-async function fetchNearbyVillages() {
+async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   const overpassUrl = "https://overpass-api.de/api/interpreter";
   const query = `
     [out:json][timeout:25];
     (
-      node["place"~"village|town|hamlet"](around:7000,${terminalLat},${terminalLon});
+      node["place"~"village|town|hamlet"](around:${radiusKm * 1000},${terminalLat},${terminalLon});
     );
     out body;
   `;
@@ -193,15 +200,23 @@ async function fetchNearbyVillages() {
     body: query
   });
   const data = await response.json();
-  fetchedVillages = data.elements.map(el => ({
+
+  const newVillages = data.elements.map(el => ({
     name: el.tags.name || "Neznámá obec",
     lat: el.lat,
     lon: el.lon
   }));
-  console.log("Nalezené obce:", fetchedVillages);
+
+  // Přidáme jen nové obce, co ještě nejsou ve fetchedVillages
+  newVillages.forEach(village => {
+    if (!fetchedVillages.some(v => v.name === village.name)) {
+      fetchedVillages.push(village);
+    }
+  });
+
+  console.log("Aktualizované obce:", fetchedVillages);
   startGeneratingPassengers();
 }
-
 let money = 0;
   
 // Spuštění generování cestujících
@@ -241,7 +256,6 @@ function renderDispatchTab() {
   // Pokusíme se zachovat scroll pokud existuje
   const existingScrollBox = tabContent.querySelector('.dispatch-scroll');
   const savedScrollTop = existingScrollBox ? existingScrollBox.scrollTop : 0;
-
   html += `
     <div class="dispatch-scroll" style="max-height: 170px; overflow-y: auto; border: 1px solid #ccc; border-radius: 8px;">
       <table style="width: 100%; border-collapse: collapse;">
@@ -306,9 +320,23 @@ function renderTab(tabName) {
     renderVehicleList();
   } else if (tabName === 'economy') {
     renderEconomyTab(); // << přidáno sem
-  } else if (tabName === 'progress') {
-    tabContent.innerHTML = '<h3>Vývoj</h3><p>Milníky a odemykání nových doprav.</p>';
+ 
+  }  else if (tabName === 'progress') {
+  renderProgressTab();
+
   }
+}
+  
+  function renderProgressTab() {
+  tabContent.innerHTML = `
+    <h3>Vývoj</h3>
+    <p>Milníky a odemykání nových doprav.</p>
+    <div class="progress-buttons">
+      <button onclick="saveGameState()">Uložit hru</button>
+      <button onclick="loadGameState()">Načíst hru</button>
+      <button onclick="deleteGameState()">Smazat uloženou hru</button>
+    </div>
+  `;
 }
   
 function updateEconomy() {
@@ -392,7 +420,7 @@ function createInitialVehicle() {
     speed: 650, // měla by být 70, ne 650
     status: 'volný',
     kmDriven: 0,
-    kmToService: 10000,
+    kmToService: 1000,
     destination: null,
     iconUrl: busTypes['mikrobus'].iconUrl
   };
@@ -642,6 +670,9 @@ function buyBus(type) {
   ownedVehicles.push(newBus);
 
   renderVehicleList(); // Aktualizujeme seznam vozidel
+// Zvýšíme rádius a přifetchneme nové obce
+  searchRadiusKm += 5;
+  fetchNearbyVillages(searchRadiusKm);
 }
 
 // Funkce pro vytvoření nového autobusu
@@ -663,6 +694,93 @@ function createBus(type) {
   };
   return newBus;
 }
+  
+  const dbName = "DopravniTerminalDB";
+const storeName = "GameState";
+
+// Otevření nebo vytvoření databáze
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+
+    request.onupgradeneeded = event => {
+      const db = event.target.result;
+      db.createObjectStore(storeName);
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject("Nepodařilo se otevřít IndexedDB");
+  });
+}
+
+// Uložení stavu hry
+async function saveGameState() {
+  const db = await openDB();
+  const tx = db.transaction(storeName, "readwrite");
+  const store = tx.objectStore(storeName);
+
+  const gameState = {
+    money,
+    ownedVehicles,
+    fetchedVillages,
+    passengerGroups,
+    searchRadiusKm
+  };
+
+  store.put(gameState, "state");
+
+  console.log("Uložen herní stav");
+}
+
+// Načtení stavu hry
+async function loadGameState() {
+  const db = await openDB();
+  const tx = db.transaction(storeName, "readonly");
+  const store = tx.objectStore(storeName);
+
+  const request = store.get("state");
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => {
+      if (request.result) {
+        const state = request.result;
+        money = state.money || 0;
+        ownedVehicles = state.ownedVehicles || [];
+        fetchedVillages = state.fetchedVillages || [];
+        passengerGroups = state.passengerGroups || {};
+        searchRadiusKm = state.searchRadiusKm || 5;
+        console.log("Načten herní stav", state);
+        
+        // Reset všech autobusů na "volný" stav
+        ownedVehicles.forEach(bus => {
+          if (bus.status.startsWith("jede do") || bus.status === "potřebuje servis") return;
+          bus.status = "volný";
+          bus.destination = null;
+        });
+
+        renderMoney();
+        renderVehicleList();
+        renderDispatchTab();
+        resolve(true);
+      } else {
+        console.log("Nebyl uložen žádný stav.");
+        resolve(false);
+      }
+    };
+    request.onerror = () => reject("Chyba při načítání stavu hry");
+  });
+}
+
+// Smazání stavu hry
+async function deleteGameState() {
+  const db = await openDB();
+  const tx = db.transaction(storeName, "readwrite");
+  const store = tx.objectStore(storeName);
+  store.delete("state");
+  console.log("Herní stav smazán");
+}
+  setInterval(() => {
+  saveGameState();
+}, 5 * 60 * 1000); // každých 5 minut
   </script>
 </body>
 </html>
