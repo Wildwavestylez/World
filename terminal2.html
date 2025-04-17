@@ -154,7 +154,7 @@
     name: "Mikrobus",
     capacity: 6,
     speed: 670,
-    price: 2000,
+    price: 20000,
     iconUrl: "https://i.imgur.com/FUu2lsY.png"
   },
   minibus: {
@@ -659,7 +659,7 @@ function buyBus(type) {
 function createBus(type) {
   const busDetails = busTypes[type];
 
-  const busName = `1C0 0001  ${ownedVehicles.length + 1}`; // Generování názvu
+  const busName = `1C0   ${ownedVehicles.length + 1}`; // Generování názvu
   const newBus = {
     id: Date.now(),
     type: type,
