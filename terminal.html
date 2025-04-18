@@ -221,6 +221,9 @@ let money = 0;
   
 // Spuštění generování cestujících
 function startGeneratingPassengers() {
+  // Pokud už nějaké skupiny existují (např. po načtení hry), nezačínej generovat znovu
+  if (Object.keys(passengerGroups).length > 0) return;
+
   setInterval(() => {
     if (fetchedVillages.length === 0) return;
 
@@ -233,10 +236,9 @@ function startGeneratingPassengers() {
       passengerGroups[destination]++;
     }
 
-    renderDispatchTab(); // vykreslí se jen když dispečink je aktivní
+    renderDispatchTab();
   }, 700);
 }
-
 // Přepis vykreslování obsahu Dispečinku
 function renderDispatchTab() {
   const activeTab = document.querySelector('.tab.active')?.dataset.tab;
