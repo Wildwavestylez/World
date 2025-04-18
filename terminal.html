@@ -747,14 +747,13 @@ async function loadGameState() {
       if (request.result) {
         const state = request.result;
         money = state.money || 0;
-        ownedVehicles = state.ownedVehicles || [];
-        // Resetujeme vozidla na "volný" stav, aby se neukazovalo na cestě
-        ownedVehicles.forEach(vehicle => {
-          if (vehicle.status === 'na cestě') {
-            vehicle.status = 'volný';
-            vehicle.destination = null; // Resetujeme destinaci
-          }
-        });
+        ownedVehicles = (state.ownedVehicles || []).map(bus => ({
+          ...bus,
+          status: bus.status === 'na cestě' || bus.status?.startsWith('jede do')
+            ? 'volný'
+            : bus.status,
+          destination: null
+        }));
         fetchedVillages = state.fetchedVillages || [];
         passengerGroups = state.passengerGroups || {};
         searchRadiusKm = state.searchRadiusKm || 5;
@@ -772,7 +771,6 @@ async function loadGameState() {
     request.onerror = () => reject("Chyba při načítání stavu hry");
   });
 }
-
 // Smazání stavu hry
 async function deleteGameState() {
   const db = await openDB();
