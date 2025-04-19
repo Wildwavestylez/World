@@ -154,9 +154,8 @@
   if (!loaded) {
     await fetchNearbyVillages(); // První fetch pokud není uložen stav
     startGeneratingPassengers(); // Start generování pasažérů u nové hry
-  } else {
-    startGeneratingPassengers(); // Start generování pasažérů i po načtení
-  }
+ 
+}  
 };
   
   const busTypes = {
