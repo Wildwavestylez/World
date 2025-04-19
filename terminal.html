@@ -23,7 +23,7 @@
     }
     .tab.active { background: #fff; font-weight: bold; }
     #tab-content { padding: 10px; overflow-y: auto; flex: 1; }
-  
+
   /* Modal základní styl */
 .modal {
   position: fixed;
@@ -55,10 +55,10 @@
 .leaflet-routing-container {
   display: none !important;
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-  
+
 }
 }
-  
+
   </style>
 </head>
 <body>
@@ -74,8 +74,8 @@
       <div id="tab-content">
         <h3>Dispečink</h3>
         <p>Zde budou skupiny cestujících podle cíle.</p>
-        
-        
+
+
       </div>
 <!-- VOZIDLA – výpis vlastněných autobusů -->
 <div id="tab-content-vehicles" class="tab-section" style="display: none;">
@@ -97,13 +97,13 @@
     <button onclick="sellVehicle()">Prodat</button>
   </div>
 </div>
-      
-      
-      
+
+
+
 <!-- EKONOMIKA -->
 <div id="tab-content-economy" class="tab-section" style="display: none;">
   <h3>Ekonomika</h3>
- 
+
   <div id="money-display" style="font-weight: bold; font-size: 1.1em; margin: 10px 0;">
   Pokladna: 0 Kč
 </div>
@@ -114,7 +114,7 @@
   <h3>Vývoj</h3>
   <p>Zde bude postupné odemykání nových funkcí (vlaky, letadla...)</p>
 </div>
-      
+
 <div id="dispatch-modal" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%);
   background:#fff; padding:20px; border:1px solid #ccc; border-radius:8px; z-index:1000; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
   <div id="dispatch-modal-content"></div>
@@ -126,8 +126,8 @@
   <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
   <script>
     // Výchozí pozice terminálu v Pošumaví
-    const terminalLat = 49.1088664;
-    const terminalLon = 13.8663668;
+    const terminalLat = 50.4792236;
+    const terminalLon = 13.8188985;
 
     const map = L.map('map').setView([terminalLat, terminalLon], 13);
 
@@ -146,18 +146,16 @@
 
     L.marker([terminalLat, terminalLon], { icon: terminalIcon })
       .addTo(map)
-      .bindPopup("Autobusový terminál")
+      .bindPopup("Tady někde bydlí bjouk")
       .openPopup();
-  
+
   window.onload = async () => {
   const loaded = await loadGameState();
   if (!loaded) {
     await fetchNearbyVillages(); // První fetch pokud není uložen stav
-    startGeneratingPassengers(); // Start generování pasažérů u nové hry
- 
-}  
+  }
 };
-  
+
   const busTypes = {
   mikrobus: {
     name: "Mikrobus",
@@ -182,7 +180,7 @@
   }
 };
 
-  let gameWasLoaded = false; // globální proměnná
+
    let searchRadiusKm = 5; // začínáme na 5 km 
     let fetchedVillages = [];
 const passengerGroups = {}; // { název obce: počet cestujících }
@@ -217,16 +215,19 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   });
 
   console.log("Aktualizované obce:", fetchedVillages);
-
+  startGeneratingPassengers();
 }
 let money = 0;
-  
-let passengerIntervalId = null;
+
+// Spuštění generování cestujících
+let passengerGenerationStarted = false;
 
 function startGeneratingPassengers() {
-  if (passengerIntervalId) return; // Už běží
+  if (passengerGenerationStarted) return; // zabrání spuštění víc intervalů
 
-  passengerIntervalId = setInterval(() => {
+  passengerGenerationStarted = true;
+
+  setInterval(() => {
     if (fetchedVillages.length === 0) return;
 
     const randomIndex = Math.floor(Math.random() * fetchedVillages.length);
@@ -241,6 +242,7 @@ function startGeneratingPassengers() {
     renderDispatchTab();
   }, 700);
 }
+
 
 // Přepis vykreslování obsahu Dispečinku
 function renderDispatchTab() {
@@ -314,7 +316,7 @@ function renderDispatchTab() {
         renderTab(tabName);
       });
     });
-  
+
   let ownedVehicles = [];
 
 function renderTab(tabName) {
@@ -325,13 +327,13 @@ function renderTab(tabName) {
     renderVehicleList();
   } else if (tabName === 'economy') {
     renderEconomyTab(); // << přidáno sem
- 
+
   }  else if (tabName === 'progress') {
   renderProgressTab();
 
   }
 }
-  
+
   function renderProgressTab() {
   tabContent.innerHTML = `
     <h3>Vývoj</h3>
@@ -343,14 +345,14 @@ function renderTab(tabName) {
     </div>
   `;
 }
-  
+
 function updateEconomy() {
   const activeTab = document.querySelector('.tab.active')?.dataset.tab;
   if (activeTab === 'economy') {
     renderEconomyTab();
   }
 }
-   
+
 
 // Funkce pro vykreslení seznamu vozidel
 function renderVehicleList() {
@@ -380,7 +382,7 @@ function renderVehicleList() {
   // Tlačítka pro nákup autobusů
   const purchaseButtons = document.createElement('div');
   purchaseButtons.innerHTML = `
-    <button onclick="buyBus('mikrobus')">Koupit Mikrobus (20 000 Kč)</button>
+    <button onclick="buyBus('mikrobus')">Koupit Mikrobus (5 000 Kč)</button>
     <button onclick="buyBus('minibus')">Koupit Minibus (50 000 Kč)</button>
     <button onclick="buyBus('autobus')">Koupit Autobus (100 000 Kč)</button>
   `;
@@ -413,14 +415,14 @@ function sellVehicle() {
   console.log("Prodáno vozidlo");
   closeVehicleModal();
 }
-  
+
 
 
 function createInitialVehicle() {
   const initialMicrobus = {
     id: Date.now(),
     type: 'mikrobus',
-    name: 'první',
+    name: 'Bjouk 1',
     capacity: 6,
     speed: 650, // měla by být 70, ne 650
     status: 'volný',
@@ -433,7 +435,7 @@ function createInitialVehicle() {
   ownedVehicles.push(initialMicrobus);
 }
   createInitialVehicle() 
-  
+
   function openDispatchModal(destination, passengerCount) {
   const availableVehicles = ownedVehicles.filter(v => v.status === 'volný' && v.capacity >= passengerCount);
 
@@ -455,7 +457,7 @@ function createInitialVehicle() {
 
   showModal(modalHtml);
 }
-  
+
 
 
 function openDispatchModal(destination, passengerCount) {
@@ -472,9 +474,9 @@ function openDispatchModal(destination, passengerCount) {
   `;
 
   modal.style.display = 'block';
-  
+
 }
-  
+
   function dispatchVehicle(vehicleId, destination, requestedPassengerCount) {
   const vehicle = ownedVehicles.find(v => v.id === vehicleId);
   if (!vehicle) return;
@@ -519,7 +521,7 @@ function openDispatchModal(destination, passengerCount) {
     removeRoute(vehicleId);
   }, travelTime + 10000); // 20 sekund na zastávce
 }
-  
+
 function renderMoney() {
   const moneyDisplay = document.getElementById('money-display');
   if (moneyDisplay) {
@@ -531,16 +533,16 @@ function closeDispatchModal() {
   const modal = document.getElementById('dispatch-modal');
   modal.style.display = 'none';
 }
-  
-  
-  
+
+
+
   function renderEconomyTab() {
   tabContent.innerHTML = `
     <h3>Ekonomika</h3>
     <p><strong>Stav účtu:</strong> ${money.toLocaleString()} Kč</p>
   `;
 }
-  
+
 
 function assignBusToDestination(destination, passengerCount) {
   const availableBus = ownedVehicles.find(bus => bus.status === 'volný');
@@ -560,7 +562,7 @@ function assignBusToDestination(destination, passengerCount) {
 
   const routeControl = L.Routing.control({
     waypoints: [
-      L.latLng(49.1088664, 13.8663668), // Terminál
+      L.latLng(50.4792236, 13.8188985), // Terminál
       L.latLng(village.lat, village.lon)
     ],
     routeWhileDragging: false,
@@ -632,7 +634,7 @@ if (availableBus.kmToService <= 0) {
             marker.setLatLng(coords[backIndex]);
           }
         }, interval);
-      }, 5000); // 20s pauza
+      }, 20000); // 20s pauza
 
     } else {
       marker.setLatLng(coords[index]);
@@ -649,13 +651,13 @@ if (availableBus.kmToService <= 0) {
 });
 }
   renderMoney();
- 
+
 
 // Funkce pro nákup autobusu
 function buyBus(type) {
   // Získáme cenu autobusu z objektu busTypes
   const busPrice = busTypes[type]?.price;
-  
+
   if (!busPrice) {
     alert('Neplatný typ autobusu!');
     return;
@@ -684,7 +686,7 @@ function buyBus(type) {
 function createBus(type) {
   const busDetails = busTypes[type];
 
-  const busName = `1C0 0001  ${ownedVehicles.length + 1}`; // Generování názvu
+  const busName = `Bjouk ${ownedVehicles.length + 1}`; // Generování názvu
   const newBus = {
     id: Date.now(),
     type: type,
@@ -699,7 +701,7 @@ function createBus(type) {
   };
   return newBus;
 }
-  
+
   const dbName = "DopravniTerminalDB";
 const storeName = "GameState";
 
@@ -752,31 +754,35 @@ async function loadGameState() {
       if (request.result) {
         const state = request.result;
         money = state.money || 0;
-        ownedVehicles = (state.ownedVehicles || []).map(v => ({
-          ...v,
-          status: v.status === 'na cestě' || v.status?.startsWith('jede') ? 'volný' : v.status,
-          destination: null
-        }));
+        ownedVehicles = state.ownedVehicles || [];
         fetchedVillages = state.fetchedVillages || [];
         passengerGroups = state.passengerGroups || {};
         searchRadiusKm = state.searchRadiusKm || 5;
 
-        console.log("Načten herní stav", state);
+        // Po načtení stavu:
+        ownedVehicles.forEach(v => {
+          if (v.status !== 'potřebuje servis') {
+            v.status = 'volný';
+            v.destination = null;
+          }
+        });
+
         renderMoney();
         renderVehicleList();
         renderDispatchTab();
+        startGeneratingPassengers(); // Tady to jede
 
-        startGeneratingPassengers(); // spustit generování
+        console.log("Načten herní stav", state);
         resolve(true);
       } else {
-        console.log("Nebyl uložen žádný stav. Spouštím novou hru.");
-        startGeneratingPassengers(); // i nová hra potřebuje generování
+        console.log("Nebyl uložen žádný stav.");
         resolve(false);
       }
     };
     request.onerror = () => reject("Chyba při načítání stavu hry");
   });
 }
+
 
 // Smazání stavu hry
 async function deleteGameState() {
