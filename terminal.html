@@ -411,11 +411,31 @@ function serviceVehicle() {
   closeVehicleModal();
 }
 
-function sellVehicle() {
-  console.log("Prodáno vozidlo");
-  closeVehicleModal();
-}
+function sellVehicle(busId) {
+  const busIndex = ownedVehicles.findIndex(bus => bus.id === busId);
+  if (busIndex === -1) {
+    alert("Autobus nebyl nalezen.");
+    return;
+  }
 
+  const bus = ownedVehicles[busIndex];
+  const confirmSale = confirm(`Opravdu chceš prodat autobus ${bus.name}?`);
+
+  if (!confirmSale) return;
+
+  const originalPrice = busTypes[bus.type].price;
+  const salePrice = Math.floor(originalPrice * (0.5 + Math.random() * 0.1)); // 50–60 %
+
+  // Přičti peníze a odeber autobus
+  money += salePrice;
+  ownedVehicles.splice(busIndex, 1);
+
+  renderMoney();
+  renderVehicleList();
+  closeVehicleModal();
+
+  alert(`Autobus ${bus.name} byl prodán za ${salePrice.toLocaleString()} Kč.`);
+}
 
 
 function createInitialVehicle() {
