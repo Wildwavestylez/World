@@ -180,7 +180,7 @@
   }
 };
 
-  
+  let gameWasLoaded = false; // globální proměnná
    let searchRadiusKm = 5; // začínáme na 5 km 
     let fetchedVillages = [];
 const passengerGroups = {}; // { název obce: počet cestujících }
@@ -220,9 +220,8 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
 let money = 0;
   
 function startGeneratingPassengers() {
-  // Pokud už nějací cestující existují, předpokládáme že jsme načetli uložený stav a NEgenerujeme znovu
-  if (Object.keys(passengerGroups).length > 0) {
-    console.log("Cestující načteni ze save, generování se nespouští.");
+  if (gameWasLoaded && Object.keys(passengerGroups).length > 0) {
+    console.log("Načteno ze save, generování pasažérů se nespouští");
     return;
   }
 
@@ -762,6 +761,7 @@ async function loadGameState() {
         }));
         fetchedVillages = state.fetchedVillages || [];
         passengerGroups = state.passengerGroups || {};
+gameWasLoaded = true;
         searchRadiusKm = state.searchRadiusKm || 5;
 
         console.log("Načten herní stav", state);
