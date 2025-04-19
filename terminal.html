@@ -215,7 +215,7 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   });
 
   console.log("Aktualizované obce:", fetchedVillages);
-  startGeneratingPassengers();
+
 }
 let money = 0;
   
@@ -768,6 +768,7 @@ gameWasLoaded = true;
         renderMoney();
         renderVehicleList();
         renderDispatchTab();
+        startGeneratingPassengers();
         resolve(true);
       } else {
         console.log("Nebyl uložen žádný stav.");
