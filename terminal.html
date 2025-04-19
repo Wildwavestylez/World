@@ -219,13 +219,12 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
 }
 let money = 0;
   
-// Spuštění generování cestujících
-let passengerGenerationStarted = false;
-
 function startGeneratingPassengers() {
-  if (passengerGenerationStarted) return; // zabrání spuštění víc intervalů
-
-  passengerGenerationStarted = true;
+  // Pokud už nějací cestující existují, předpokládáme že jsme načetli uložený stav a NEgenerujeme znovu
+  if (Object.keys(passengerGroups).length > 0) {
+    console.log("Cestující načteni ze save, generování se nespouští.");
+    return;
+  }
 
   setInterval(() => {
     if (fetchedVillages.length === 0) return;
@@ -754,25 +753,21 @@ async function loadGameState() {
       if (request.result) {
         const state = request.result;
         money = state.money || 0;
-        ownedVehicles = state.ownedVehicles || [];
+        ownedVehicles = (state.ownedVehicles || []).map(bus => ({
+          ...bus,
+          status: bus.status === 'na cestě' || bus.status?.startsWith('jede do')
+            ? 'volný'
+            : bus.status,
+          destination: null
+        }));
         fetchedVillages = state.fetchedVillages || [];
         passengerGroups = state.passengerGroups || {};
         searchRadiusKm = state.searchRadiusKm || 5;
 
-        // Po načtení stavu:
-        ownedVehicles.forEach(v => {
-          if (v.status !== 'potřebuje servis') {
-            v.status = 'volný';
-            v.destination = null;
-          }
-        });
-
+        console.log("Načten herní stav", state);
         renderMoney();
         renderVehicleList();
         renderDispatchTab();
-        startGeneratingPassengers(); // Tady to jede
-
-        console.log("Načten herní stav", state);
         resolve(true);
       } else {
         console.log("Nebyl uložen žádný stav.");
@@ -782,7 +777,6 @@ async function loadGameState() {
     request.onerror = () => reject("Chyba při načítání stavu hry");
   });
 }
-
 
 // Smazání stavu hry
 async function deleteGameState() {
