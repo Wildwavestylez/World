@@ -153,7 +153,9 @@
   const loaded = await loadGameState();
   if (!loaded) {
     await fetchNearbyVillages(); // První fetch pokud není uložen stav
-    startGeneratingPassengers(); // <<< Spustíme generování pro novou hru
+    startGeneratingPassengers(); // Start generování pasažérů u nové hry
+  } else {
+    startGeneratingPassengers(); // Start generování pasažérů i po načtení
   }
 };
   
