@@ -442,7 +442,7 @@ function createInitialVehicle() {
   const initialMicrobus = {
     id: Date.now(),
     type: 'mikrobus',
-    name: 'Bjouk 1',
+    name: 'cápek 1',
     capacity: 6,
     speed: 650, // měla by být 70, ne 650
     status: 'volný',
@@ -539,7 +539,7 @@ function openDispatchModal(destination, passengerCount) {
     renderVehicleList();
     renderDispatchTab();
     removeRoute(vehicleId);
-  }, travelTime + 10000); // 20 sekund na zastávce
+  }, travelTime + 5000); // 5 sekund na zastávce
 }
 
 function renderMoney() {
