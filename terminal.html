@@ -752,26 +752,25 @@ async function loadGameState() {
       if (request.result) {
         const state = request.result;
         money = state.money || 0;
-        ownedVehicles = (state.ownedVehicles || []).map(bus => ({
-          ...bus,
-          status: bus.status === 'na cestě' || bus.status?.startsWith('jede do')
-            ? 'volný'
-            : bus.status,
+        ownedVehicles = (state.ownedVehicles || []).map(v => ({
+          ...v,
+          status: v.status === 'na cestě' || v.status?.startsWith('jede') ? 'volný' : v.status,
           destination: null
         }));
         fetchedVillages = state.fetchedVillages || [];
         passengerGroups = state.passengerGroups || {};
-gameWasLoaded = true;
         searchRadiusKm = state.searchRadiusKm || 5;
 
         console.log("Načten herní stav", state);
         renderMoney();
         renderVehicleList();
         renderDispatchTab();
-        startGeneratingPassengers();
+
+        startGeneratingPassengers(); // spustit generování
         resolve(true);
       } else {
-        console.log("Nebyl uložen žádný stav.");
+        console.log("Nebyl uložen žádný stav. Spouštím novou hru.");
+        startGeneratingPassengers(); // i nová hra potřebuje generování
         resolve(false);
       }
     };
