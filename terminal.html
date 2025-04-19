@@ -747,27 +747,36 @@ async function loadGameState() {
   const tx = db.transaction(storeName, "readonly");
   const store = tx.objectStore(storeName);
 
-  const savedState = await store.get("state");
+  const request = store.get("state");
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => {
+      if (request.result) {
+        const state = request.result;
+        money = state.money || 0;
+        ownedVehicles = (state.ownedVehicles || []).map(v => ({
+          ...v,
+          status: v.status === 'na cestě' || v.status?.startsWith('jede') ? 'volný' : v.status,
+          destination: null
+        }));
+        fetchedVillages = state.fetchedVillages || [];
+        passengerGroups = state.passengerGroups || {};
+        searchRadiusKm = state.searchRadiusKm || 5;
 
-  if (!savedState) return false;
+        console.log("Načten herní stav", state);
+        renderMoney();
+        renderVehicleList();
+        renderDispatchTab();
 
-  // Obnovení stavu
-  money = savedState.money || 0;
-  ownedVehicles = savedState.ownedVehicles || [];
-  fetchedVillages = savedState.fetchedVillages || [];
-  passengerGroups = savedState.passengerGroups || {};
-  searchRadiusKm = savedState.searchRadiusKm || 5;
-
-  renderMoney();
-  renderVehicleList();
-  renderDispatchTab();
-
-  console.log("Stav načten:", savedState);
-
-  // <<< Přidáme spuštění generování cestujících
-  startGeneratingPassengers();
-
-  return true;
+        startGeneratingPassengers(); // spustit generování
+        resolve(true);
+      } else {
+        console.log("Nebyl uložen žádný stav. Spouštím novou hru.");
+        startGeneratingPassengers(); // i nová hra potřebuje generování
+        resolve(false);
+      }
+    };
+    request.onerror = () => reject("Chyba při načítání stavu hry");
+  });
 }
 
 // Smazání stavu hry
