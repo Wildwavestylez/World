@@ -126,8 +126,8 @@
   <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
   <script>
     // Výchozí pozice terminálu v Pošumaví
-    const terminalLat = 50.4792236;
-    const terminalLon = 13.8188985;
+    const terminalLat = 49.1196904;
+    const terminalLon = 13.8485080;
 
     const map = L.map('map').setView([terminalLat, terminalLon], 13);
 
@@ -146,7 +146,7 @@
 
     L.marker([terminalLat, terminalLon], { icon: terminalIcon })
       .addTo(map)
-      .bindPopup("Tady někde bydlí bjouk")
+      .bindPopup("Šupák")
       .openPopup();
 
   window.onload = async () => {
@@ -562,7 +562,7 @@ function assignBusToDestination(destination, passengerCount) {
 
   const routeControl = L.Routing.control({
     waypoints: [
-      L.latLng(50.4792236, 13.8188985), // Terminál
+      L.latLng(49.1196904, 13.8485080), // Terminál
       L.latLng(village.lat, village.lon)
     ],
     routeWhileDragging: false,
