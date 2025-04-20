@@ -217,7 +217,7 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   console.log("Aktualizované obce:", fetchedVillages);
   startGeneratingPassengers();
 }
-let money = 0;
+let money = 100000;
 
 // Spuštění generování cestujících
 let passengerGenerationStarted = false;
@@ -447,7 +447,7 @@ function createInitialVehicle() {
     speed: 650, // měla by být 70, ne 650
     status: 'volný',
     kmDriven: 0,
-    kmToService: 20000,
+    kmToService: 200000,
     destination: null,
     iconUrl: busTypes['mikrobus'].iconUrl
   };
