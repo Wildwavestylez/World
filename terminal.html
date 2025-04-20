@@ -105,7 +105,7 @@
   <h3>Ekonomika</h3>
 
   <div id="money-display" style="font-weight: bold; font-size: 1.1em; margin: 10px 0;">
-  Pokladna: 10000 Kč
+  Pokladna: 0 Kč
 </div>
 </div>
 
@@ -161,7 +161,7 @@
     name: "Mikrobus",
     capacity: 6,
     speed: 670,
-    price: 5000,
+    price: 10000,
     iconUrl: "https://i.imgur.com/FUu2lsY.png"
   },
   minibus: {
@@ -217,7 +217,7 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   console.log("Aktualizované obce:", fetchedVillages);
   startGeneratingPassengers();
 }
-let money = 10000;
+let money = 0;
 
 // Spuštění generování cestujících
 let passengerGenerationStarted = false;
