@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bot Výnos Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f7f7f7;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+    }
+    .input-group {
+      margin-bottom: 10px;
+    }
+    label {
+      display: inline-block;
+      width: 180px;
+    }
+    input {
+      padding: 5px;
+      width: 150px;
+    }
+    button {
+      padding: 8px 16px;
+      margin-top: 10px;
+    }
+    .results {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #e6ffe6;
+      border: 1px solid #b2ffb2;
+    }
+  </style>
+</head>
+<body>
+  <h1>Výkon bota – Dashboard</h1>
+  <div class="input-group">
+    <label>Čas běhu (v minutách):</label>
+    <input type="number" id="minutes" />
+  </div>
+  <div class="input-group">
+    <label>Počet transakcí:</label>
+    <input type="number" id="trades" />
+  </div>
+  <div class="input-group">
+    <label>Celkový zisk (USDT):</label>
+    <input type="number" id="profit" step="0.01" />
+  </div>
+  <button onclick="calculate()">Spočítat</button>
+
+  <div class="results" id="results" style="display:none">
+    <p><strong>Transakcí za hodinu:</strong> <span id="tph"></span></p>
+    <p><strong>Výdělek za hodinu:</strong> <span id="pph"></span> USDT</p>
+    <p><strong>Průměrný zisk na transakci:</strong> <span id="avg"></span> USDT</p>
+  </div>
+
+  <script>
+    function calculate() {
+      const minutes = parseFloat(document.getElementById("minutes").value);
+      const trades = parseInt(document.getElementById("trades").value);
+      const profit = parseFloat(document.getElementById("profit").value);
+
+      if (!minutes || !trades || !profit) return;
+
+      const hours = minutes / 60;
+      const tradesPerHour = (trades / hours).toFixed(2);
+      const profitPerHour = (profit / hours).toFixed(2);
+      const averagePerTrade = (profit / trades).toFixed(4);
+
+      document.getElementById("tph").textContent = tradesPerHour;
+      document.getElementById("pph").textContent = profitPerHour;
+      document.getElementById("avg").textContent = averagePerTrade;
+      document.getElementById("results").style.display = "block";
+    }
+  </script>
+</body>
+</html>
