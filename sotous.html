@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>tady všude budou fotky vlaků kámo</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: sans-serif;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    #sidePanel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 300px;
+      height: 100%;
+      background: white;
+      border-left: 1px solid #ccc;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+      padding: 10px;
+    }
+    #sidePanel.open {
+      transform: translateX(0);
+    }
+    #togglePanel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1100;
+      padding: 6px 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #addButton {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 1100;
+      padding: 10px 16px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .record {
+      margin-bottom: 12px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <button id="togglePanel">Seznam</button>
+  <button id="addButton">Přidat záznam</button>
+  <div id="sidePanel"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyA2jiHEqJDjkb9vsrVmQq2XhUFLkpYZ1Gg",
+      authDomain: "vlaky-d5a1e.firebaseapp.com",
+      projectId: "vlaky-d5a1e",
+      storageBucket: "vlaky-d5a1e.appspot.com",
+      messagingSenderId: "1063678625780",
+      appId: "1:1063678625780:web:4e03c02e6b4cc80fcd9ba1",
+      measurementId: "G-GC1GEDGZ5V"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const map = L.map('map').setView([49.8, 15.5], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data © OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Toggle panel
+    const sidePanel = document.getElementById("sidePanel");
+    document.getElementById("togglePanel").addEventListener("click", () => {
+      sidePanel.classList.toggle("open");
+    });
+
+    // Add button
+    document.getElementById("addButton").addEventListener("click", () => {
+      const latlng = map.getCenter();
+      const text = prompt("Zadej poznámku:");
+      const img = prompt("Odkaz na fotku (např. z Imgur):");
+
+      if (text) {
+        db.collection("zaznamy").add({
+          lat: latlng.lat,
+          lng: latlng.lng,
+          text,
+          img
+        }).then(docRef => {
+          addMarker(latlng.lat, latlng.lng, text, img);
+          loadRecords(); // Refresh panel
+        });
+      }
+    });
+
+    function addMarker(lat, lng, text, img) {
+      const marker = L.marker([lat, lng]).addTo(map);
+      const content = `<strong>${text}</strong><br>${img ? `<img src="${img}" style="max-width:200px">` : ""}`;
+      marker.bindPopup(content);
+    }
+
+    function loadRecords() {
+      sidePanel.innerHTML = "<h3>Záznamy</h3>";
+      db.collection("zaznamy").get().then(snapshot => {
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const div = document.createElement("div");
+          div.className = "record";
+          div.innerHTML = `<strong>${data.text}</strong><br>${data.img ? `<a href="${data.img}" target="_blank">Otevřít fotku</a>` : "Bez fotky"}`;
+          sidePanel.appendChild(div);
+          addMarker(data.lat, data.lng, data.text, data.img);
+        });
+      });
+    }
+
+    // Load existing records
+    loadRecords();
+  </script>
+</body>
+</html>
