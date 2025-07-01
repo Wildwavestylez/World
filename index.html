@@ -44,12 +44,21 @@
 
         let center = [49.1675000, 13.8898087];
 
-        let polygonPoints = [
-            [center[0] + 0.002, center[1] - 0.002],
-            [center[0] + 0.002, center[1] + 0.002],
-            [center[0] - 0.002, center[1] + 0.002],
-            [center[0] - 0.002, center[1] - 0.002]
-        ];
+        let savedPolygon = localStorage.getItem("polygonPoints");
+
+let polygonPoints;
+
+if (savedPolygon) {
+    polygonPoints = JSON.parse(savedPolygon);
+} else {
+    polygonPoints = [
+        [center[0] + 0.002, center[1] - 0.002],
+        [center[0] + 0.002, center[1] + 0.002],
+        [center[0] - 0.002, center[1] + 0.002],
+        [center[0] - 0.002, center[1] - 0.002]
+    ];
+}
+        
 
         let polygon = L.polygon(polygonPoints, { color: 'blue' }).addTo(map);
 
@@ -170,6 +179,8 @@ function expandPolygon() {
 
     let area = calculatePolygonArea(polygonPoints);
     let population = Math.round(area * populationDensity);
+
+localStorage.setItem("polygonPoints", JSON.stringify(polygonPoints));
 
     document.getElementById("area").textContent = area.toFixed(2);
     document.getElementById("population").textContent = population.toLocaleString();
