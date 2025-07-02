@@ -89,12 +89,26 @@ function distance(coord1, coord2) {
         }
 
         function movePointAway(point, center, distance) {
-            let latDiff = point[0] - center[0];
-            let lngDiff = point[1] - center[1];
-            let length = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-            let scale = distance / length;
-            return [point[0] + latDiff * scale, point[1] + lngDiff * scale];
-        }
+    let latDiff = point[0] - center[0];
+    let lngDiff = point[1] - center[1];
+
+    let length = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+    let normLat = latDiff / length;
+    let normLng = lngDiff / length;
+
+    // 🎯 Přidej náhodný úhel (v rozsahu ±15°)
+    let angleOffset = (Math.random() - 0.5) * (Math.PI / 6); // ±21°
+    let cosA = Math.cos(angleOffset);
+    let sinA = Math.sin(angleOffset);
+
+    let rotatedLat = normLat * cosA - normLng * sinA;
+    let rotatedLng = normLat * sinA + normLng * cosA;
+
+    return [
+        point[0] + rotatedLat * distance,
+        point[1] + rotatedLng * distance
+    ];
+}
 
         function calculatePolygonArea(points) {
             let earthRadius = 6371; // Poloměr Země v km
