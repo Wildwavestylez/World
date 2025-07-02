@@ -126,10 +126,22 @@ function expandPolygon() {
     let totalPoints = polygonPoints.length;
     let maxWaitTurns = Math.floor(0.5 * totalPoints);
 
-    let selectedIndex = currentIndex;
+    let availablePoints = polygonPoints
+    .map((point, index) => ({ point, index }))
+    .filter(({ index }) => !blockedPoints[index]);
 
-// Posuň index na další bod ve směru hodinových ručiček
-currentIndex = (currentIndex + 1) % polygonPoints.length;
+if (availablePoints.length === 0) return;
+
+let forcedMoveIndex = moveTracker.indexOf(Math.max(...moveTracker));
+let mustMove = moveTracker[forcedMoveIndex] >= maxWaitTurns;
+
+let selectedIndex;
+if (mustMove) {
+    selectedIndex = forcedMoveIndex;
+} else {
+    let randomPoint = availablePoints[Math.floor(Math.random() * availablePoints.length)];
+    selectedIndex = randomPoint.index;
+}
     // Náhodná vzdálenost mezi 150 a 300 metry (přibližně) nebo větší pro každý 50. tah
     let distance;
     if (turn % 10 === 0) {
