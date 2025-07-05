@@ -225,26 +225,23 @@ function expandPolygon() {
     let convexHull = getConvexHull(polygonPoints);
     let isOnHull = isOnConvexHull(currentPoint, convexHull);
 
-    // Základní délka posunu
-    let baseDistance = 0.0018 + Math.random() * 0.004;
-
     let newPoint;
 
     if (!isOnHull) {
-        // Bublina → silnější a přímý tlak ven
-        let forceDistance = baseDistance * 3 + Math.random() * 0.003; // 600–1800m
-        newPoint = forcePointOutward(currentPoint, center, forceDistance);
+        // Vnitřní bod – silnější posun (500–800 m)
+        let distance = 0.0045 + Math.random() * 0.003; // 0.0045–0.0075
+        newPoint = forcePointOutward(currentPoint, center, distance);
     } else {
-        // Normální bod → lehký růst s mírným šumem
-        newPoint = movePointAway(currentPoint, center, baseDistance, selectedIndex);
+        // Vnější bod – jemný posun (200–400 m)
+        let distance = 0.002 + Math.random() * 0.002; // 0.002–0.004
+        newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
     }
 
-    // 🔒 Zajistí že nový bod je opravdu jiný než původní
-    if (distanceBetween(currentPoint, newPoint) > 0.0001) {
+    // Zajistí, že se opravdu hýbe
+    if (distanceBetween(currentPoint, newPoint) > 0.00001) {
         polygonPoints[selectedIndex] = newPoint;
     }
 
-    // Správa pohybu
     moveTracker[selectedIndex] = 0;
     blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
@@ -252,7 +249,7 @@ function expandPolygon() {
         if (i !== selectedIndex) moveTracker[i]++;
     }
 
-    // Přidávání bodu mezi dlouhé segmenty
+    // Přidání bodu mezi dlouhé úseky
     for (let i = 0; i < polygonPoints.length; i++) {
         let p1 = polygonPoints[i];
         let p2 = polygonPoints[(i + 1) % polygonPoints.length];
@@ -267,10 +264,8 @@ function expandPolygon() {
         }
     }
 
-    // Posun na další bod
     currentIndex = (currentIndex + 1) % polygonPoints.length;
 
-    // Aktualizace polygonu
     polygon.setLatLngs(polygonPoints);
 
     let area = calculatePolygonArea(polygonPoints);
@@ -281,7 +276,6 @@ function expandPolygon() {
     document.getElementById("area").textContent = area.toFixed(2);
     document.getElementById("population").textContent = population.toLocaleString();
 }
-
         function unlockBlockedPoints() {
             let currentTime = Date.now();
             for (let index in blockedPoints) {
