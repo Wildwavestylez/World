@@ -157,39 +157,7 @@ function isPointInPolygon(point, polygon) {
     return inside;
 }
   
-  function canMovePoint(index, newPoint) {
-    let n = polygonPoints.length;
-    let prevIndex = (index - 1 + n) % n;
-    let nextIndex = (index + 1) % n;
-
-    for (let i = 0; i < n; i++) {
-        let j = (i + 1) % n;
-
-        // Přeskoč sousední úseky
-        if (i === prevIndex || i === index || j === prevIndex || j === index) continue;
-
-        let a = polygonPoints[i];
-        let b = polygonPoints[j];
-
-        let seg1 = polygonPoints[prevIndex];
-        let seg2 = polygonPoints[nextIndex];
-
-        if (
-            linesIntersect(seg1, newPoint, a, b) ||
-            linesIntersect(newPoint, seg2, a, b)
-        ) {
-            return false;
-        }
-    }
-    return true;
-}
   
-  function linesIntersect(a, b, c, d) {
-    function ccw(p1, p2, p3) {
-        return (p3[1]-p1[1])*(p2[0]-p1[0]) > (p2[1]-p1[1])*(p3[0]-p1[0]);
-    }
-    return (ccw(a,c,d) != ccw(b,c,d)) && (ccw(a,b,c) != ccw(a,b,d));
-}
   
   
 function expandPolygon() {
@@ -222,21 +190,18 @@ function expandPolygon() {
         newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
     }
 
-    // Zkontrolujeme, zda pohyb nezpůsobí překřížení
-    if (canMovePoint(selectedIndex, newPoint)) {
-        polygonPoints[selectedIndex] = newPoint;
-    } 
-    // Pokud NEprojde kontrolou – nevadí, necháme být a zkusíme to příště znovu
+    // 🔥 Žádná kontrola překřížení – vždy se pohne
+    polygonPoints[selectedIndex] = newPoint;
 
     moveTracker[selectedIndex] = 0;
     blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
-    // Ostatním bodům zvýšíme tracker
+    // Zvýšíme tracker ostatním
     for (let i = 0; i < moveTracker.length; i++) {
         if (i !== selectedIndex) moveTracker[i]++;
     }
 
-    // Přidáme nový bod mezi dlouhé úseky
+    // Přidáme bod mezi příliš dlouhé úseky
     for (let i = 0; i < polygonPoints.length; i++) {
         let p1 = polygonPoints[i];
         let p2 = polygonPoints[(i + 1) % polygonPoints.length];
@@ -251,6 +216,7 @@ function expandPolygon() {
         }
     }
 
+    // Pokračujeme na další bod
     currentIndex = (currentIndex + 1) % polygonPoints.length;
 
     polygon.setLatLngs(polygonPoints);
