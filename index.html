@@ -92,11 +92,11 @@ function distance(coord1, coord2) {
     let prev = polygonPoints[(index - 1 + polygonPoints.length) % polygonPoints.length];
     let next = polygonPoints[(index + 1) % polygonPoints.length];
 
-    // Vektor tangenty (hranové směry)
+    // Vektor tangenty (mezi sousedními body)
     let dx = next[1] - prev[1];
     let dy = next[0] - prev[0];
 
-    // Normála (kolmice) – směr od polygonu ven
+    // Normála (kolmý směr)
     let nx = -dy;
     let ny = dx;
 
@@ -105,20 +105,42 @@ function distance(coord1, coord2) {
     nx /= length;
     ny /= length;
 
-    // Náhodná odchylka ±30° → celkem 60°
-    let angleOffset = (Math.random() - 0.5) * (Math.PI / 3); // ±30°
-    let cosA = Math.cos(angleOffset);
-    let sinA = Math.sin(angleOffset);
+    // Vektor ke středu (směr dovnitř)
+    let toCenterX = center[1] - point[1];
+    let toCenterY = center[0] - point[0];
 
-    let rotatedNx = nx * cosA - ny * sinA;
-    let rotatedNy = nx * sinA + ny * cosA;
+    // Normalizace vektoru ke středu
+    let centerLength = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
+    let cx = toCenterX / centerLength;
+    let cy = toCenterY / centerLength;
+
+    let finalDirX, finalDirY;
+    let attempts = 0;
+
+    // Hledej směr, který není nasměrován do středu
+    do {
+        let angleOffset = (Math.random() - 0.5) * (Math.PI / 3); // ±30°
+        let cosA = Math.cos(angleOffset);
+        let sinA = Math.sin(angleOffset);
+
+        let rotatedNx = nx * cosA - ny * sinA;
+        let rotatedNy = nx * sinA + ny * cosA;
+
+        finalDirX = rotatedNx;
+        finalDirY = rotatedNy;
+
+        // Skalární součin – pokud je < 0, směr míří ke středu
+        let dotProduct = finalDirX * cx + finalDirY * cy;
+
+        if (dotProduct < 0.05 || attempts > 10) break; // čím menší, tím víc míří ke středu
+        attempts++;
+    } while (true);
 
     return [
-        point[0] + rotatedNy * distance, // latitude
-        point[1] + rotatedNx * distance  // longitude
+        point[0] + finalDirY * distance, // latitude
+        point[1] + finalDirX * distance  // longitude
     ];
 }
-
 
         function calculatePolygonArea(points) {
             let earthRadius = 6371; // Poloměr Země v km
