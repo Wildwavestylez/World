@@ -283,7 +283,10 @@ function expandPolygon() {
         }, 400);
 
 
-
+function clearLocalStorage() {
+    localStorage.removeItem("polygonPoints");
+    location.reload(); // Překreslí mapu od začátku
+}
 
 
 
