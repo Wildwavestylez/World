@@ -169,8 +169,14 @@ function expandPolygon() {
     let currentPoint = polygonPoints[selectedIndex];
 
     // Náhodná vzdálenost 200–600 m
-    let distance = 0.0018 + Math.random() * 0.004;
-
+    let distance;
+if (isInside) {
+    // Uvnitř polygonu – 500 až 800 metrů
+    distance = 0.0045 + Math.random() * 0.003; // ~500–800 m
+} else {
+    // Normální růst po kraji – 200 až 600 metrů
+    distance = 0.0018 + Math.random() * 0.004; // ~200–600 m
+}
     let newPoint;
 
     // Zjistíme, jestli je bod uvnitř polygonu (zamotanej)
