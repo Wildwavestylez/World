@@ -88,50 +88,39 @@ function distance(coord1, coord2) {
             return [latSum / points.length, lngSum / points.length];
         }
 
-        function movePointFromEdge(pointIndex, distance) {
-    let total = polygonPoints.length;
-    let prev = polygonPoints[(pointIndex - 1 + total) % total];
-    let curr = polygonPoints[pointIndex];
-    let next = polygonPoints[(pointIndex + 1) % total];
+        function movePointAway(point, center, distance, index) {
+    let prev = polygonPoints[(index - 1 + polygonPoints.length) % polygonPoints.length];
+    let next = polygonPoints[(index + 1) % polygonPoints.length];
 
-    // Spočítej tangentu (okraj polygonu)
-    let tangentLat = next[0] - prev[0];
-    let tangentLng = next[1] - prev[1];
+    // Vektor tangenty (hranové směry)
+    let dx = next[1] - prev[1];
+    let dy = next[0] - prev[0];
 
-    // Normála (kolmá na tangentu)
-    let normalLat = -tangentLng;
-    let normalLng = tangentLat;
+    // Normála (kolmice) – směr od polygonu ven
+    let nx = -dy;
+    let ny = dx;
 
-    // Jednotkový vektor
-    let length = Math.sqrt(normalLat * normalLat + normalLng * normalLng);
-    normalLat /= length;
-    normalLng /= length;
+    // Normalizace
+    let length = Math.sqrt(nx * nx + ny * ny);
+    nx /= length;
+    ny /= length;
 
-    // Směr ke středu
-    let center = getCentroid(polygonPoints);
-    let toCenterLat = center[0] - curr[0];
-    let toCenterLng = center[1] - curr[1];
-
-    // Ověření: je-li úhel mezi normálou a vektorem ke středu < 90°, normála míří dovnitř → OTOČIT
-    let dot = normalLat * toCenterLat + normalLng * toCenterLng;
-    if (dot > 0) {
-        normalLat = -normalLat;
-        normalLng = -normalLng;
-    }
-
-    // Přidej náhodný úhel (±30°)
+    // Náhodná odchylka ±30° → celkem 60°
     let angleOffset = (Math.random() - 0.5) * (Math.PI / 3); // ±30°
     let cosA = Math.cos(angleOffset);
     let sinA = Math.sin(angleOffset);
 
-    let rotatedLat = normalLat * cosA - normalLng * sinA;
-    let rotatedLng = normalLat * sinA + normalLng * cosA;
+    let rotatedNx = nx * cosA - ny * sinA;
+    let rotatedNy = nx * sinA + ny * cosA;
 
     return [
-        curr[0] + rotatedLat * distance,
-        curr[1] + rotatedLng * distance
+        point[0] + rotatedNy * distance, // latitude
+        point[1] + rotatedNx * distance  // longitude
     ];
-}     function calculatePolygonArea(points) {
+}
+
+
+        function calculatePolygonArea(points) {
             let earthRadius = 6371; // Poloměr Země v km
             let area = 0;
             let n = points.length;
@@ -154,48 +143,70 @@ function distance(coord1, coord2) {
 
         let turn = 0; // Přidáme proměnnou pro sledování počtu tahů
 
+
+function isPointInPolygon(point, polygon) {
+    let x = point[1], y = point[0];
+    let inside = false;
+
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        let xi = polygon[i][1], yi = polygon[i][0];
+        let xj = polygon[j][1], yj = polygon[j][0];
+
+        let intersect = ((yi > y) != (yj > y)) &&
+            (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+
+    return inside;
+}
 function expandPolygon() {
     turn++;
 
     let center = getCentroid(polygonPoints);
     let totalPoints = polygonPoints.length;
-
     let selectedIndex = currentIndex;
 
-    // Náhodná vzdálenost mezi 200 a 600 metrů (přibližně)
-    let distance = 0.0018 + Math.random() * 0.004; // cca 200–600 m
+    // Náhodná vzdálenost 200-600m
+    let distance = 0.0018 + Math.random() * 0.004;
 
-    let selectedPoint = polygonPoints[selectedIndex];
-let isInside = isPointInsidePolygon(selectedPoint, polygonPoints);
+    let currentPoint = polygonPoints[selectedIndex];
+    let newPoint;
 
-if (isInside) {
-    // Bod leží uvnitř polygonu – vytlačit přímo od středu ven
-    polygonPoints[selectedIndex] = movePointAway(selectedPoint, getCentroid(polygonPoints), distance);
-} else {
-    // Bod je na okraji – použít „chytřejší“ rozvětvující pohyb
-    polygonPoints[selectedIndex] = movePointFromEdge(selectedIndex, distance);
-}// Zaznamenání posunu + cooldown
-    moveTracker[selectedIndex] = 0;
-    blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
-
-    // Zvýšení trackeru u ostatních bodů
-    for (let i = 0; i < moveTracker.length; i++) {
-        if (i !== selectedIndex) moveTracker[i]++;
+    if (isPointInPolygon(currentPoint, polygonPoints)) {
+        // Pokud bod uvnitř, posuneme ho přímo od středu
+        newPoint = [
+            currentPoint[0] + (currentPoint[0] - center[0]) / distance * distance,
+            currentPoint[1] + (currentPoint[1] - center[1]) / distance * distance
+        ];
+    } else {
+        // Jinak použijeme tvůj movePointAway s náhodnou odchylkou
+        newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
     }
 
-    // Přidání nového bodu, pokud je úsek moc dlouhý
-    for (let i = 0; i < polygonPoints.length; i++) {
-        let p1 = polygonPoints[i];
-        let p2 = polygonPoints[(i + 1) % polygonPoints.length];
+    // Zkontroluj, jestli se pohybem nevytvoří průsečík, pokud ano - pohyb zruš
+    if (canMovePoint(selectedIndex, newPoint)) {
+        polygonPoints[selectedIndex] = newPoint;
 
-        let segmentLength = distanceBetween(p1, p2);
-        if (segmentLength > 0.023) {
-            let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
-            polygonPoints.splice(i + 1, 0, midPoint);
-            moveTracker.splice(i + 1, 0, 0);
-            // Úprava currentIndex, aby se zachovalo pořadí
-            if (currentIndex > i) currentIndex++;
-            break;
+        moveTracker[selectedIndex] = 0;
+        blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
+
+        for (let i = 0; i < moveTracker.length; i++) {
+            if (i !== selectedIndex) moveTracker[i]++;
+        }
+
+        // Přidání nového bodu, pokud je úsek moc dlouhý
+        for (let i = 0; i < polygonPoints.length; i++) {
+            let p1 = polygonPoints[i];
+            let p2 = polygonPoints[(i + 1) % polygonPoints.length];
+
+            let segmentLength = distanceBetween(p1, p2);
+            if (segmentLength > 0.023) {
+                let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+                polygonPoints.splice(i + 1, 0, midPoint);
+                moveTracker.splice(i + 1, 0, 0);
+                if (currentIndex > i) currentIndex++;
+                break;
+            }
         }
     }
 
@@ -211,23 +222,6 @@ if (isInside) {
 
     document.getElementById("area").textContent = area.toFixed(2);
     document.getElementById("population").textContent = population.toLocaleString();
-}
-
-
-function isPointInsidePolygon(point, polygonArray) {
-    let x = point[1], y = point[0];
-    let inside = false;
-
-    for (let i = 0, j = polygonArray.length - 1; i < polygonArray.length; j = i++) {
-        let xi = polygonArray[i][1], yi = polygonArray[i][0];
-        let xj = polygonArray[j][1], yj = polygonArray[j][0];
-
-        let intersect = ((yi > y) !== (yj > y)) &&
-            (x < (xj - xi) * (y - yi) / (yj - yi + 0.00000001) + xi);
-        if (intersect) inside = !inside;
-    }
-
-    return inside;
 }
 
 function distanceBetween(p1, p2) {
@@ -252,12 +246,7 @@ function distanceBetween(p1, p2) {
 
 
 
-// Inicializační výpočet po načtení
-polygon.setLatLngs(polygonPoints);
-let initialArea = calculatePolygonArea(polygonPoints);
-let initialPopulation = Math.round(initialArea * populationDensity);
-document.getElementById("area").textContent = initialArea.toFixed(2);
-document.getElementById("population").textContent = initialPopulation.toLocaleString();
+
 
 
     </script>
