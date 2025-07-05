@@ -230,7 +230,16 @@ const stepsPerSector = 200;
 let currentSectorIndex = 0;
 let lastSectorChangeTurn = 0;
 
+let sectorQueue = shuffleArray([...directionalSectors]);
+let currentSectorIndex = 0;
+let lastSectorChangeTurn = 0;
 
+function shuffleArray(array) {
+    return array
+        .map(value => ({ value, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .map(({ value }) => value);
+}
     
     function getAngleDegrees(center, point) {
     let dx = point[1] - center[1];
@@ -254,46 +263,50 @@ function expandPolygon() {
     turn++;
 
     let center = getCentroid(polygonPoints);
-    let totalPoints = polygonPoints.length;
     let selectedIndex = currentIndex;
     let currentPoint = polygonPoints[selectedIndex];
 
-    // Výpočet konvexního obalu
+    // Konvexní obal a kontrola, jestli bod je na vnější hraně
     let convexHull = getConvexHull(polygonPoints);
     let isOnHull = isOnConvexHull(currentPoint, convexHull);
 
-    // --- Přepínání směru po každých 1000 tazích
+    // 🔁 Změna směru po stepsPerSector tazích
     if (turn - lastSectorChangeTurn >= stepsPerSector) {
-        currentSectorIndex = (currentSectorIndex + 1) % directionalSectors.length;
+        currentSectorIndex++;
+
+        if (currentSectorIndex >= sectorQueue.length) {
+            sectorQueue = shuffleArray([...directionalSectors]); // Nové náhodné pořadí
+            currentSectorIndex = 0;
+        }
+
         lastSectorChangeTurn = turn;
-        console.log("👉 Aktivní směr růstu:", directionalSectors[currentSectorIndex].name);
+        console.log("🧭 Nový směr:", sectorQueue[currentSectorIndex].name);
     }
 
-    let activeSector = directionalSectors[currentSectorIndex];
+    let activeSector = sectorQueue[currentSectorIndex];
+
+    // Výpočet úhlu bodu vůči středu
     let angle = getAngleDegrees(center, currentPoint);
     let inActiveSector = isInSector(angle, activeSector);
 
+    // Určení vzdálenosti
     let distance;
-    let newPoint;
-
     if (!isOnHull) {
-        // Vnitřní bod – vyšší priorita růstu ven
         distance = inActiveSector
-            ? 0.005 + Math.random() * 0.003  // 500–800 m
+            ? 0.005 + Math.random() * 0.003
             : 0.002 + Math.random() * 0.002;
         newPoint = forcePointOutward(currentPoint, center, distance);
     } else {
-        // Vnější bod
         distance = inActiveSector
             ? 0.005 + Math.random() * 0.003
             : 0.002 + Math.random() * 0.002;
         newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
     }
 
-    // Přímé přepsání pozice
+    // Uložení nové pozice
     polygonPoints[selectedIndex] = newPoint;
 
-    // Přidání bodu mezi dlouhé úseky
+    // Přidání bodu mezi dlouhé segmenty
     for (let i = 0; i < polygonPoints.length; i++) {
         let p1 = polygonPoints[i];
         let p2 = polygonPoints[(i + 1) % polygonPoints.length];
@@ -307,21 +320,22 @@ function expandPolygon() {
         }
     }
 
+    // Další bod na řadě
     currentIndex = (currentIndex + 1) % polygonPoints.length;
 
-    // Aktualizace polygonu
+    // Aktualizace polygonu na mapě
     polygon.setLatLngs(polygonPoints);
 
-    // Výpočty plochy a obyvatel
+    // Výpočet rozlohy a počtu obyvatel
     let area = calculatePolygonArea(polygonPoints);
     let population = Math.round(area * populationDensity);
 
     localStorage.setItem("polygonPoints", JSON.stringify(polygonPoints));
-
     document.getElementById("area").textContent = area.toFixed(2);
     document.getElementById("population").textContent = population.toLocaleString();
 }
-    
+
+
     function unlockBlockedPoints() {
             let currentTime = Date.now();
             for (let index in blockedPoints) {
