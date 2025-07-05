@@ -132,7 +132,7 @@ function distance(coord1, coord2) {
         // Skalární součin – pokud je < 0, směr míří ke středu
         let dotProduct = finalDirX * cx + finalDirY * cy;
 
-        if (dotProduct < 0.05 || attempts > 10) break; // čím menší, tím víc míří ke středu
+        if (dotProduct < 0.01 || attempts > 10) break; // čím menší, tím víc míří ke středu
         attempts++;
     } while (true);
 
