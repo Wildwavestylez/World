@@ -88,27 +88,37 @@ function distance(coord1, coord2) {
             return [latSum / points.length, lngSum / points.length];
         }
 
-        function movePointAway(point, center, distance) {
-    let latDiff = point[0] - center[0];
-    let lngDiff = point[1] - center[1];
+        function movePointAway(point, center, distance, index) {
+    let prev = polygonPoints[(index - 1 + polygonPoints.length) % polygonPoints.length];
+    let next = polygonPoints[(index + 1) % polygonPoints.length];
 
-    let length = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-    let normLat = latDiff / length;
-    let normLng = lngDiff / length;
+    // Vektor tangenty (hranové směry)
+    let dx = next[1] - prev[1];
+    let dy = next[0] - prev[0];
 
-    // 🎯 Přidej náhodný úhel (v rozsahu ±15°)
-    let angleOffset = (Math.random() - 0.5) * (Math.PI / 6); // ±21°
+    // Normála (kolmice) – směr od polygonu ven
+    let nx = -dy;
+    let ny = dx;
+
+    // Normalizace
+    let length = Math.sqrt(nx * nx + ny * ny);
+    nx /= length;
+    ny /= length;
+
+    // Náhodná odchylka ±30° → celkem 60°
+    let angleOffset = (Math.random() - 0.5) * (Math.PI / 3); // ±30°
     let cosA = Math.cos(angleOffset);
     let sinA = Math.sin(angleOffset);
 
-    let rotatedLat = normLat * cosA - normLng * sinA;
-    let rotatedLng = normLat * sinA + normLng * cosA;
+    let rotatedNx = nx * cosA - ny * sinA;
+    let rotatedNy = nx * sinA + ny * cosA;
 
     return [
-        point[0] + rotatedLat * distance,
-        point[1] + rotatedLng * distance
+        point[0] + rotatedNy * distance, // latitude
+        point[1] + rotatedNx * distance  // longitude
     ];
 }
+
 
         function calculatePolygonArea(points) {
             let earthRadius = 6371; // Poloměr Země v km
@@ -144,9 +154,7 @@ function expandPolygon() {
     // Náhodná vzdálenost mezi 200 a 600 metrů (přibližně)
     let distance = 0.0018 + Math.random() * 0.004; // cca 200–600 m
 
-    polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, distance);
-
-    // Zaznamenání posunu + cooldown
+    polygonPoints[selectedIndex] = movePointAway(polygonPoints[selectedIndex], center, distance, selectedIndex); // Zaznamenání posunu + cooldown
     moveTracker[selectedIndex] = 0;
     blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
