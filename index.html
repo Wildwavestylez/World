@@ -225,17 +225,17 @@ function expandPolygon() {
     let isOnHull = isOnConvexHull(currentPoint, convexHull);
 
     // Rozhodnutí o vzdálenosti posunu
-    let distance = 0.0018 + Math.random() * 0.004; // 200–600 m
+    let baseDistance = 0.0018 + Math.random() * 0.004; // 200–600 m
+let newPoint;
 
-    let newPoint;
-    if (!isOnHull) {
-        // Bod je uvnitř – vytlačit ven
-        newPoint = forcePointOutward(currentPoint, center, distance);
-    } else {
-        // Normální růst
-        newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
-    }
-
+if (!isOnHull) {
+    // Bublina → větší vzdálenost a přímý směr od středu
+    let forceDistance = baseDistance * 2.5 + Math.random() * 0.002; // třeba až 1500 m
+    newPoint = forcePointOutward(currentPoint, center, forceDistance);
+} else {
+    // Normální růst
+    newPoint = movePointAway(currentPoint, center, baseDistance, selectedIndex);
+}
     polygonPoints[selectedIndex] = newPoint;
 
     moveTracker[selectedIndex] = 0;
