@@ -292,7 +292,7 @@ function expandPolygon() {
 let distance;
 if (!isOnHull) {
     distance = inActiveSector
-        ? 0.0135 + Math.random() * 0.003 // 1500–1800 metrů
+        ? 0.0115 + Math.random() * 0.003 // 1500–1800 metrů
         : 0.002 + Math.random() * 0.002;
     newPoint = forcePointOutward(currentPoint, center, distance);
 } else {
