@@ -228,26 +228,17 @@ function expandPolygon() {
     let newPoint;
 
     if (!isOnHull) {
-        // Vnitřní bod – silnější posun (500–800 m)
-        let distance = 0.0045 + Math.random() * 0.003; // 0.0045–0.0075
+        // Vnitřní bod – 500–800 m
+        let distance = 0.0045 + Math.random() * 0.003;
         newPoint = forcePointOutward(currentPoint, center, distance);
     } else {
-        // Vnější bod – jemný posun (200–400 m)
-        let distance = 0.002 + Math.random() * 0.002; // 0.002–0.004
+        // Vnější bod – 200–400 m
+        let distance = 0.002 + Math.random() * 0.002;
         newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
     }
 
-    // Zajistí, že se opravdu hýbe
-    if (distanceBetween(currentPoint, newPoint) > 0.00001) {
-        polygonPoints[selectedIndex] = newPoint;
-    }
-
-    moveTracker[selectedIndex] = 0;
-    blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
-
-    for (let i = 0; i < moveTracker.length; i++) {
-        if (i !== selectedIndex) moveTracker[i]++;
-    }
+    // PŘÍMÉ PŘEPSÁNÍ pozice
+    polygonPoints[selectedIndex] = newPoint;
 
     // Přidání bodu mezi dlouhé úseky
     for (let i = 0; i < polygonPoints.length; i++) {
@@ -258,7 +249,6 @@ function expandPolygon() {
         if (segmentLength > 0.023) {
             let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
             polygonPoints.splice(i + 1, 0, midPoint);
-            moveTracker.splice(i + 1, 0, 0);
             if (currentIndex > i) currentIndex++;
             break;
         }
@@ -266,8 +256,10 @@ function expandPolygon() {
 
     currentIndex = (currentIndex + 1) % polygonPoints.length;
 
+    // Aktualizace polygonu
     polygon.setLatLngs(polygonPoints);
 
+    // Výpočty plochy a obyvatel
     let area = calculatePolygonArea(polygonPoints);
     let population = Math.round(area * populationDensity);
 
