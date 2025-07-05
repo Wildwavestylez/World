@@ -221,23 +221,30 @@ function expandPolygon() {
     let selectedIndex = currentIndex;
     let currentPoint = polygonPoints[selectedIndex];
 
+    // Výpočet konvexního obalu
     let convexHull = getConvexHull(polygonPoints);
     let isOnHull = isOnConvexHull(currentPoint, convexHull);
 
-    // Rozhodnutí o vzdálenosti posunu
-    let baseDistance = 0.0018 + Math.random() * 0.004; // 200–600 m
-let newPoint;
+    // Základní délka posunu
+    let baseDistance = 0.0018 + Math.random() * 0.004;
 
-if (!isOnHull) {
-    // Bublina → větší vzdálenost a přímý směr od středu
-    let forceDistance = baseDistance * 2.5 + Math.random() * 0.002; // třeba až 1500 m
-    newPoint = forcePointOutward(currentPoint, center, forceDistance);
-} else {
-    // Normální růst
-    newPoint = movePointAway(currentPoint, center, baseDistance, selectedIndex);
-}
-    polygonPoints[selectedIndex] = newPoint;
+    let newPoint;
 
+    if (!isOnHull) {
+        // Bublina → silnější a přímý tlak ven
+        let forceDistance = baseDistance * 3 + Math.random() * 0.003; // 600–1800m
+        newPoint = forcePointOutward(currentPoint, center, forceDistance);
+    } else {
+        // Normální bod → lehký růst s mírným šumem
+        newPoint = movePointAway(currentPoint, center, baseDistance, selectedIndex);
+    }
+
+    // 🔒 Zajistí že nový bod je opravdu jiný než původní
+    if (distanceBetween(currentPoint, newPoint) > 0.0001) {
+        polygonPoints[selectedIndex] = newPoint;
+    }
+
+    // Správa pohybu
     moveTracker[selectedIndex] = 0;
     blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
@@ -245,7 +252,7 @@ if (!isOnHull) {
         if (i !== selectedIndex) moveTracker[i]++;
     }
 
-    // Přidání bodu mezi dlouhé úseky
+    // Přidávání bodu mezi dlouhé segmenty
     for (let i = 0; i < polygonPoints.length; i++) {
         let p1 = polygonPoints[i];
         let p2 = polygonPoints[(i + 1) % polygonPoints.length];
@@ -260,8 +267,10 @@ if (!isOnHull) {
         }
     }
 
+    // Posun na další bod
     currentIndex = (currentIndex + 1) % polygonPoints.length;
 
+    // Aktualizace polygonu
     polygon.setLatLngs(polygonPoints);
 
     let area = calculatePolygonArea(polygonPoints);
