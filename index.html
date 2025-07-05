@@ -156,32 +156,30 @@ function isPointInPolygon(point, polygon) {
     }
     return inside;
 }
-  
-  
-  
-  
+
+
+
+
 function expandPolygon() {
     turn++;
 
     let center = getCentroid(polygonPoints);
     let totalPoints = polygonPoints.length;
     let selectedIndex = currentIndex;
-    let currentPoint = polygonPoints[selectedIndex];
+let currentPoint = polygonPoints[selectedIndex];
 
-    // Náhodná vzdálenost 200–600 m
-    let distance;
+// Zjistíme, jestli je bod uvnitř polygonu (zamotanej)
+let isInside = isPointInPolygon(currentPoint, polygonPoints);
+
+// Nastavení vzdálenosti podle toho, jestli je bod uvnitř nebo na kraji
+let distance;
 if (isInside) {
-    // Uvnitř polygonu – 500 až 800 metrů
-    distance = 0.0045 + Math.random() * 0.003; // ~500–800 m
+    distance = 0.0045 + Math.random() * 0.003; // 500–800 m
 } else {
-    // Normální růst po kraji – 200 až 600 metrů
-    distance = 0.0018 + Math.random() * 0.004; // ~200–600 m
+    distance = 0.0018 + Math.random() * 0.004; // 200–600 m
 }
-    let newPoint;
 
-    // Zjistíme, jestli je bod uvnitř polygonu (zamotanej)
-    let isInside = isPointInPolygon(currentPoint, polygonPoints);
-
+let newPoint;
     if (isInside) {
         // Rozmotání – přímý pohyb od středu
         let dx = currentPoint[0] - center[0];
