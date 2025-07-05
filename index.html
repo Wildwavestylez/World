@@ -160,52 +160,92 @@ function isPointInPolygon(point, polygon) {
 
 
 
+// Pomocná funkce: výpočet vzdálenosti
+function distanceBetween(p1, p2) {
+    let latDiff = p2[0] - p1[0];
+    let lngDiff = p2[1] - p1[1];
+    return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+}
+
+// Výpočet konvexního obalu (Graham Scan / Jarvis March zjednodušený)
+function getConvexHull(points) {
+    points = points.slice(); // kopie
+    points.sort((a, b) => a[1] === b[1] ? a[0] - b[0] : a[1] - b[1]); // podle x, pak y
+
+    function cross(o, a, b) {
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    }
+
+    let lower = [];
+    for (let p of points) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+            lower.pop();
+        }
+        lower.push(p);
+    }
+
+    let upper = [];
+    for (let i = points.length - 1; i >= 0; i--) {
+        let p = points[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+            upper.pop();
+        }
+        upper.push(p);
+    }
+
+    upper.pop();
+    lower.pop();
+    return lower.concat(upper);
+}
+
+function isOnConvexHull(point, hull) {
+    return hull.some(p => Math.abs(p[0] - point[0]) < 1e-8 && Math.abs(p[1] - point[1]) < 1e-8);
+}
+
+// Silnější pohyb směrem od středu
+function forcePointOutward(point, center, distance) {
+    let dx = point[0] - center[0];
+    let dy = point[1] - center[1];
+    let length = Math.sqrt(dx * dx + dy * dy) || 1;
+    return [
+        point[0] + (dx / length) * distance * 1.5,
+        point[1] + (dy / length) * distance * 1.5
+    ];
+}
+
 function expandPolygon() {
     turn++;
 
     let center = getCentroid(polygonPoints);
     let totalPoints = polygonPoints.length;
     let selectedIndex = currentIndex;
-let currentPoint = polygonPoints[selectedIndex];
+    let currentPoint = polygonPoints[selectedIndex];
 
-// Zjistíme, jestli je bod uvnitř polygonu (zamotanej)
-let isInside = isPointInPolygon(currentPoint, polygonPoints);
+    let convexHull = getConvexHull(polygonPoints);
+    let isOnHull = isOnConvexHull(currentPoint, convexHull);
 
-// Nastavení vzdálenosti podle toho, jestli je bod uvnitř nebo na kraji
-let distance;
-if (isInside) {
-    distance = 0.0045 + Math.random() * 0.003; // 500–800 m
-} else {
-    distance = 0.0018 + Math.random() * 0.004; // 200–600 m
-}
+    // Rozhodnutí o vzdálenosti posunu
+    let distance = 0.0018 + Math.random() * 0.004; // 200–600 m
 
-let newPoint;
-    if (isInside) {
-        // Rozmotání – přímý pohyb od středu
-        let dx = currentPoint[0] - center[0];
-        let dy = currentPoint[1] - center[1];
-        let length = Math.sqrt(dx * dx + dy * dy) || 1;
-        newPoint = [
-            currentPoint[0] + (dx / length) * distance,
-            currentPoint[1] + (dy / length) * distance
-        ];
+    let newPoint;
+    if (!isOnHull) {
+        // Bod je uvnitř – vytlačit ven
+        newPoint = forcePointOutward(currentPoint, center, distance);
     } else {
-        // Normální růst po obvodu
+        // Normální růst
         newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
     }
 
-    // 🔥 Žádná kontrola překřížení – vždy se pohne
     polygonPoints[selectedIndex] = newPoint;
 
     moveTracker[selectedIndex] = 0;
     blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
-    // Zvýšíme tracker ostatním
     for (let i = 0; i < moveTracker.length; i++) {
         if (i !== selectedIndex) moveTracker[i]++;
     }
 
-    // Přidáme bod mezi příliš dlouhé úseky
+    // Přidání bodu mezi dlouhé úseky
     for (let i = 0; i < polygonPoints.length; i++) {
         let p1 = polygonPoints[i];
         let p2 = polygonPoints[(i + 1) % polygonPoints.length];
@@ -220,7 +260,6 @@ let newPoint;
         }
     }
 
-    // Pokračujeme na další bod
     currentIndex = (currentIndex + 1) % polygonPoints.length;
 
     polygon.setLatLngs(polygonPoints);
@@ -232,12 +271,6 @@ let newPoint;
 
     document.getElementById("area").textContent = area.toFixed(2);
     document.getElementById("population").textContent = population.toLocaleString();
-}
-
-function distanceBetween(p1, p2) {
-    let latDiff = p2[0] - p1[0];
-    let lngDiff = p2[1] - p1[1];
-    return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
 }
 
         function unlockBlockedPoints() {
