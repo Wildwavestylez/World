@@ -311,7 +311,7 @@ if (!isOnHull) {
         let p2 = polygonPoints[(i + 1) % polygonPoints.length];
         let segmentLength = distanceBetween(p1, p2);
 
-        if (segmentLength > 0.033) {
+        if (segmentLength > 0.038) {
             let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
             polygonPoints.splice(i + 1, 0, midPoint);
             if (currentIndex > i) currentIndex++;
