@@ -165,7 +165,16 @@ function expandPolygon() {
     // Náhodná vzdálenost mezi 200 a 600 metrů (přibližně)
     let distance = 0.0018 + Math.random() * 0.004; // cca 200–600 m
 
-    polygonPoints[selectedIndex] = movePointFromEdge(selectedIndex, distance);// Zaznamenání posunu + cooldown
+    let selectedPoint = polygonPoints[selectedIndex];
+let isInside = isPointInsidePolygon(selectedPoint, polygonPoints);
+
+if (isInside) {
+    // Bod leží uvnitř polygonu – vytlačit přímo od středu ven
+    polygonPoints[selectedIndex] = movePointAway(selectedPoint, getCentroid(polygonPoints), distance);
+} else {
+    // Bod je na okraji – použít „chytřejší“ rozvětvující pohyb
+    polygonPoints[selectedIndex] = movePointFromEdge(selectedIndex, distance);
+}// Zaznamenání posunu + cooldown
     moveTracker[selectedIndex] = 0;
     blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
@@ -202,6 +211,23 @@ function expandPolygon() {
 
     document.getElementById("area").textContent = area.toFixed(2);
     document.getElementById("population").textContent = population.toLocaleString();
+}
+
+
+function isPointInsidePolygon(point, polygonArray) {
+    let x = point[1], y = point[0];
+    let inside = false;
+
+    for (let i = 0, j = polygonArray.length - 1; i < polygonArray.length; j = i++) {
+        let xi = polygonArray[i][1], yi = polygonArray[i][0];
+        let xj = polygonArray[j][1], yj = polygonArray[j][0];
+
+        let intersect = ((yi > y) !== (yj > y)) &&
+            (x < (xj - xi) * (y - yi) / (yj - yi + 0.00000001) + xi);
+        if (intersect) inside = !inside;
+    }
+
+    return inside;
 }
 
 function distanceBetween(p1, p2) {
