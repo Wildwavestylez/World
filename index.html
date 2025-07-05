@@ -147,43 +147,79 @@ function distance(coord1, coord2) {
 function isPointInPolygon(point, polygon) {
     let x = point[1], y = point[0];
     let inside = false;
-
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
         let xi = polygon[i][1], yi = polygon[i][0];
         let xj = polygon[j][1], yj = polygon[j][0];
-
         let intersect = ((yi > y) != (yj > y)) &&
             (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
         if (intersect) inside = !inside;
     }
-
     return inside;
 }
+  
+  function canMovePoint(index, newPoint) {
+    let n = polygonPoints.length;
+    let prevIndex = (index - 1 + n) % n;
+    let nextIndex = (index + 1) % n;
+
+    for (let i = 0; i < n; i++) {
+        let j = (i + 1) % n;
+
+        // Přeskoč sousední úseky
+        if (i === prevIndex || i === index || j === prevIndex || j === index) continue;
+
+        let a = polygonPoints[i];
+        let b = polygonPoints[j];
+
+        let seg1 = polygonPoints[prevIndex];
+        let seg2 = polygonPoints[nextIndex];
+
+        if (
+            linesIntersect(seg1, newPoint, a, b) ||
+            linesIntersect(newPoint, seg2, a, b)
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+  
+  function linesIntersect(a, b, c, d) {
+    function ccw(p1, p2, p3) {
+        return (p3[1]-p1[1])*(p2[0]-p1[0]) > (p2[1]-p1[1])*(p3[0]-p1[0]);
+    }
+    return (ccw(a,c,d) != ccw(b,c,d)) && (ccw(a,b,c) != ccw(a,b,d));
+}
+  
+  
 function expandPolygon() {
     turn++;
 
     let center = getCentroid(polygonPoints);
     let totalPoints = polygonPoints.length;
     let selectedIndex = currentIndex;
+    let currentPoint = polygonPoints[selectedIndex];
 
-    // Náhodná vzdálenost 200-600m
+    // Náhodná vzdálenost (200–600 m)
     let distance = 0.0018 + Math.random() * 0.004;
 
-    let currentPoint = polygonPoints[selectedIndex];
     let newPoint;
 
+    // 1) Bod je uvnitř => rozmotat = posunout od středu
     if (isPointInPolygon(currentPoint, polygonPoints)) {
-        // Pokud bod uvnitř, posuneme ho přímo od středu
+        let dx = currentPoint[0] - center[0];
+        let dy = currentPoint[1] - center[1];
+        let length = Math.sqrt(dx * dx + dy * dy) || 1;
         newPoint = [
-            currentPoint[0] + (currentPoint[0] - center[0]) / distance * distance,
-            currentPoint[1] + (currentPoint[1] - center[1]) / distance * distance
+            currentPoint[0] + (dx / length) * distance,
+            currentPoint[1] + (dy / length) * distance
         ];
     } else {
-        // Jinak použijeme tvůj movePointAway s náhodnou odchylkou
+        // 2) Bod na hraně => klasický výběžkový růst
         newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
     }
 
-    // Zkontroluj, jestli se pohybem nevytvoří průsečík, pokud ano - pohyb zruš
+    // Zkontroluj, jestli by pohyb nezpůsobil překřížení
     if (canMovePoint(selectedIndex, newPoint)) {
         polygonPoints[selectedIndex] = newPoint;
 
@@ -194,12 +230,12 @@ function expandPolygon() {
             if (i !== selectedIndex) moveTracker[i]++;
         }
 
-        // Přidání nového bodu, pokud je úsek moc dlouhý
+        // Přidat nový bod, pokud je segment moc dlouhý
         for (let i = 0; i < polygonPoints.length; i++) {
             let p1 = polygonPoints[i];
             let p2 = polygonPoints[(i + 1) % polygonPoints.length];
-
             let segmentLength = distanceBetween(p1, p2);
+
             if (segmentLength > 0.023) {
                 let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
                 polygonPoints.splice(i + 1, 0, midPoint);
