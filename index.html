@@ -94,34 +94,44 @@ function distance(coord1, coord2) {
     let curr = polygonPoints[pointIndex];
     let next = polygonPoints[(pointIndex + 1) % total];
 
-    // Spočítej vektor "okrajové tangenty"
+    // Spočítej tangentu (okraj polygonu)
     let tangentLat = next[0] - prev[0];
     let tangentLng = next[1] - prev[1];
 
-    // Jednotkový normálový vektor (směr ven od hrany)
+    // Normála (kolmá na tangentu)
     let normalLat = -tangentLng;
     let normalLng = tangentLat;
 
+    // Jednotkový vektor
     let length = Math.sqrt(normalLat * normalLat + normalLng * normalLng);
     normalLat /= length;
     normalLng /= length;
 
-    // Náhodný úhel ±30° od normály (tj. celkem 60° rozpětí)
+    // Směr ke středu
+    let center = getCentroid(polygonPoints);
+    let toCenterLat = center[0] - curr[0];
+    let toCenterLng = center[1] - curr[1];
+
+    // Ověření: je-li úhel mezi normálou a vektorem ke středu < 90°, normála míří dovnitř → OTOČIT
+    let dot = normalLat * toCenterLat + normalLng * toCenterLng;
+    if (dot > 0) {
+        normalLat = -normalLat;
+        normalLng = -normalLng;
+    }
+
+    // Přidej náhodný úhel (±30°)
     let angleOffset = (Math.random() - 0.5) * (Math.PI / 3); // ±30°
     let cosA = Math.cos(angleOffset);
     let sinA = Math.sin(angleOffset);
 
-    // Otoč vektor
     let rotatedLat = normalLat * cosA - normalLng * sinA;
     let rotatedLng = normalLat * sinA + normalLng * cosA;
 
-    // Nová pozice
     return [
         curr[0] + rotatedLat * distance,
         curr[1] + rotatedLng * distance
     ];
-}
-        function calculatePolygonArea(points) {
+}     function calculatePolygonArea(points) {
             let earthRadius = 6371; // Poloměr Země v km
             let area = 0;
             let n = points.length;
