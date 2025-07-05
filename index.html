@@ -200,13 +200,16 @@ function expandPolygon() {
     let selectedIndex = currentIndex;
     let currentPoint = polygonPoints[selectedIndex];
 
-    // Náhodná vzdálenost (200–600 m)
+    // Náhodná vzdálenost 200–600 m
     let distance = 0.0018 + Math.random() * 0.004;
 
     let newPoint;
 
-    // 1) Bod je uvnitř => rozmotat = posunout od středu
-    if (isPointInPolygon(currentPoint, polygonPoints)) {
+    // Zjistíme, jestli je bod uvnitř polygonu (zamotanej)
+    let isInside = isPointInPolygon(currentPoint, polygonPoints);
+
+    if (isInside) {
+        // Rozmotání – přímý pohyb od středu
         let dx = currentPoint[0] - center[0];
         let dy = currentPoint[1] - center[1];
         let length = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -215,38 +218,39 @@ function expandPolygon() {
             currentPoint[1] + (dy / length) * distance
         ];
     } else {
-        // 2) Bod na hraně => klasický výběžkový růst
+        // Normální růst po obvodu
         newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
     }
 
-    // Zkontroluj, jestli by pohyb nezpůsobil překřížení
+    // Zkontrolujeme, zda pohyb nezpůsobí překřížení
     if (canMovePoint(selectedIndex, newPoint)) {
         polygonPoints[selectedIndex] = newPoint;
+    } 
+    // Pokud NEprojde kontrolou – nevadí, necháme být a zkusíme to příště znovu
 
-        moveTracker[selectedIndex] = 0;
-        blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
+    moveTracker[selectedIndex] = 0;
+    blockedPoints[selectedIndex] = Date.now() + (totalPoints / 2) * 1000;
 
-        for (let i = 0; i < moveTracker.length; i++) {
-            if (i !== selectedIndex) moveTracker[i]++;
-        }
+    // Ostatním bodům zvýšíme tracker
+    for (let i = 0; i < moveTracker.length; i++) {
+        if (i !== selectedIndex) moveTracker[i]++;
+    }
 
-        // Přidat nový bod, pokud je segment moc dlouhý
-        for (let i = 0; i < polygonPoints.length; i++) {
-            let p1 = polygonPoints[i];
-            let p2 = polygonPoints[(i + 1) % polygonPoints.length];
-            let segmentLength = distanceBetween(p1, p2);
+    // Přidáme nový bod mezi dlouhé úseky
+    for (let i = 0; i < polygonPoints.length; i++) {
+        let p1 = polygonPoints[i];
+        let p2 = polygonPoints[(i + 1) % polygonPoints.length];
+        let segmentLength = distanceBetween(p1, p2);
 
-            if (segmentLength > 0.023) {
-                let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
-                polygonPoints.splice(i + 1, 0, midPoint);
-                moveTracker.splice(i + 1, 0, 0);
-                if (currentIndex > i) currentIndex++;
-                break;
-            }
+        if (segmentLength > 0.023) {
+            let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+            polygonPoints.splice(i + 1, 0, midPoint);
+            moveTracker.splice(i + 1, 0, 0);
+            if (currentIndex > i) currentIndex++;
+            break;
         }
     }
 
-    // Posun na další bod
     currentIndex = (currentIndex + 1) % polygonPoints.length;
 
     polygon.setLatLngs(polygonPoints);
