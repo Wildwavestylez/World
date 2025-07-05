@@ -212,6 +212,43 @@ function forcePointOutward(point, center, distance) {
         point[1] + (dy / length) * distance * 1.5
     ];
 }
+    
+    
+    
+    const directionalSectors = [
+    { name: "Sever", from: 345, to: 15 },
+    { name: "Severovýchod", from: 15, to: 75 },
+    { name: "Východ", from: 75, to: 105 },
+    { name: "Jihovýchod", from: 105, to: 165 },
+    { name: "Jih", from: 165, to: 195 },
+    { name: "Jihozápad", from: 195, to: 255 },
+    { name: "Západ", from: 255, to: 285 },
+    { name: "Severozápad", from: 285, to: 345 }
+];
+
+const stepsPerSector = 1000;
+let currentSectorIndex = 0;
+let lastSectorChangeTurn = 0;
+
+
+    
+    function getAngleDegrees(center, point) {
+    let dx = point[1] - center[1];
+    let dy = point[0] - center[0];
+    let angleRad = Math.atan2(dx, dy); // Pozor na přehození dx/dy
+    let angleDeg = angleRad * 180 / Math.PI;
+    if (angleDeg < 0) angleDeg += 360;
+    return angleDeg;
+}
+
+function isInSector(angle, sector) {
+    if (sector.from < sector.to) {
+        return angle >= sector.from && angle <= sector.to;
+    } else {
+        // Přesahuje přes 0°
+        return angle >= sector.from || angle <= sector.to;
+    }
+}
 
 function expandPolygon() {
     turn++;
@@ -225,19 +262,35 @@ function expandPolygon() {
     let convexHull = getConvexHull(polygonPoints);
     let isOnHull = isOnConvexHull(currentPoint, convexHull);
 
+    // --- Přepínání směru po každých 1000 tazích
+    if (turn - lastSectorChangeTurn >= stepsPerSector) {
+        currentSectorIndex = (currentSectorIndex + 1) % directionalSectors.length;
+        lastSectorChangeTurn = turn;
+        console.log("👉 Aktivní směr růstu:", directionalSectors[currentSectorIndex].name);
+    }
+
+    let activeSector = directionalSectors[currentSectorIndex];
+    let angle = getAngleDegrees(center, currentPoint);
+    let inActiveSector = isInSector(angle, activeSector);
+
+    let distance;
     let newPoint;
 
     if (!isOnHull) {
-        // Vnitřní bod – 500–800 m
-        let distance = 0.0045 + Math.random() * 0.003;
+        // Vnitřní bod – vyšší priorita růstu ven
+        distance = inActiveSector
+            ? 0.005 + Math.random() * 0.003  // 500–800 m
+            : 0.002 + Math.random() * 0.002;
         newPoint = forcePointOutward(currentPoint, center, distance);
     } else {
-        // Vnější bod – 200–400 m
-        let distance = 0.002 + Math.random() * 0.002;
+        // Vnější bod
+        distance = inActiveSector
+            ? 0.005 + Math.random() * 0.003
+            : 0.002 + Math.random() * 0.002;
         newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
     }
 
-    // PŘÍMÉ PŘEPSÁNÍ pozice
+    // Přímé přepsání pozice
     polygonPoints[selectedIndex] = newPoint;
 
     // Přidání bodu mezi dlouhé úseky
@@ -268,7 +321,8 @@ function expandPolygon() {
     document.getElementById("area").textContent = area.toFixed(2);
     document.getElementById("population").textContent = population.toLocaleString();
 }
-        function unlockBlockedPoints() {
+    
+    function unlockBlockedPoints() {
             let currentTime = Date.now();
             for (let index in blockedPoints) {
                 if (currentTime >= blockedPoints[index]) {
