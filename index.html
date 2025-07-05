@@ -252,7 +252,12 @@ function distanceBetween(p1, p2) {
 
 
 
-
+// Inicializační výpočet po načtení
+polygon.setLatLngs(polygonPoints);
+let initialArea = calculatePolygonArea(polygonPoints);
+let initialPopulation = Math.round(initialArea * populationDensity);
+document.getElementById("area").textContent = initialArea.toFixed(2);
+document.getElementById("population").textContent = initialPopulation.toLocaleString();
 
 
     </script>
