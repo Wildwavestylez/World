@@ -1,0 +1,623 @@
+<!DOCTYPE html><html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Kapelní Magnát – Prototyp</title>
+  <style>
+    :root{
+      --bg:#0f1221;--panel:#171a2b;--muted:#8a90ad;--text:#e8ecff;--accent:#7c9bff;--good:#4dd27c;--bad:#ff6b6b;--warn:#ffd166;
+      --ring:0 0 0 3px rgba(124,155,255,.25);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#0b0e1a,#0f1221 30%,#111638);color:var(--text)}
+    .app{max-width:760px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+    header{position:sticky;top:0;z-index:10;background:rgba(15,18,33,.75);backdrop-filter:blur(8px);border-bottom:1px solid rgba(124,155,255,.15)}
+    .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:10px}
+    .chip{background:var(--panel);padding:10px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;border:1px solid rgba(124,155,255,.15)}
+    .chip b{font-size:.95rem}
+    .chip span{color:var(--muted);font-size:.85rem}
+    .bar{height:6px;background:#22263c;border-radius:8px;overflow:hidden;margin-top:6px}
+    .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#9bd0ff)}
+    .row{display:flex;gap:8px}
+    .row>.btn{flex:1}
+    main{flex:1;display:flex;flex-direction:column;gap:12px;padding:12px}
+    .card{background:var(--panel);border:1px solid rgba(124,155,255,.15);border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+    h1{font-size:1.15rem;margin:0 0 10px}
+    h2{font-size:1rem;margin:0 0 8px;color:#c7d4ff}.btn{background:linear-gradient(180deg,#2a3159,#222744);color:#fff;border:none;padding:12px 14px;border-radius:14px;font-weight:600;font-size:1rem;box-shadow:0 6px 12px rgba(0,0,0,.2);border:1px solid rgba(124,155,255,.2)}
+.btn:active{transform:translateY(1px)}
+.btn.outline{background:#151935;border:1px solid rgba(124,155,255,.35)}
+.btn.green{background:linear-gradient(180deg,#2c6d4a,#234f39)}
+.btn.red{background:linear-gradient(180deg,#7a2a2a,#4e1b1b)}
+.btn:focus{outline:none;box-shadow:var(--ring)}
+
+.today{display:grid;gap:10px}
+.today .pill{display:inline-flex;gap:6px;align-items:center;background:#11142a;border:1px solid rgba(124,155,255,.15);color:#cfe3ff;padding:6px 10px;border-radius:999px;font-size:.85rem}
+
+.list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto}
+.item{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px;border-radius:12px;background:#121634;border:1px solid rgba(124,155,255,.15)}
+.item .meta{font-size:.85rem;color:var(--muted)}
+
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi .box{background:#121634;border:1px solid rgba(124,155,255,.15);border-radius:12px;padding:10px;text-align:center}
+.kpi .box b{display:block;font-size:1.1rem}
+.kpi .box span{color:var(--muted);font-size:.8rem}
+
+footer{position:sticky;bottom:0;background:rgba(15,18,33,.8);backdrop-filter:blur(8px);border-top:1px solid rgba(124,155,255,.15);padding:10px}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(2,4,12,.65);display:none;align-items:flex-end}
+.modal.open{display:flex}
+.sheet{background:var(--panel);border-top-left-radius:18px;border-top-right-radius:18px;width:100%;max-width:760px;margin:0 auto;box-shadow:0 -10px 30px rgba(0,0,0,.35);border:1px solid rgba(124,155,255,.15);max-height:85vh;overflow:auto}
+.sheet header{position:sticky;top:0;background:rgba(23,26,43,.95)}
+.sheet .content{padding:12px}
+.venue{padding:10px;border-radius:12px;border:1px solid rgba(124,155,255,.15);background:#121634;margin-bottom:8px}
+.venue h3{margin:0 0 6px;font-size:1rem}
+.tag{display:inline-block;background:#0c1030;border:1px solid rgba(124,155,255,.25);color:#cfe3ff;padding:4px 8px;border-radius:999px;font-size:.75rem;margin-right:6px}
+
+.grid2{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.field{display:grid;gap:6px;margin:6px 0}
+label{font-size:.85rem;color:#bcd0ff}
+input[type="date"],input[type="number"],select{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(124,155,255,.35);background:#0f1330;color:#e8ecff}
+input[type="range"]{width:100%}
+
+.note{font-size:.85rem;color:var(--muted)}
+
+@media (min-width:600px){
+  .stats{grid-template-columns:repeat(4,1fr)}
+  .today{grid-template-columns:1.3fr 1fr}
+}
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="stats">
+        <div class="chip"><div><b>Den</b><div class="bar"><i id="dayBar" style="width:0%"></i></div></div><span id="dayLabel">1</span></div>
+        <div class="chip"><div><b>Hotovost</b><div class="bar"><i id="cashBar" style="width:50%"></i></div></div><span id="cash">$ 2 500</span></div>
+        <div class="chip"><div><b>Fanoušci</b><div class="bar"><i id="fanBar" style="width:0%"></i></div></div><span id="fans">120</span></div>
+        <div class="chip"><div><b>Úroveň</b><div class="bar"><i id="lvlBar" style="width:0%"></i></div></div><span id="level">Okres</span></div>
+      </div>
+      <div class="row" style="padding:0 10px 10px">
+        <button class="btn" id="btnPlan">Naplánovat koncert</button>
+        <button class="btn green" id="btnNext">Další den ▶</button>
+      </div>
+    </header><main>
+  <section class="card today">
+    <div>
+      <h1>Dnešní plán</h1>
+      <div id="todayBadge" class="pill">Volno · naplánuj koncert, PR nebo nahrávání</div>
+    </div>
+    <div class="kpi">
+      <div class="box"><b id="kpiDist">0 km</b><span>Vzdálenost od posledního místa</span></div>
+      <div class="box"><b id="kpiFatigue">0%</b><span>Únava kapely</span></div>
+      <div class="box"><b id="kpiHype">0</b><span>Hype (PR posledních 7 dní)</span></div>
+    </div>
+    <div class="row">
+      <button class="btn outline" id="btnPR">Udělát PR (+Hype, -$)</button>
+      <button class="btn outline" id="btnRecord">Nahrávat singl (trvá 3 dny)</button>
+    </div>
+    <div class="row">
+      <button class="btn outline" id="btnRest">Volno (– únava)</button>
+      <button class="btn red" id="btnCancel">Zrušit dnešní akci</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Nadcházející události</h2>
+    <div class="list" id="agenda"></div>
+  </section>
+
+  <section class="card">
+    <h2>Log událostí</h2>
+    <div class="list" id="log"></div>
+  </section>
+</main>
+
+<footer>
+  <div class="row">
+    <button class="btn outline" id="btnSave">Uložit</button>
+    <button class="btn outline" id="btnLoad">Načíst</button>
+    <button class="btn outline" id="btnReset">Nová hra</button>
+  </div>
+</footer>
+
+  </div>  <!-- Modal plánování koncertu -->  <div class="modal" id="planModal" aria-hidden="true">
+    <div class="sheet">
+      <header class="row" style="padding:10px">
+        <button class="btn outline" id="closePlan">Zavřít</button>
+        <div style="flex:1"></div>
+        <button class="btn green" id="confirmPlan">Přidat do kalendáře</button>
+      </header>
+      <div class="content">
+        <h2>Vyber místo a parametry</h2>
+        <div class="field">
+          <label for="dateInput">Datum</label>
+          <input type="date" id="dateInput" />
+        </div>
+        <div class="field">
+          <label for="venueSelect">Místo (odfiltrováno podle úrovně a vzdálenosti)</label>
+          <select id="venueSelect"></select>
+        </div>
+        <div class="grid2 field">
+          <label for="price">Cena lístku: <b id="priceLabel">250</b> Kč</label>
+          <input type="range" id="price" min="100" max="600" step="10" value="250" />
+        </div>
+        <div class="grid2 field">
+          <label for="promo">Marketing rozpočet: <b id="promoLabel">$ 150</b></label>
+          <input type="range" id="promo" min="0" max="1000" step="50" value="150" />
+        </div>
+        <p class="note" id="venueInfo">—</p>
+        <div id="suggest" class="note"></div>
+        <div class="list" id="venueList"></div>
+      </div>
+    </div>
+  </div>  <script>
+  // ======= Data =======
+  const VENUES = [
+    { id:1, region:'okres', city:'Vimperk', venue:'KD Vimperk', cap:200, rent:350, q:0.85, lat:49.0590, lon:13.7760 },
+    { id:2, region:'okres', city:'Blatná', venue:'KD Blatná', cap:250, rent:360, q:0.88, lat:49.4243, lon:13.8824 },
+    { id:3, region:'okres', city:'Volyně', venue:'KD Volyně', cap:250, rent:320, q:0.84, lat:49.1656, lon:13.8865 },
+    { id:4, region:'okres', city:'Malenice', venue:'KD Malenice', cap:220, rent:300, q:0.80, lat:49.1487, lon:13.8432 },
+    { id:5, region:'okres', city:'Čepřovice', venue:'Sál Čepřovice', cap:280, rent:280, q:0.78, lat:49.1540, lon:13.9600 },
+    { id:6, region:'okres', city:'Vlachovo Březí', venue:'KD Vlachovo Březí', cap:180, rent:260, q:0.78, lat:49.0750, lon:13.9894 },
+{ id:7, region:'okres', city:'Volary', venue:'KD Volary', cap:250, rent:320, q:0.82, lat:48.9084, lon:13.8866 },
+{ id:8, region:'okres', city:'Stachy', venue:'Sál Stachy', cap:160, rent:230, q:0.76, lat:49.0948, lon:13.6333 },
+{ id:9, region:'okres', city:'Borová Lada', venue:'Letní parket Borová Lada', cap:140, rent:200, q:0.74, lat:48.9836, lon:13.6802 },
+{ id:10, region:'okres', city:'Kvilda', venue:'Sál Kvilda', cap:120, rent:180, q:0.72, lat:49.0204, lon:13.5785 },
+{ id:11, region:'okres', city:'Čestice', venue:'KD Čestice', cap:150, rent:210, q:0.75, lat:49.1431, lon:13.9113 },
+{ id:12, region:'okres', city:'Kašperské Hory', venue:'KD Kašperské Hory', cap:200, rent:280, q:0.80, lat:49.1426, lon:13.5557 },
+{ id:13, region:'okres', city:'Soběšice', venue:'Sál Soběšice', cap:130, rent:190, q:0.73, lat:49.2428, lon:13.6845 },
+{ id:14, region:'okres', city:'Kraselov', venue:'KD Kraselov', cap:140, rent:200, q:0.74, lat:49.2224, lon:13.8620 },
+{ id:15, region:'okres', city:'Katovice', venue:'KD Katovice', cap:200, rent:280, q:0.79, lat:49.2734, lon:13.8397 },
+{ id:16, region:'okres', city:'Střelské Hoštice', venue:'KD Střelské Hoštice', cap:150, rent:210, q:0.75, lat:49.2769, lon:13.8092 },
+{ id:17, region:'okres', city:'Šumavské Hoštice', venue:'KD Šumavské Hoštice', cap:140, rent:200, q:0.74, lat:49.0853, lon:13.9145 },
+{ id:18, region:'okres', city:'Bělčice', venue:'KD Bělčice', cap:160, rent:230, q:0.76, lat:49.4621, lon:13.9518 },
+{ id:19, region:'okres', city:'Sedlice', venue:'KD Sedlice', cap:170, rent:240, q:0.77, lat:49.3875, lon:13.9384 },
+{ id:20, region:'okres', city:'Radomyšl', venue:'KD Radomyšl', cap:180, rent:250, q:0.78, lat:49.3114, lon:13.9361 },
+{ id:21, region:'okres', city:'Štěkeň', venue:'KD Štěkeň', cap:160, rent:230, q:0.76, lat:49.2964, lon:14.0150 },
+{ id:22, region:'okres', city:'Kestřany', venue:'Sál Kestřany', cap:150, rent:210, q:0.75, lat:49.2750, lon:14.1021 },
+{ id:23, region:'okres', city:'Putim', venue:'KD Putim', cap:150, rent:210, q:0.75, lat:49.2706, lon:14.1322 },
+{ id:24, region:'okres', city:'Čejetice', venue:'KD Čejetice', cap:150, rent:210, q:0.75, lat:49.2589, lon:14.0385 },
+{ id:25, region:'okres', city:'Cehnice', venue:'KD Cehnice', cap:150, rent:210, q:0.75, lat:49.2071, lon:14.0340 },
+{ id:26, region:'okres', city:'Protivín', venue:'KD Protivín', cap:280, rent:360, q:0.84, lat:49.1991, lon:14.2171 },
+{ id:27, region:'okres', city:'Strunkovice nad Blanicí', venue:'KD Strunkovice', cap:180, rent:250, q:0.78, lat:49.0818, lon:14.0367 },
+{ id:28, region:'okres', city:'Hracholusky', venue:'KD Hracholusky', cap:140, rent:200, q:0.74, lat:49.1039, lon:14.0398 },
+{ id:29, region:'okres', city:'Chroboly', venue:'Sál Chroboly', cap:130, rent:190, q:0.73, lat:48.9879, lon:14.0503 },
+{ id:30, region:'okres', city:'Ktiš', venue:'KD Ktiš', cap:140, rent:200, q:0.74, lat:48.9631, lon:14.0511 },
+{ id:31, region:'okres', city:'Lhenice', venue:'KD Lhenice', cap:160, rent:230, q:0.76, lat:48.9833, lon:14.1017 },
+{ id:32, region:'okres', city:'Pištín', venue:'KD Pištín', cap:150, rent:210, q:0.75, lat:49.0484, lon:14.3515 },
+{ id:33, region:'okres', city:'Dívčice', venue:'KD Dívčice', cap:140, rent:200, q:0.74, lat:49.0841, lon:14.3266 },
+{ id:34, region:'okres', city:'Křemže', venue:'KD Křemže', cap:180, rent:250, q:0.78, lat:48.9044, lon:14.2890 },
+{ id:35, region:'okres', city:'Lažiště', venue:'KD Lažiště', cap:140, rent:200, q:0.74, lat:49.0685, lon:13.8993 },
+{ id:36, region:'okres', city:'Lenora', venue:'KD Lenora', cap:130, rent:190, q:0.73, lat:48.9081, lon:13.7888 },
+{ id:37, region:'okres', city:'Strážný', venue:'Letní parket Strážný', cap:150, rent:210, q:0.75, lat:48.9078, lon:13.6989 },
+  { id:38, region:'okres', city:"Strakonice", venue:"KD Strakonice", cap:450, rent:500, q:0.9, lat:49.2614, lon:13.9024 },
+{ id:39, region:'okres', city:"Volyně", venue:"KD Volyně", cap:250, rent:320, q:0.84, lat:49.1656, lon:13.8865 },
+{ id:40, region:'okres', city:"Blatná", venue:"KD Blatná", cap:250, rent:360, q:0.88, lat:49.4243, lon:13.8824 },
+{ id:41, region:'okres', city:"Vodňany", venue:"KD Vodňany", cap:300, rent:350, q:0.85, lat:49.1473, lon:14.1758 },
+{ id:42, region:'okres', city:"Bavorov", venue:"Sál Bavorov", cap:180, rent:280, q:0.8, lat:49.1226, lon:14.0783 },
+{ id:43, region:'okres', city:"Prachatice", venue:"KD Prachatice", cap:400, rent:500, q:0.9, lat:49.0138, lon:14.0000 },
+{ id:44, region:'okres', city:"Vimperk", venue:"KD Vimperk", cap:200, rent:350, q:0.85, lat:49.0590, lon:13.7760 },
+{ id:45, region:'okres', city:"Netolice", venue:"KD Netolice", cap:250, rent:320, q:0.83, lat:49.0501, lon:14.1995 },
+{ id:46, region:'okres', city:"Malenice", venue:"KD Malenice", cap:220, rent:300, q:0.8, lat:49.1487, lon:13.8432 },
+{ id:47, region:'okres', city:"Čkyně", venue:"Sál Čkyně", cap:180, rent:250, q:0.78, lat:49.1129, lon:13.8317 },
+{ id:48, region:'okres', city:"Vacov", venue:"KD Vacov", cap:200, rent:280, q:0.79, lat:49.1242, lon:13.7294 },
+{ id:49, region:'okres', city:"Husinec", venue:"Sál Husinec", cap:150, rent:220, q:0.75, lat:49.0562, lon:14.0025 },
+{ id:50, region:'okres', city:"Zdíkov", venue:"KD Zdíkov", cap:200, rent:260, q:0.77, lat:49.0956, lon:13.6610 },
+{ id:51, region:'okres', city:"Horažďovice", venue:"KD Horažďovice", cap:300, rent:380, q:0.86, lat:49.3211, lon:13.6994 },
+{ id:52, region:'okres', city:"Písek", venue:"Kulturní dům Písek", cap:600, rent:700, q:0.92, lat:49.3093, lon:14.1475 },
+{ id:53, region:'okres', city:"Český Krumlov", venue:"Městské divadlo ČK", cap:280, rent:400, q:0.88, lat:48.8106, lon:14.3151 },
+    // kraj
+    { id:101, region:'kraj', city:'České Budějovice', venue:'KD Metropol', cap:1200, rent:2100, q:0.9, lat:48.9747, lon:14.4749 },
+    { id:102, region:'kraj', city:'Tábor', venue:'KC Tábor', cap:900, rent:1600, q:0.88, lat:49.4148, lon:14.6586 },
+    { id:103, region:'kraj', city:'Písek', venue:'Kulturní dům Písek', cap:800, rent:1400, q:0.86, lat:49.3081, lon:14.1475 },
+    { id:104, region:'kraj', city:'České Budějovice', venue:'Krajské kulturní centrum České Budějovice', cap:800, rent:12000, q:0.95, lat:48.9747, lon:14.4740 },
+{ id:105, region:'kraj', city:'Tábor', venue:'Kulturák Tábor', cap:600, rent:10000, q:0.92, lat:49.4144, lon:14.6578 },
+{ id:106, region:'kraj', city:'Písek', venue:'Kulturní dům Písek', cap:500, rent:9000, q:0.9, lat:49.3093, lon:14.1475 },
+{ id:107, region:'kraj', city:'Strakonice', venue:'KD Strakonice', cap:450, rent:8500, q:0.88, lat:49.2614, lon:13.9024 },
+{ id:108, region:'kraj', city:'Jindřichův Hradec', venue:'Kulturní dům Jindřichův Hradec', cap:500, rent:9500, q:0.91, lat:49.1441, lon:15.0033 },
+{ id:109, region:'kraj', city:'Prachatice', venue:'Krajský sál Prachatice', cap:400, rent:8000, q:0.88, lat:49.0138, lon:14.0000 },
+{ id:110, region:'kraj', city:'Pelhřimov', venue:'Kulturní centrum Pelhřimov', cap:350, rent:7500, q:0.87, lat:49.4314, lon:15.2239 },
+{ id:111, region:'kraj', city:'Kaplice', venue:'KD Kaplice', cap:300, rent:7000, q:0.85, lat:48.6089, lon:14.5124 },
+{ id:112, region:'kraj', city:'Nové Hrady', venue:'Sál Nové Hrady', cap:300, rent:7000, q:0.84, lat:48.7333, lon:14.7000 },
+{ id:113, region:'kraj', city:'Vodňany', venue:'Kulturák Vodňany', cap:350, rent:7500, q:0.86, lat:49.1473, lon:14.1758 },
+  { id:114, region:'kraj', city:'Týn nad Vltavou', venue:'Kulturák Týn nad Vltavou', cap:400, rent:9000, q:0.88, lat:49.2586, lon:14.4382 },
+{ id:115, region:'kraj', city:'Milevsko', venue:'KD Milevsko', cap:350, rent:8500, q:0.87, lat:49.4893, lon:14.3281 },
+{ id:116, region:'kraj', city:'Nepomuk', venue:'Sál Nepomuk', cap:300, rent:8000, q:0.85, lat:49.4031, lon:13.7432 },
+{ id:117, region:'kraj', city:'Opařany', venue:'KD Opařany', cap:300, rent:8000, q:0.84, lat:49.4064, lon:14.5764 },
+{ id:118, region:'kraj', city:'Bechyně', venue:'Kulturní dům Bechyně', cap:350, rent:8500, q:0.86, lat:49.3342, lon:14.4775 },
+{ id:119, region:'kraj', city:'Soběslav', venue:'KD Soběslav', cap:400, rent:9000, q:0.88, lat:49.2279, lon:14.5855 },
+{ id:120, region:'kraj', city:'Veselí nad Lužnicí', venue:'Kulturák Veselí nad Lužnicí', cap:450, rent:9500, q:0.89, lat:49.0972, lon:14.7746 },
+{ id:121, region:'kraj', city:'Sezimovo Ústí', venue:'KD Sezimovo Ústí', cap:500, rent:10000, q:0.91, lat:49.3991, lon:14.6629 },
+{ id:122, region:'kraj', city:'Mladá Vožice', venue:'Sál Mladá Vožice', cap:300, rent:8000, q:0.85, lat:49.5548, lon:14.7224 },
+{ id:123, region:'kraj', city:'Pacov', venue:'KD Pacov', cap:350, rent:8500, q:0.86, lat:49.4811, lon:15.0069 },
+{ id:124, region:'kraj', city:'Kovářov', venue:'Sál Kovářov', cap:300, rent:8000, q:0.84, lat:49.4414, lon:14.5263 },
+{ id:125, region:'kraj', city:'Kozárovice', venue:'KD Kozárovice', cap:300, rent:8000, q:0.84, lat:49.4360, lon:14.4245 },
+{ id:126, region:'kraj', city:'Březnice', venue:'KD Březnice', cap:400, rent:9000, q:0.88, lat:49.5440, lon:13.8865 },
+{ id:127, region:'kraj', city:'Lnáře', venue:'Sál Lnáře', cap:300, rent:8000, q:0.85, lat:49.4418, lon:13.8554 },
+{ id:128, region:'kraj', city:'Rožmitál pod Třemšínem', venue:'KD Rožmitál p. Tř.', cap:350, rent:8500, q:0.86, lat:49.6165, lon:13.7595 },
+{ id:129, region:'kraj', city:'Hvožďany', venue:'Sál Hvožďany', cap:300, rent:8000, q:0.84, lat:49.2390, lon:14.0050 },
+{ id:130, region:'kraj', city:'Mirovice', venue:'KD Mirovice', cap:350, rent:8500, q:0.86, lat:49.4486, lon:13.9973 },
+{ id:131, region:'kraj', city:'Čimelice', venue:'Sál Čimelice', cap:300, rent:8000, q:0.84, lat:49.4746, lon:13.9981 },
+{ id:132, region:'kraj', city:'Jistebnice', venue:'KD Jistebnice', cap:350, rent:8500, q:0.86, lat:49.5280, lon:14.0784 },
+{ id:133, region:'kraj', city:'Chotoviny', venue:'Sál Chotoviny', cap:300, rent:8000, q:0.84, lat:49.5507, lon:14.0711 },
+{ id:134, region:'kraj', city:'Chýnov', venue:'KD Chýnov', cap:400, rent:9000, q:0.87, lat:49.4181, lon:14.6174 },
+{ id:135, region:'kraj', city:'Černovice', venue:'Sál Černovice', cap:300, rent:8000, q:0.84, lat:49.4263, lon:14.5690 },
+{ id:136, region:'kraj', city:'Kamenice nad Lipou', venue:'KD Kamenice n. L.', cap:350, rent:8500, q:0.86, lat:49.3604, lon:15.0536 },
+{ id:137, region:'kraj', city:'Žirovnice', venue:'Sál Žirovnice', cap:300, rent:8000, q:0.84, lat:49.2921, lon:15.1759 },
+{ id:138, region:'kraj', city:'Počátky', venue:'KD Počátky', cap:350, rent:8500, q:0.86, lat:49.3022, lon:15.3700 },
+{ id:139, region:'kraj', city:'Strmilov', venue:'Sál Strmilov', cap:300, rent:8000, q:0.84, lat:49.2070, lon:15.3881 },
+{ id:140, region:'kraj', city:'Kunžak', venue:'KD Kunžak', cap:350, rent:8500, q:0.86, lat:49.1272, lon:15.4413 },
+{ id:141, region:'kraj', city:'Dačice', venue:'Kulturní dům Dačice', cap:450, rent:9500, q:0.89, lat:49.0005, lon:15.5095 },
+{ id:142, region:'kraj', city:'Slavonice', venue:'KD Slavonice', cap:350, rent:8500, q:0.86, lat:48.9598, lon:15.5206 },
+{ id:143, region:'kraj', city:'Telč', venue:'Kulturní dům Telč', cap:400, rent:9000, q:0.88, lat:49.1845, lon:15.3833 },
+{ id:144, region:'kraj', city:'Jemnice', venue:'KD Jemnice', cap:350, rent:8500, q:0.86, lat:49.0883, lon:15.4545 },
+{ id:145, region:'kraj', city:'Písečné', venue:'Sál Písečné', cap:300, rent:8000, q:0.84, lat:49.0110, lon:15.5232 },
+{ id:146, region:'kraj', city:'Nová Bystřice', venue:'KD Nová Bystřice', cap:350, rent:8500, q:0.86, lat:48.9646, lon:15.5723 },
+{ id:147, region:'kraj', city:'Chlum u Třeboně', venue:'Kulturák Chlum u Třeboně', cap:400, rent:9000, q:0.87, lat:49.0271, lon:14.8275 },
+{ id:148, region:'kraj', city:'Třeboň', venue:'Kulturní dům Třeboň', cap:450, rent:9500, q:0.89, lat:49.0035, lon:14.7757 },
+{ id:149, region:'kraj', city:'Suchdol nad Lužnicí', venue:'KD Suchdol n. L.', cap:350, rent:8500, q:0.86, lat:49.0107, lon:14.8322 },
+{ id:150, region:'kraj', city:'České Velenice', venue:'KD České Velenice', cap:300, rent:8000, q:0.84, lat:48.6831, lon:14.8607 },
+{ id:151, region:'kraj', city:'Nové Hrady', venue:'Sál Nové Hrady', cap:300, rent:8000, q:0.84, lat:48.7333, lon:14.7000 },
+{ id:152, region:'kraj', city:'Trhové Sviny', venue:'KD Trhové Sviny', cap:350, rent:8500, q:0.86, lat:49.0000, lon:14.7125 },
+{ id:153, region:'kraj', city:'Borovany', venue:'KD Borovany', cap:350, rent:8500, q:0.86, lat:49.0365, lon:14.6092 },
+{ id:154, region:'kraj', city:'Ledenice', venue:'KD Ledenice', cap:300, rent:8000, q:0.84, lat:49.0560, lon:14.5921 },
+{ id:155, region:'kraj', city:'Lišov', venue:'Kulturák Lišov', cap:400, rent:9000, q:0.87, lat:49.0347, lon:14.5524 },
+{ id:156, region:'kraj', city:'Rudolfov', venue:'KD Rudolfov', cap:350, rent:8500, q:0.86, lat:49.0363, lon:14.5133 },
+{ id:157, region:'kraj', city:'Velešín', venue:'Sál Velešín', cap:300, rent:8000, q:0.84, lat:49.0325, lon:14.4351 },
+{ id:158, region:'kraj', city:'Vyšší Brod', venue:'KD Vyšší Brod', cap:350, rent:8500, q:0.86, lat:48.6842, lon:14.4048},
+  
+    // celá ČR
+    { id:201, region:'cz', city:'Praha', venue:'O2 universum', cap:5000, rent:18000, q:0.92, lat:50.1030, lon:14.4921 },
+    { id:202, region:'cz', city:'Brno', venue:'Winning Group Arena', cap:4500, rent:12000, q:0.9, lat:49.2149, lon:16.6124 },
+    // Evropa
+    { id:301, region:'eu', city:'Berlin', venue:'Mercedes-Benz Arena', cap:17000, rent:60000, q:0.93, lat:52.505, lon:13.444 },
+    { id:302, region:'eu', city:'Wien', venue:'Wiener Stadthalle', cap:16000, rent:50000, q:0.92, lat:48.204, lon:16.336 },
+    // Svět
+    { id:401, region:'world', city:'London', venue:'Wembley Stadium', cap:90000, rent:250000, q:0.95, lat:51.556, lon:-0.279 },
+    { id:402, region:'world', city:'Los Angeles', venue:'SoFi Stadium', cap:70000, rent:220000, q:0.95, lat:33.953, lon:-118.339 }
+  ];
+
+  const LEVELS = [
+    { key:'okres', label:'Okres', needFans:0 },
+    { key:'kraj', label:'Kraj', needFans:500 },
+    { key:'cz', label:'ČR', needFans:2000 },
+    { key:'eu', label:'Evropa', needFans:8000 },
+    { key:'world', label:'Svět', needFans:20000 }
+  ];
+
+  // ======= Helpers =======
+  const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
+  const km=(a,b)=>{ // haversine
+    const R=6371;const dLat=(b.lat-a.lat)*Math.PI/180;const dLon=(b.lon-a.lon)*Math.PI/180;
+    const s1=Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+    return Math.round(2*R*Math.asin(Math.sqrt(s1)));
+  };
+  const fmtMoney=(n)=>`$ ${n.toLocaleString('cs-CZ')}`;
+  const fmtKc=(n)=>`${n.toLocaleString('cs-CZ')} Kč`;
+  const todayISO=()=>new Date(state.date).toISOString().slice(0,10);
+
+  // ======= Game State =======
+  let state = {
+    date: new Date(2025,0,1), // 1.1.2025, 1 den = 1 tah
+    cash: 2500,
+    fans: 120, // start
+    hype: 0, // 0-100, krátkodobá poptávka
+    fatigue: 0, // 0-100
+    level: 'okres',
+    home: {lat:49.1088664, lon:13.8663668, name:'Start: Pošumaví'},
+    lastSpot: {lat:49.1088664, lon:13.8663668, name:'Start'},
+    calendar: [], // {date:'YYYY-MM-DD', type:'concert'|'pr'|'record'|'rest', payload:{venueId, price, promo}}
+    log: []
+  };
+
+  // ======= Persistence =======
+  const save=()=>localStorage.setItem('kapelniMagnat', JSON.stringify(serializeState()));
+  const load=()=>{
+    const s=localStorage.getItem('kapelniMagnat');
+    if(!s) return false;
+    try{ const obj=JSON.parse(s); deserializeState(obj); renderAll(); pushLog('Hra načtena.'); return true;}catch(e){console.error(e);return false}
+  }
+  function serializeState(){
+    return { ...state, date: state.date.toISOString() };
+  }
+  function deserializeState(obj){
+    state = { ...obj, date: new Date(obj.date) };
+  }
+
+  // ======= Core Logic =======
+  function levelForFans(fans){
+    let k='okres';
+    for(const L of LEVELS){ if(fans>=L.needFans) k=L.key; }
+    return k;
+  }
+  function venuesAvailable(){
+    const lvl=state.level;
+    let base=VENUES.filter(v=>{
+      const idxLevel=LEVELS.findIndex(L=>L.key===lvl);
+      const idxV=LEVELS.findIndex(L=>L.key===v.region);
+      return idxV<=idxLevel; // odemčené
+    });
+    // vzdálenostní filtr: při nízké unavě a penězích doporučujeme bližší
+    const cur={lat:state.lastSpot.lat,lon:state.lastSpot.lon};
+    base=base.map(v=>({ ...v, dist: km(cur,{lat:v.lat,lon:v.lon}) }))
+             .sort((a,b)=>a.dist-b.dist);
+    return base;
+  }
+
+  function demandEstimate(venue, price, promo){
+    // Heuristika poptávky: roste s fanoušky, kvalitou, hype; klesá s cenou a únavou
+    const fBase = Math.pow(state.fans, 0.75); // diminishing returns
+    const q = venue.q; // 0.75–0.95
+    const hype = 1 + clamp(state.hype/100,0,0.8); // až +80%
+    const priceFactor = clamp(350/price, 0.4, 1.3); // 350 Kč jako referenční
+    const promoFactor = 1 + clamp(promo/1000,0,0.6); // až +60%
+    const fatiguePenalty = 1 - clamp(state.fatigue/150,0,0.4); // únava snižuje výkon
+    const randomness = 0.9 + Math.random()*0.2; // 0.9–1.1
+    let demand = fBase * q * hype * priceFactor * promoFactor * fatiguePenalty * randomness;
+    demand = Math.floor(demand);
+    return clamp(demand, 0, venue.cap);
+  }
+
+  function travelDays(from,to){
+    const d=km(from,to); // d km
+    // 500 km/den efektivně, minimálně 0 dní (místní), strop 3 dny
+    return clamp(Math.ceil(d/500),0,3);
+  }
+
+  function resolveToday(){
+    const iso=todayISO();
+    const ev=state.calendar.find(e=>e.date===iso);
+    if(!ev){ updateTodayBadge('Volno · naplánuj koncert, PR nebo nahrávání'); return; }
+
+    if(ev.type==='concert'){
+      const venue=VENUES.find(v=>v.id===ev.payload.venueId);
+      const price=ev.payload.price;
+      const promo=ev.payload.promo;
+      const attendance = demandEstimate(venue, price, promo);
+      const tickets = attendance * price;
+      const merch = Math.round(attendance * price * 0.15);
+      const travelKms = km(state.lastSpot,{lat:venue.lat,lon:venue.lon});
+      const travelCost = Math.round(travelKms * 0.25); // $/km
+      const hotel = Math.round(60 * 4); // 4 osoby low-cost
+      const rent = venue.rent;
+      const promoCost = Math.round(promo*1); // promo rozpočet
+      const costs = rent + travelCost + hotel + promoCost;
+      const profit = tickets + merch - costs;
+
+      state.cash += profit;
+      state.fans += Math.round(attendance * venue.q * 0.1); // získaní fanoušci
+      state.hype = clamp(state.hype + 5,0,100);
+      state.fatigue = clamp(state.fatigue + 12,0,100);
+      state.lastSpot = {lat:venue.lat,lon:venue.lon,name:`${venue.venue}, ${venue.city}`};
+      state.level = levelForFans(state.fans);
+
+      pushLog(`🎤 ${venue.city} – ${venue.venue}: návštěva ${attendance}/${venue.cap}, lístky ${fmtKc(price)} → ${fmtMoney(profit)} ${profit>=0?'zisk':'ztráta'}.`);
+      updateTodayBadge(`Dnes koncert: ${venue.city} – ${venue.venue} • návštěva ~${attendance}/${venue.cap}`);
+
+      // zablokuj další koncerty podle vzdálenosti (autoplán: vložíme travel bloky?) ne – jen únava.
+
+    } else if(ev.type==='pr'){
+      const cost=200;
+      state.cash -= cost;
+      state.hype = clamp(state.hype + 15,0,100);
+      pushLog(`📣 PR kampaň – hype +15, náklady ${fmtMoney(cost)}`);
+      updateTodayBadge('PR den · hype +15');
+    } else if(ev.type==='record'){
+      // 3 dny blokace – vkládáme jednotlivé dny již při plánování
+      const cost=150;
+      state.cash -= cost;
+      state.hype = clamp(state.hype + 8,0,100);
+      state.fans += 5; // malý dlouhodobý efekt
+      pushLog(`🎚️ Nahrávání – malé zlepšení povědomí, náklady ${fmtMoney(cost)}`);
+      updateTodayBadge('Nahrávání ve studiu');
+    } else if(ev.type==='rest'){
+      const recovered = 15;
+      state.fatigue = clamp(state.fatigue - recovered,0,100);
+      state.hype = clamp(state.hype - 3,0,100);
+      pushLog(`🛌 Volno – únava −${recovered}%`);
+      updateTodayBadge('Volno (regenerace)');
+    }
+  }
+
+  function nextDay(){
+    resolveToday();
+    // posun dne
+    state.date = new Date(state.date.getTime() + 24*3600*1000);
+    // přirozený úbytek hype a malá obnova únavy
+    state.hype = clamp(state.hype - 2,0,100);
+    state.fatigue = clamp(state.fatigue - 3,0,100);
+    renderAll();
+  }
+
+  // ======= UI Rendering =======
+  function renderAll(){
+    // header KPIs
+    document.getElementById('dayLabel').textContent = state.date.toLocaleDateString('cs-CZ');
+    const yearProgress = (state.date - new Date(state.date.getFullYear(),0,1)) / (new Date(state.date.getFullYear()+1,0,1) - new Date(state.date.getFullYear(),0,1));
+    document.getElementById('dayBar').style.width = Math.round(yearProgress*100)+'%';
+    document.getElementById('cash').textContent = fmtMoney(Math.round(state.cash));
+    document.getElementById('fans').textContent = Math.round(state.fans).toLocaleString('cs-CZ');
+    const lvl = LEVELS.find(L=>L.key===state.level);
+    document.getElementById('level').textContent = lvl?lvl.label:state.level;
+    const nextLvl = LEVELS.find(L=>L.needFans>state.fans);
+    const pctToNext = nextLvl? clamp((state.fans - LEVELS[Math.max(0,LEVELS.findIndex(L=>L.key===state.level))].needFans) / (nextLvl.needFans - LEVELS[Math.max(0,LEVELS.findIndex(L=>L.key===state.level))].needFans),0,1) : 1;
+    document.getElementById('lvlBar').style.width = Math.round(pctToNext*100)+'%';
+
+    document.getElementById('cashBar').style.width = clamp((state.cash/20000)*100,0,100)+'%';
+    document.getElementById('fanBar').style.width = clamp((state.fans/20000)*100,0,100)+'%';
+
+    // Today KPI
+    document.getElementById('kpiDist').textContent = `${km(state.lastSpot, state.lastSpot)} km`; // placeholder (0)
+    document.getElementById('kpiFatigue').textContent = `${state.fatigue}%`;
+    document.getElementById('kpiHype').textContent = `${state.hype}`;
+
+    renderAgenda();
+    renderPlanModalOptions();
+  }
+
+  function updateTodayBadge(text){
+    document.getElementById('todayBadge').textContent = text;
+  }
+
+  function renderAgenda(){
+    const wrap=document.getElementById('agenda');
+    wrap.innerHTML='';
+    const upcoming=[...state.calendar]
+      .filter(e=> new Date(e.date) >= state.date )
+      .sort((a,b)=> a.date.localeCompare(b.date))
+      .slice(0,20);
+    if(upcoming.length===0){wrap.innerHTML='<div class="item"><div>Žádné události. Naplánuj koncert!</div></div>';return}
+    for(const e of upcoming){
+      const div=document.createElement('div');div.className='item';
+      const when=new Date(e.date).toLocaleDateString('cs-CZ');
+      const kind = e.type==='concert' ? '🎤 Koncert' : e.type==='pr' ? '📣 PR' : e.type==='record' ? '🎚️ Nahrávání' : '🛌 Volno';
+      let where='';
+      if(e.type==='concert'){
+        const v=VENUES.find(v=>v.id===e.payload.venueId);
+        where = ` · ${v.city} – ${v.venue}`;
+      }
+      div.innerHTML=`<div><b>${when}</b> · ${kind}${where}</div><div class="meta">${e.type==='concert'?fmtKc(e.payload.price):''}</div>`;
+      wrap.appendChild(div);
+    }
+  }
+
+  function pushLog(text){
+    state.log.unshift({t:new Date().toISOString(), text});
+    const pane=document.getElementById('log');
+    const div=document.createElement('div');div.className='item';div.innerHTML=`<div>${new Date().toLocaleTimeString('cs-CZ')} · ${text}</div>`;pane.prepend(div);
+    // keep last 50
+    while(state.log.length>50){ state.log.pop(); }
+  }
+
+  // ======= Planning Modal =======
+  const planModal=document.getElementById('planModal');
+  const venueSelect=document.getElementById('venueSelect');
+  const venueInfo=document.getElementById('venueInfo');
+  const priceInput=document.getElementById('price');
+  const priceLabel=document.getElementById('priceLabel');
+  const promoInput=document.getElementById('promo');
+  const promoLabel=document.getElementById('promoLabel');
+  const dateInput=document.getElementById('dateInput');
+  const suggest=document.getElementById('suggest');
+
+  function openPlanModal(){
+    planModal.classList.add('open');
+    dateInput.value = todayISO();
+    renderPlanModalOptions();
+  }
+  function closePlanModal(){ planModal.classList.remove('open'); }
+
+  function renderPlanModalOptions(){
+    // populate venues
+    const list=venuesAvailable();
+    venueSelect.innerHTML='';
+    for(const v of list){
+      const opt=document.createElement('option');
+      opt.value=v.id; opt.textContent=`${v.city} – ${v.venue} · ${v.cap} kap. · ${v.dist} km`;
+      venueSelect.appendChild(opt);
+    }
+    updateVenueInfo();
+  }
+
+  function updateVenueInfo(){
+    const id=parseInt(venueSelect.value||0,10);
+    const v=VENUES.find(x=>x.id===id) || venuesAvailable()[0];
+    if(!v) { venueInfo.textContent=''; return; }
+    venueInfo.textContent = `${v.city} – ${v.venue} • kapacita ${v.cap}, nájem ${fmtMoney(v.rent)}, kvalita ${Math.round(v.q*100)}%`;
+
+    priceLabel.textContent = priceInput.value;
+    promoLabel.textContent = fmtMoney(parseInt(promoInput.value,10));
+
+    const est = demandEstimate(v, parseInt(priceInput.value,10), parseInt(promoInput.value,10));
+    suggest.innerHTML = `
+      <div class="item">
+        <div>Odhad návštěvnosti: <b>${est}</b> / ${v.cap}</div>
+        <div class="meta">Tip: lístek ${fmtKc(parseInt(priceInput.value,10))}, promo ${fmtMoney(parseInt(promoInput.value,10))}</div>
+      </div>`;
+  }
+
+  function planConcert(){
+    const id=parseInt(venueSelect.value,10);
+    const date=dateInput.value;
+    if(!id||!date){ alert('Vyber datum a místo.'); return; }
+    // Kontrola kolize
+    if(state.calendar.some(e=>e.date===date)) { alert('V tento den už je akce v kalendáři.'); return; }
+    const v=VENUES.find(x=>x.id===id);
+    // Cestovní buffer – zjisti poslední koncert před datem
+    const prev=state.calendar.filter(e=>e.type==='concert' && e.date<date).sort((a,b)=>a.date.localeCompare(b.date)).pop();
+    let minStart=state.lastSpot;
+    if(prev){ const pv=VENUES.find(x=>x.id===prev.payload.venueId); minStart={lat:pv.lat,lon:pv.lon}; }
+    const daysNeeded = travelDays(minStart,{lat:v.lat,lon:v.lon});
+    // najdi poslední událost a spočítej rozdíl
+    const lastDate = prev? new Date(prev.date) : state.date;
+    const target = new Date(date);
+    const diffDays = Math.ceil((target - lastDate)/(24*3600*1000));
+    if(diffDays<daysNeeded){
+      alert(`Potřebuješ min. ${daysNeeded} den/dny na přesun z předchozího koncertu. Zvol pozdější datum.`);
+      return;
+    }
+    // Ok, přidej koncert
+    state.calendar.push({
+      date,
+      type:'concert',
+      payload:{ venueId:id, price:parseInt(priceInput.value,10), promo:parseInt(promoInput.value,10) }
+    });
+    // volitelně přidat den volna před/po dle únavy
+    pushLog(`📅 Přidán koncert ${v.city} – ${v.venue} na ${new Date(date).toLocaleDateString('cs-CZ')}`);
+    closePlanModal();
+    renderAll();
+  }
+
+  // Quick actions today
+  function addToday(type){
+    const iso=todayISO();
+    if(state.calendar.some(e=>e.date===iso)) { alert('Dnes už je něco v kalendáři.'); return; }
+    state.calendar.push({date:iso, type});
+    pushLog(`📌 Dnes přidáno: ${type.toUpperCase()}`);
+    renderAll();
+  }
+  function cancelToday(){
+    const iso=todayISO();
+    const i=state.calendar.findIndex(e=>e.date===iso);
+    if(i>=0){ state.calendar.splice(i,1); pushLog('❌ Dnešní akce zrušena'); renderAll(); }
+  }
+
+  // ======= Events =======
+  document.getElementById('btnPlan').addEventListener('click', openPlanModal);
+  document.getElementById('closePlan').addEventListener('click', closePlanModal);
+  document.getElementById('confirmPlan').addEventListener('click', planConcert);
+  venueSelect.addEventListener('change', updateVenueInfo);
+  priceInput.addEventListener('input', updateVenueInfo);
+  promoInput.addEventListener('input', updateVenueInfo);
+  dateInput.addEventListener('change', updateVenueInfo);
+
+  document.getElementById('btnNext').addEventListener('click', nextDay);
+  document.getElementById('btnPR').addEventListener('click', ()=>addToday('pr'));
+  document.getElementById('btnRecord').addEventListener('click', ()=>{
+    // Nahrávání 3 dny v řadě (pokud volné)
+    for(let i=0;i<3;i++){
+      const d=new Date(state.date.getTime()+i*24*3600*1000).toISOString().slice(0,10);
+      if(state.calendar.some(e=>e.date===d)) { alert('V následujících 3 dnech už něco je.'); return; }
+    }
+    for(let i=0;i<3;i++){
+      const d=new Date(state.date.getTime()+i*24*3600*1000).toISOString().slice(0,10);
+      state.calendar.push({date:d,type:'record'});
+    }
+    pushLog('🎚️ Naplánováno nahrávání na 3 dny');
+    renderAll();
+  });
+  document.getElementById('btnRest').addEventListener('click', ()=>addToday('rest'));
+  document.getElementById('btnCancel').addEventListener('click', cancelToday);
+
+  document.getElementById('btnSave').addEventListener('click', ()=>{ save(); pushLog('Uloženo.'); });
+  document.getElementById('btnLoad').addEventListener('click', ()=>{ if(!load()) alert('Nenalezen žádný uložený postup.'); });
+  document.getElementById('btnReset').addEventListener('click', ()=>{ if(confirm('Začít novou hru?')){ localStorage.removeItem('kapelniMagnat'); location.reload(); } });
+
+  // ======= Boot =======
+  renderAll();
+  pushLog('Nová hra: start v Pošumaví, rozjeď to po kulturních domech!');
+  </script></body>
+</html>
