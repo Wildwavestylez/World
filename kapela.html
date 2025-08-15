@@ -849,11 +849,312 @@ input[type="range"]{width:100%}
 { id:709, region:'eu', city:'Valletta', venue:'Ta Qali National Stadium', cap:17000, rent:200000, q:0.86, lat:35.9120, lon:14.4770 },
 
 // Faerské ostrovy
-{ id:710, region:'eu', city:'Tórshavn', venue:'Tórsvøllur', cap:6000, rent:80000, q:0.82, lat:62.0070, lon:-6.7710 }
+{ id:710, region:'eu', city:'Tórshavn', venue:'Tórsvøllur', cap:6000, rent:80000, q:0.82, lat:62.0070, lon:-6.7710 },
 
  // Svět
-    { id:1001, region:'world', city:'London', venue:'Wembley Stadium', cap:90000, rent:250000, q:0.95, lat:51.556, lon:-0.279 },
-    { id:1002, region:'world', city:'Los Angeles', venue:'SoFi Stadium', cap:70000, rent:220000, q:0.95, lat:33.953, lon:-118.339 }
+    
+  // Západní pobřeží USA
+  { id:1000, region:'world', city:'Los Angeles', venue:'SoFi Stadium', cap:70000, rent:3000000, q:0.95, lat:33.953, lon:-118.339 },
+  { id:1001, region:'world', city:'San Francisco', venue:'Levi\'s Stadium', cap:68000, rent:2800000, q:0.94, lat:37.403, lon:-121.970 },
+  { id:1002, region:'world', city:'Seattle', venue:'Lumen Field', cap:68000, rent:2500000, q:0.93, lat:47.595, lon:-122.331 },
+  { id:1003, region:'world', city:'Portland', venue:'Providence Park', cap:25000, rent:1500000, q:0.88, lat:45.521, lon:-122.681 },
+
+  // Středozápad USA
+  { id:1004, region:'world', city:'Chicago', venue:'Soldier Field', cap:61000, rent:2700000, q:0.94, lat:41.862, lon:-87.616 },
+  { id:1005, region:'world', city:'Minneapolis', venue:'U.S. Bank Stadium', cap:66000, rent:2900000, q:0.93, lat:44.973, lon:-93.257 },
+
+  // Východní pobřeží USA
+  { id:1006, region:'world', city:'New York', venue:'MetLife Stadium', cap:82000, rent:5000000, q:0.96, lat:40.813, lon:-74.074 },
+  { id:1007, region:'world', city:'Boston', venue:'Gillette Stadium', cap:65000, rent:3500000, q:0.94, lat:42.090, lon:-71.264 },
+  { id:1008, region:'world', city:'Philadelphia', venue:'Lincoln Financial Field', cap:68000, rent:3200000, q:0.95, lat:39.900, lon:-75.167 },
+  { id:1009, region:'world', city:'Miami', venue:'Hard Rock Stadium', cap:65000, rent:3000000, q:0.93, lat:25.957, lon:-80.238 },
+
+  // Kanada
+  { id:1010, region:'world', city:'Toronto', venue:'Rogers Centre', cap:50000, rent:2200000, q:0.92, lat:43.641, lon:-79.389 },
+  { id:1011, region:'world', city:'Vancouver', venue:'BC Place', cap:54000, rent:2500000, q:0.93, lat:49.277, lon:-123.108 },
+  { id:1012, region:'world', city:'Montreal', venue:'Olympic Stadium', cap:61000, rent:2800000, q:0.91, lat:45.554, lon:-73.553 },
+
+  // Další západní USA
+  { id:1013, region:'world', city:'Las Vegas', venue:'Allegiant Stadium', cap:65000, rent:3200000, q:0.94, lat:36.090, lon:-115.183 },
+  { id:1014, region:'world', city:'Phoenix', venue:'State Farm Stadium', cap:63000, rent:3000000, q:0.93, lat:33.527, lon:-112.262 },
+  { id:1015, region:'world', city:'San Diego', venue:'SDCCU Stadium', cap:70000, rent:2800000, q:0.92, lat:32.783, lon:-117.121 },
+
+  // Další střed USA
+  { id:1016, region:'world', city:'Denver', venue:'Empower Field at Mile High', cap:76000, rent:3100000, q:0.93, lat:39.743, lon:-105.020 },
+  { id:1017, region:'world', city:'Kansas City', venue:'Arrowhead Stadium', cap:76000, rent:3000000, q:0.92, lat:39.049, lon:-94.483 },
+  { id:1018, region:'world', city:'Dallas', venue:'AT&T Stadium', cap:80000, rent:5000000, q:0.95, lat:32.747, lon:-97.094 },
+  { id:1019, region:'world', city:'Houston', venue:'NRG Stadium', cap:72000, rent:4000000, q:0.94, lat:29.684, lon:-95.410 },
+
+  // Další východ USA
+  { id:1020, region:'world', city:'Washington D.C.', venue:'FedExField', cap:82000, rent:3500000, q:0.94, lat:38.907, lon:-76.864 },
+  { id:1021, region:'world', city:'Atlanta', venue:'Mercedes-Benz Stadium', cap:71000, rent:3300000, q:0.93, lat:33.755, lon:-84.400 },
+  { id:1022, region:'world', city:'Chicago', venue:'Wrigley Field (concert config)', cap:42000, rent:2200000, q:0.90, lat:41.948, lon:-87.655 },
+
+  // Kanada – další
+  { id:1023, region:'world', city:'Calgary', venue:'McMahon Stadium', cap:36000, rent:1800000, q:0.88, lat:51.107, lon:-114.059 },
+  { id:1024, region:'world', city:'Edmonton', venue:'Commonwealth Stadium', cap:60000, rent:2500000, q:0.91, lat:53.554, lon:-113.491 },
+  { id:1025, region:'world', city:'Ottawa', venue:'TD Place Stadium', cap:24000, rent:1400000, q:0.87, lat:45.395, lon:-75.691 },
+
+
+  // Mexiko
+  { id:1026, region:'world', city:'Ciudad de México', venue:'Estadio Azteca', cap:87000, rent:4500000, q:0.95, lat:19.303, lon:-99.150 },
+  { id:1027, region:'world', city:'Guadalajara', venue:'Estadio Akron', cap:46000, rent:2000000, q:0.92, lat:20.680, lon:-103.347 },
+  { id:1028, region:'world', city:'Monterrey', venue:'Estadio BBVA', cap:52000, rent:2200000, q:0.93, lat:25.682, lon:-100.309 },
+
+  // Brazílie
+  { id:1029, region:'world', city:'Rio de Janeiro', venue:'Maracanã Stadium', cap:78000, rent:4000000, q:0.95, lat:-22.912, lon:-43.230 },
+  { id:1030, region:'world', city:'São Paulo', venue:'Allianz Parque', cap:43000, rent:2000000, q:0.92, lat:-23.527, lon:-46.677 },
+  { id:1031, region:'world', city:'Belo Horizonte', venue:'Mineirão', cap:62000, rent:2500000, q:0.93, lat:-19.865, lon:-43.971 },
+
+  // Argentina
+  { id:1032, region:'world', city:'Buenos Aires', venue:'Estadio Monumental', cap:70000, rent:3000000, q:0.94, lat:-34.545, lon:-58.449 },
+  { id:1033, region:'world', city:'Córdoba', venue:'Estadio Mario Alberto Kempes', cap:57000, rent:2500000, q:0.92, lat:-31.413, lon:-64.181 },
+
+  // Chile
+  { id:1034, region:'world', city:'Santiago', venue:'Estadio Nacional', cap:48000, rent:2200000, q:0.91, lat:-33.437, lon:-70.612 },
+
+  // Kolumbie
+  { id:1035, region:'world', city:'Bogotá', venue:'Estadio El Campín', cap:36000, rent:1800000, q:0.89, lat:4.676, lon:-74.052 },
+  { id:1036, region:'world', city:'Medellín', venue:'Estadio Atanasio Girardot', cap:40000, rent:2000000, q:0.90, lat:6.243, lon:-75.583 },
+
+  // Peru
+  { id:1037, region:'world', city:'Lima', venue:'Estadio Nacional', cap:50000, rent:2200000, q:0.91, lat:-12.056, lon:-77.034 },
+
+
+  // Brazílie – další
+  { id:1038, region:'world', city:'Porto Alegre', venue:'Estádio Beira-Rio', cap:50000, rent:2300000, q:0.92, lat:-30.066, lon:-51.217 },
+  { id:1039, region:'world', city:'Recife', venue:'Arena Pernambuco', cap:44000, rent:2100000, q:0.91, lat:-8.067, lon:-34.873 },
+  { id:1040, region:'world', city:'Salvador', venue:'Fonte Nova', cap:45000, rent:2150000, q:0.90, lat:-12.968, lon:-38.510 },
+
+  // Argentina – další
+  { id:1041, region:'world', city:'Rosario', venue:'Estadio Gigante de Arroyito', cap:42000, rent:2000000, q:0.89, lat:-32.946, lon:-60.650 },
+  { id:1042, region:'world', city:'Mendoza', venue:'Estadio Malvinas Argentinas', cap:42000, rent:2000000, q:0.88, lat:-32.890, lon:-68.827 },
+
+  // Chile – další
+  { id:1043, region:'world', city:'Valparaíso', venue:'Estadio Elías Figueroa', cap:20000, rent:1200000, q:0.85, lat:-33.047, lon:-71.612 },
+  { id:1044, region:'world', city:'Concepción', venue:'Estadio Ester Roa', cap:30000, rent:1500000, q:0.87, lat:-36.826, lon:-73.049 },
+
+  // Kolumbie – další
+  { id:1045, region:'world', city:'Cali', venue:'Estadio Olímpico Pascual Guerrero', cap:40000, rent:2000000, q:0.89, lat:3.422, lon:-76.521 },
+  { id:1046, region:'world', city:'Barranquilla', venue:'Estadio Metropolitano', cap:46000, rent:2200000, q:0.91, lat:10.968, lon:-74.788 },
+
+  // Peru – další
+  { id:1047, region:'world', city:'Arequipa', venue:'Estadio Monumental de la UNSA', cap:40000, rent:2000000, q:0.88, lat:-16.398, lon:-71.537 },
+
+  // Mexiko – další
+  { id:1048, region:'world', city:'Tijuana', venue:'Estadio Caliente', cap:27000, rent:1500000, q:0.86, lat:32.514, lon:-117.038 },
+  { id:1049, region:'world', city:'Monclova', venue:'Estadio de Monclova', cap:15000, rent:1000000, q:0.82, lat:26.906, lon:-101.420 }, 
+
+  // Karibik – velká města
+  { id:1050, region:'world', city:'Havana', venue:'Estadio Latinoamericano', cap:30000, rent:1800000, q:0.88, lat:23.137, lon:-82.357 },
+  { id:1051, region:'world', city:'Santo Domingo', venue:'Estadio Olímpico Félix Sánchez', cap:27000, rent:1600000, q:0.87, lat:18.487, lon:-69.929 },
+  { id:1052, region:'world', city:'San Juan', venue:'Estadio Hiram Bithorn', cap:18000, rent:1200000, q:0.85, lat:18.438, lon:-66.062 },
+  { id:1053, region:'world', city:'Kingston', venue:'National Stadium', cap:35000, rent:2000000, q:0.89, lat:17.997, lon:-76.793 },
+
+  // Karibik – menší a střední
+  { id:1054, region:'world', city:'Port-au-Prince', venue:'Stade Sylvio Cator', cap:15000, rent:900000, q:0.82, lat:18.541, lon:-72.339 },
+  { id:1055, region:'world', city:'Bridgetown', venue:'Wildey Turf', cap:12000, rent:800000, q:0.80, lat:13.107, lon:-59.614 },
+  { id:1056, region:'world', city:'Nassau', venue:'Thomas A. Robinson Stadium', cap:15000, rent:950000, q:0.83, lat:25.050, lon:-77.350 },
+
+  // Menší Latinská Amerika
+  { id:1057, region:'world', city:'La Paz', venue:'Estadio Hernando Siles', cap:42000, rent:1800000, q:0.86, lat:-16.503, lon:-68.148 },
+  { id:1058, region:'world', city:'Sucre', venue:'Estadio Olímpico Patria', cap:25000, rent:1200000, q:0.82, lat:-19.033, lon:-65.260 },
+  { id:1059, region:'world', city:'Quito', venue:'Estadio Olímpico Atahualpa', cap:35000, rent:1800000, q:0.85, lat:-0.205, lon:-78.489 },
+  { id:1060, region:'world', city:'Guayaquil', venue:'Estadio Monumental Banco Pichincha', cap:58000, rent:2200000, q:0.90, lat:-2.200, lon:-79.889 },
+  { id:1061, region:'world', city:'Montevideo', venue:'Estadio Centenario', cap:60000, rent:2500000, q:0.92, lat:-34.906, lon:-56.193 },
+  { id:1062, region:'world', city:'Asunción', venue:'Estadio Defensores del Chaco', cap:42000, rent:1800000, q:0.88, lat:-25.302, lon:-57.635 },
+
+
+  // Austrálie – velká města
+  { id:1063, region:'world', city:'Sydney', venue:'Sydney Cricket Ground', cap:48000, rent:2200000, q:0.92, lat:-33.891, lon:151.224 },
+  { id:1064, region:'world', city:'Melbourne', venue:'Melbourne Cricket Ground', cap:100000, rent:5000000, q:0.95, lat:-37.819, lon:144.983 },
+  { id:1065, region:'world', city:'Brisbane', venue:'Suncorp Stadium', cap:52000, rent:2500000, q:0.93, lat:-27.467, lon:153.023 },
+  { id:1066, region:'world', city:'Perth', venue:'Optus Stadium', cap:60000, rent:3000000, q:0.94, lat:-31.950, lon:115.860 },
+  { id:1067, region:'world', city:'Adelaide', venue:'Adelaide Oval', cap:53000, rent:2500000, q:0.92, lat:-34.916, lon:138.632 },
+
+  // Nový Zéland
+  { id:1068, region:'world', city:'Auckland', venue:'Eden Park', cap:50000, rent:2200000, q:0.91, lat:-36.866, lon:174.756 },
+  { id:1069, region:'world', city:'Wellington', venue:'Sky Stadium', cap:35000, rent:1800000, q:0.89, lat:-41.282, lon:174.784 },
+  { id:1070, region:'world', city:'Christchurch', venue:'Orangetheory Stadium', cap:22000, rent:1200000, q:0.87, lat:-43.532, lon:172.630 },
+
+  // Havaj
+  { id:1071, region:'world', city:'Honolulu', venue:'Aloha Stadium', cap:50000, rent:2500000, q:0.90, lat:21.298, lon:-157.914 },
+
+  // Ostatní ostrovy Oceánie
+  { id:1072, region:'world', city:'Suva', venue:'ANZ National Stadium', cap:15000, rent:900000, q:0.85, lat:-18.124, lon:178.450 },
+  { id:1073, region:'world', city:'Port Moresby', venue:'Sir John Guise Stadium', cap:20000, rent:1100000, q:0.87, lat:-9.478, lon:147.160 },
+  { id:1074, region:'world', city:'Apia', venue:'Apia Park', cap:12000, rent:800000, q:0.82, lat:-13.833, lon:-171.750 },
+
+  // Thajsko
+  { id:1075, region:'world', city:'Bangkok', venue:'Rajamangala National Stadium', cap:50000, rent:2200000, q:0.92, lat:13.756, lon:100.558 },
+  { id:1076, region:'world', city:'Chiang Mai', venue:'700th Anniversary Stadium', cap:25000, rent:1200000, q:0.88, lat:18.787, lon:98.993 },
+
+  // Vietnam
+  { id:1077, region:'world', city:'Hanoi', venue:'My Dinh National Stadium', cap:40000, rent:2000000, q:0.90, lat:21.028, lon:105.834 },
+  { id:1078, region:'world', city:'Ho Chi Minh City', venue:'Thống Nhất Stadium', cap:20000, rent:1200000, q:0.87, lat:10.776, lon:106.695 },
+
+  // Malajsie
+  { id:1079, region:'world', city:'Kuala Lumpur', venue:'Bukit Jalil National Stadium', cap:87000, rent:3500000, q:0.95, lat:3.077, lon:101.710 },
+
+  // Indonésie
+  { id:1080, region:'world', city:'Jakarta', venue:'Gelora Bung Karno Stadium', cap:77000, rent:3000000, q:0.94, lat:-6.218, lon:106.801 },
+  { id:1081, region:'world', city:'Surabaya', venue:'Gelora Bung Tomo Stadium', cap:45000, rent:1800000, q:0.91, lat:-7.249, lon:112.750 },
+
+  // Filipíny
+  { id:1082, region:'world', city:'Manila', venue:'Rizal Memorial Stadium', cap:15000, rent:900000, q:0.85, lat:14.581, lon:120.978 },
+
+  // Singapur
+  { id:1083, region:'world', city:'Singapore', venue:'National Stadium Singapore', cap:55000, rent:2500000, q:0.93, lat:1.303, lon:103.874 },
+
+  // Laos
+  { id:1084, region:'world', city:'Vientiane', venue:'Chao Anouvong Stadium', cap:12000, rent:800000, q:0.82, lat:17.968, lon:102.613 },
+
+  // Kambodža
+  { id:1085, region:'world', city:'Phnom Penh', venue:'Olympic Stadium', cap:50000, rent:2200000, q:0.90, lat:11.565, lon:104.917 },
+
+  // Myanmar
+  { id:1086, region:'world', city:'Yangon', venue:'Thuwunna Stadium', cap:32000, rent:1500000, q:0.87, lat:16.856, lon:96.195 },
+
+
+  // Japonsko – velká města
+  { id:1087, region:'world', city:'Tokio', venue:'Tokyo Dome', cap:55000, rent:3000000, q:0.94, lat:35.705, lon:139.751 },
+  { id:1088, region:'world', city:'Osaka', venue:'Kyocera Dome Osaka', cap:36000, rent:2000000, q:0.91, lat:34.665, lon:135.502 },
+  { id:1089, region:'world', city:'Yokohama', venue:'Nissan Stadium', cap:72000, rent:3500000, q:0.95, lat:35.511, lon:139.617 },
+  { id:1090, region:'world', city:'Nagoya', venue:'Toyota Stadium', cap:45000, rent:2200000, q:0.92, lat:35.174, lon:137.013 },
+  { id:1091, region:'world', city:'Fukuoka', venue:'Fukuoka Dome', cap:38000, rent:2000000, q:0.90, lat:33.457, lon:130.451 },
+
+  // Jižní Korea
+  { id:1092, region:'world', city:'Soul', venue:'Jamsil Olympic Stadium', cap:65000, rent:3500000, q:0.95, lat:37.515, lon:127.077 },
+  { id:1093, region:'world', city:'Busan', venue:'Busan Asiad Main Stadium', cap:53000, rent:2500000, q:0.92, lat:35.180, lon:129.072 },
+  { id:1094, region:'world', city:'Incheon', venue:'Incheon Munhak Stadium', cap:50000, rent:2300000, q:0.91, lat:37.451, lon:126.659 },
+
+  // Tchaj-wan
+  { id:1095, region:'world', city:'Taipei', venue:'Taipei Arena', cap:15000, rent:1200000, q:0.87, lat:25.051, lon:121.513 },
+  { id:1096, region:'world', city:'Kaohsiung', venue:'Kaohsiung National Stadium', cap:55000, rent:2500000, q:0.92, lat:22.611, lon:120.300 }, 
+
+
+  // Kazachstán
+  { id:1097, region:'world', city:'Almaty', venue:'Almaty Central Stadium', cap:23000, rent:1200000, q:0.88, lat:43.256, lon:76.928 },
+  { id:1098, region:'world', city:'Nur-Sultan', venue:'Astana Arena', cap:30000, rent:1500000, q:0.90, lat:51.096, lon:71.398 },
+
+  // Uzbekistán
+  { id:1099, region:'world', city:'Taškent', venue:'Bunyodkor Stadium', cap:35000, rent:1800000, q:0.91, lat:41.325, lon:69.264 },
+  { id:1100, region:'world', city:'Samarkand', venue:'Dinamo Stadium', cap:15000, rent:900000, q:0.85, lat:39.654, lon:66.959 },
+
+  // Kyrgyzstán
+  { id:1101, region:'world', city:'Biškek', venue:'Dolen Omurzakov Stadium', cap:23000, rent:1200000, q:0.87, lat:42.877, lon:74.590 },
+
+  // Tádžikistán
+  { id:1102, region:'world', city:'Dušanbe', venue:'Pamir Stadium', cap:20000, rent:1000000, q:0.85, lat:38.556, lon:68.787 },
+
+  // Turkmenistán
+  { id:1103, region:'world', city:'Ašchabad', venue:'Köpetdag Stadium', cap:26000, rent:1300000, q:0.88, lat:37.952, lon:58.383 },
+
+  // Indie
+  { id:1104, region:'world', city:'Delhi', venue:'Jawaharlal Nehru Stadium', cap:60000, rent:3000000, q:0.94, lat:28.564, lon:77.219 },
+  { id:1105, region:'world', city:'Mumbai', venue:'Wankhede Stadium', cap:33000, rent:1800000, q:0.91, lat:18.938, lon:72.825 },
+  { id:1106, region:'world', city:'Bengaluru', venue:'Sree Kanteerava Stadium', cap:25000, rent:1200000, q:0.89, lat:12.978, lon:77.592 },
+
+  // Nepál
+  { id:1107, region:'world', city:'Káthmándú', venue:'Dasarath Stadium', cap:15000, rent:900000, q:0.85, lat:27.717, lon:85.324 },
+
+  // Bhútán
+  { id:1108, region:'world', city:'Thimphu', venue:'Changlimithang Stadium', cap:15000, rent:800000, q:0.83, lat:27.472, lon:89.638 },
+
+  // Bangladéš
+  { id:1109, region:'world', city:'Dháka', venue:'Bangabandhu National Stadium', cap:36000, rent:1800000, q:0.90, lat:23.810, lon:90.412 },
+
+  // Srí Lanka
+  { id:1110, region:'world', city:'Colombo', venue:'Sugathadasa Stadium', cap:25000, rent:1200000, q:0.88, lat:6.927, lon:79.861 },
+
+  { id:1111, region:'world', city:'Chennai', venue:'Jawaharlal Nehru Stadium Chennai', cap:40000, rent:2000000, q:0.91, lat:13.082, lon:80.270 },
+  { id:1112, region:'world', city:'Kolkata', venue:'Salt Lake Stadium', cap:82000, rent:4000000, q:0.95, lat:22.572, lon:88.363 },
+  { id:1113, region:'world', city:'Hyderabad', venue:'G.M.C Balayogi Athletic Stadium', cap:30000, rent:1500000, q:0.89, lat:17.425, lon:78.456 },
+  { id:1114, region:'world', city:'Pune', venue:'Shree Shiv Chhatrapati Sports Complex', cap:25000, rent:1200000, q:0.87, lat:18.556, lon:73.843 },
+  { id:1115, region:'world', city:'Ahmedabad', venue:'Sardar Patel Stadium (Motera)', cap:110000, rent:5000000, q:0.96, lat:23.030, lon:72.525 },
+  { id:1116, region:'world', city:'Jaipur', venue:'Jawahar Lal Nehru Stadium Jaipur', cap:30000, rent:1500000, q:0.88, lat:26.919, lon:75.819 },
+  { id:1117, region:'world', city:'Lucknow', venue:'Babu Banarasi Das Indoor Stadium', cap:20000, rent:1000000, q:0.85, lat:26.846, lon:80.946 },
+  { id:1118, region:'world', city:'Kanpur', venue:'Green Park Stadium', cap:32000, rent:1600000, q:0.89, lat:26.449, lon:80.331 },
+  { id:1119, region:'world', city:'Bhopal', venue:'Tatya Tope Stadium', cap:22000, rent:1100000, q:0.86, lat:23.259, lon:77.412 },
+  { id:1120, region:'world', city:'Indore', venue:'Holkar Cricket Stadium', cap:30000, rent:1500000, q:0.88, lat:22.719, lon:75.857 },
+
+
+  // SAE
+  { id:1121, region:'world', city:'Abu Dhabi', venue:'Zayed Sports City Stadium', cap:43000, rent:2200000, q:0.92, lat:24.413, lon:54.474 },
+  { id:1122, region:'world', city:'Dubaj', venue:'Dubai International Stadium', cap:25000, rent:1500000, q:0.90, lat:25.269, lon:55.316 },
+
+  // Katar
+  { id:1123, region:'world', city:'Doha', venue:'Khalifa International Stadium', cap:40000, rent:2200000, q:0.91, lat:25.282, lon:51.534 },
+
+  // Izrael
+  { id:1124, region:'world', city:'Tel Aviv', venue:'Bloomfield Stadium', cap:30000, rent:1800000, q:0.89, lat:32.083, lon:34.781 },
+  { id:1125, region:'world', city:'Jerusalem', venue:'Teddy Stadium', cap:31000, rent:1800000, q:0.90, lat:31.777, lon:35.204 },
+
+  // Jordánsko
+  { id:1126, region:'world', city:'Amman', venue:'Amman International Stadium', cap:30000, rent:1700000, q:0.88, lat:31.946, lon:35.927 },
+
+  // Bahrajn
+  { id:1127, region:'world', city:'Manama', venue:'National Stadium Bahrain', cap:24000, rent:1400000, q:0.87, lat:26.217, lon:50.583 },
+
+  // Omán
+  { id:1128, region:'world', city:'Muscat', venue:'Sultan Qaboos Sports Complex', cap:25000, rent:1500000, q:0.88, lat:23.610, lon:58.529 },
+
+  // Kuvajt
+  { id:1129, region:'world', city:'Kuvajt City', venue:'Jaber Al-Ahmad International Stadium', cap:60000, rent:3000000, q:0.93, lat:29.347, lon:47.961 },
+
+  // Jihoafrická republika
+  { id:1130, region:'world', city:'Johannesburg', venue:'FNB Stadium (Soccer City)', cap:94000, rent:4000000, q:0.95, lat:-26.234, lon:28.982 },
+  { id:1131, region:'world', city:'Kapstadt', venue:'Cape Town Stadium', cap:55000, rent:2500000, q:0.92, lat:-33.903, lon:18.414 },
+
+  // Maroko
+  { id:1132, region:'world', city:'Casablanca', venue:'Stade Mohammed V', cap:45000, rent:2200000, q:0.91, lat:33.593, lon:-7.619 },
+  { id:1133, region:'world', city:'Rabat', venue:'Stade de Rabat', cap:35000, rent:1800000, q:0.89, lat:34.021, lon:-6.840 },
+
+  // Egypt
+  { id:1134, region:'world', city:'Káhira', venue:'Cairo International Stadium', cap:75000, rent:3500000, q:0.94, lat:30.013, lon:31.208 },
+  { id:1135, region:'world', city:'Alexandrie', venue:'Alexandria Stadium', cap:20000, rent:1200000, q:0.88, lat:31.200, lon:29.918 },
+
+  // Keňa
+  { id:1136, region:'world', city:'Nairobi', venue:'Moi International Sports Centre', cap:60000, rent:3000000, q:0.92, lat:-1.283, lon:36.817 },
+
+  // Senegal
+  { id:1137, region:'world', city:'Dakar', venue:'Stade Léopold Sédar Senghor', cap:50000, rent:2500000, q:0.90, lat:14.738, lon:-17.479 },
+
+  // Nigérie
+  { id:1138, region:'world', city:'Lagos', venue:'Teslim Balogun Stadium', cap:24000, rent:1400000, q:0.87, lat:6.521, lon:3.384 },
+
+
+  // Turecko
+  { id:1139, region:'world', city:'Istanbul', venue:'Atatürk Olympic Stadium', cap:76000, rent:4000000, q:0.95, lat:41.053, lon:28.974 },
+  { id:1140, region:'world', city:'Ankara', venue:'Eryaman Stadium', cap:20000, rent:1200000, q:0.89, lat:39.920, lon:32.854 },
+  { id:1141, region:'world', city:'Izmir', venue:'Stadyum İzmir', cap:35000, rent:1800000, q:0.91, lat:38.419, lon:27.128 },
+
+  // Gruzie
+  { id:1142, region:'world', city:'Tbilisi', venue:'Boris Paichadze Dinamo Arena', cap:55000, rent:2500000, q:0.92, lat:41.721, lon:44.805 },
+
+  // Ázerbájdžán
+  { id:1143, region:'world', city:'Baku', venue:'Baku Olympic Stadium', cap:69000, rent:3000000, q:0.94, lat:40.372, lon:49.853 },
+
+  // Arménie
+  { id:1144, region:'world', city:'Jerevan', venue:'Republican Stadium', cap:14000, rent:900000, q:0.87, lat:40.183, lon:44.510 },
+
+
+  { id:1145, region:'world', city:'Bursa', venue:'Bursa Büyükşehir Stadium', cap:45000, rent:2200000, q:0.91, lat:40.195, lon:29.061 },
+  { id:1146, region:'world', city:'Antalya', venue:'Antalya Stadium', cap:32000, rent:1800000, q:0.89, lat:36.907, lon:30.694 },
+  { id:1147, region:'world', city:'Konya', venue:'Konya Büyükşehir Stadium', cap:42000, rent:2100000, q:0.90, lat:37.874, lon:32.493 },
+  { id:1148, region:'world', city:'Gaziantep', venue:'Kamil Ocak Stadium', cap:35000, rent:1800000, q:0.88, lat:37.066, lon:37.383 },
+  { id:1149, region:'world', city:'Eskişehir', venue:'Eskişehir Stadium', cap:30000, rent:1600000, q:0.87, lat:39.776, lon:30.520 },
+  { id:1150, region:'world', city:'Trabzon', venue:'Şenol Güneş Stadium', cap:40000, rent:2000000, q:0.90, lat:41.005, lon:39.720 },
+  { id:1151, region:'world', city:'Adana', venue:'Adana Stadium', cap:33000, rent:1700000, q:0.88, lat:37.000, lon:35.321 },
+  { id:1152, region:'world', city:'Mersin', venue:'Mersin Stadium', cap:25000, rent:1500000, q:0.86, lat:36.812, lon:34.641 },
+  { id:1153, region:'world', city:'Kayseri', venue:'Kadir Has Stadium', cap:32000, rent:1700000, q:0.88, lat:38.731, lon:35.478 },
+  { id:1154, region:'world', city:'Samsun', venue:'Samsun 19 Mayıs Stadium', cap:33000, rent:1800000, q:0.87, lat:41.286, lon:36.331 },
+
+
+
+
+
+
   ];
 
   const LEVELS = [
