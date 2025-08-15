@@ -428,7 +428,7 @@ input[type="range"]{width:100%}
     state.date = new Date(state.date.getTime() + 24*3600*1000);
     // přirozený úbytek hype a malá obnova únavy
     state.hype = clamp(state.hype - 2,0,100);
-    state.fatigue = clamp(state.fatigue - 3,0,100);
+    state.fatigue = clamp(state.fatigue - 6,0,100);
     renderAll();
   }
 
