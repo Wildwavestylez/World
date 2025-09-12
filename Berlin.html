@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Úklid U/S-Bahn Berlin — prototyp</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+  :root{
+    --panel: rgba(10,12,18,0.85);
+    --accent: #ff7a1a;
+  }
+  html,body,#map { height:100%; margin:0; padding:0; font-family:Inter,Segoe UI,Roboto,Arial; background:#071029; color:#eee; }
+  #map { z-index:0; }
+
+  /* HUD / menu */
+  .hud {
+    position: absolute; left:12px; top:12px; z-index:1100;
+    background:var(--panel); padding:10px; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.6);
+    min-width:260px;
+  }
+  .title { font-weight:700; font-size:15px; margin-bottom:6px; display:flex; gap:8px; align-items:center; }
+  .small { font-size:12px; color:#ddd; opacity:.9; }
+  .burger { position:absolute; right:12px; top:12px; z-index:1200; }
+  .hambtn { width:46px; height:46px; border-radius:10px; background:var(--panel); display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 8px 30px rgba(0,0,0,.6); }
+  .menu { position:absolute; right:12px; top:64px; z-index:1200; background:var(--panel); padding:10px; border-radius:10px; display:none; min-width:320px; max-height:70vh; overflow:auto;}
+  .menu h3{ margin:0 0 8px 0; font-size:14px;}
+  .btn { background:linear-gradient(180deg,#ff8c3a,#ff6b00); color:white; border:none; padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:700; }
+  .btn.secondary { background:transparent; border:1px solid #333; color:#ddd; font-weight:600; }
+  .row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .list { max-height:240px; overflow:auto; padding:6px; background:rgba(255,255,255,0.03); border-radius:8px; }
+  .route-item { padding:8px; border-radius:6px; background:rgba(255,255,255,0.02); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .route-meta { font-size:12px; color:#ccc; }
+  footer.hint { position:absolute; left:12px; bottom:12px; z-index:1100; color:#ddd; opacity:.95; font-size:13px; background:var(--panel); padding:8px; border-radius:10px; }
+
+  /* small helpers */
+  .muted { color:#bbb; font-size:13px; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="hud">
+  <div class="title">🧽 Úklid U/S-Bahn Berlin — demo</div>
+  <div class="small">Zatím načítáme jen U-bahn a S-bahn. Klikni na "Načti linky".</div>
+  <div style="margin-top:8px;">
+    <div>Finance: <strong id="money">€ 1000</strong></div>
+    <div class="muted">Reputace: <span id="reputation">100</span></div>
+    <div class="muted">Zaměstnanci: <span id="empsCount">0</span></div>
+  </div>
+  <div style="margin-top:8px;" class="legend">
+    <div class="muted">Legenda: <span style="color:green">čistá</span> • <span style="color:orange">poloviční</span> • <span style="color:red">špinavá</span></div>
+  </div>
+</div>
+
+<div class="burger">
+  <div class="hambtn" id="hambtn" title="Menu">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h18M3 18h18" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <div class="menu" id="menu">
+    <h3>Dispečink</h3>
+
+    <div class="row">
+      <button class="btn" id="loadRoutesBtn">🛰️ Načti U/S-Bahn (Berlin)</button>
+      <button class="btn secondary" id="clearRoutesBtn">Vyčistit mapu</button>
+    </div>
+
+    <div style="margin-top:8px;">
+      <strong>Linky (demo omezeno):</strong>
+      <div class="list" id="routesList">
+        <div class="small">Stiskni "Načti linky" pro vypsání.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:8px;">
+      <div class="row">
+        <button class="btn" id="startPlayerBtn">▶️ Start hráč (jede linku)</button>
+        <button class="btn secondary" id="stopPlayerBtn">⏸️ Stop hráč</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="hireBtn">👷 Najmi zaměstnance (€200)</button>
+        <button class="btn secondary" id="assignBtn">🔁 Přiřaď první zaměstnance</button>
+      </div>
+    </div>
+
+    <div style="margin-top:8px;">
+      <div class="small">Tip: zaměstnance můžeš přiřadit ke konkrétní lince tlačítkem u linky.</div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.04);margin:8px 0;" />
+    <div class="small">Demo: travelTime = 10s, cleanTime = 10s. Tyto hodnoty lze upravit v kódu.</div>
+  </div>
+</div>
+
+<footer class="hint">Po spuštění: Načti linky → vyber linku nebo najmi zaměstnance → Start hráč. Currywurst až po testu 🌭</footer>
+
+<script>
+/*
+  Kompletní demo:
+  - Načítá pouze U-bahn (route=subway) a S-bahn (route=train + service=s-bahn) v Berlíně z Overpass API
+  - Vykreslí trasy (polyline) a zastávky (circleMarker)
+  - Hráč + zaměstnanci jezdí zastávka-po-zastávce, travelTime a cleanTime jsou demo 10s
+  - Zastávky se časem znečišťují (rychleji pro U/S)
+  - Funkce: najímat, přiřadit, start/stop hráče, manuální klik pro úklid
+*/
+
+/* ========== Konfigurace ========== */
+const MAX_RELATIONS = 70;        // kolik relations z Overpass vezmeme (demo)
+const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+const AREA_NAME = "Berlin";
+const TRAVEL_TIME_MS = 10 * 1000; // demo: 10s jízda mezi zastávkami
+const CLEAN_TIME_MS = 10 * 1000;  // demo: 10s čištění
+const START_MONEY = 1000;
+
+/* ========== Map a vrstvy ========== */
+const map = L.map('map').setView([52.5208, 13.4050], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM contributors' }).addTo(map);
+
+const routeLayerGroup = L.layerGroup().addTo(map);
+const stopsLayerGroup = L.layerGroup().addTo(map);
+const actorsLayerGroup = L.layerGroup().addTo(map);
+
+/* ========== App stát ========== */
+let appState = {
+  routes: [],        // {id, name, ref, type, stops[], polyline}
+  player: null,      // runner object or null
+  employees: [],     // runner objects
+  money: START_MONEY,
+  reputation: 100,
+  dirtyTimers: []
+};
+
+  
+const CLEAN_REWARD = 50; // odměna za úklid jedné zastávky
+
+function addMoney(amount) {
+  appState.money += amount;
+  document.getElementById("money").textContent = "€ " + Math.round(appState.money);
+}
+  
+/* ========== UI helper ========== */
+function updateHUD(){
+  document.getElementById('money').textContent = "€ " + Math.round(appState.money);
+  document.getElementById('reputation').textContent = Math.round(appState.reputation);
+  document.getElementById('empsCount').textContent = appState.employees.length;
+}
+updateHUD();
+
+/* ========== Utility ========== */
+function colorByClean(val){
+  if(val >= 70) return 'green';
+  if(val >= 35) return 'orange';
+  return 'red';
+}
+
+/* ========== Overpass dotaz - jen U a S Bahn ========== */
+async function fetchOverpassUS(){
+  // Query: relations route=subway (U-Bahn) and route=train with service=s-bahn (S-Bahn)
+  const q = `
+[out:json][timeout:60];
+area["name"="${AREA_NAME}"]["boundary"="administrative"]->.a;
+(
+  relation["route"="subway"](area.a);
+  relation["route"="train"]["service"="s-bahn"](area.a);
+);
+out body;
+>;
+out skel qt;
+`;
+  const res = await fetch(OVERPASS_URL, { method:'POST', body: q });
+  if(!res.ok) throw new Error('Overpass response error: ' + res.status);
+  const json = await res.json();
+  return json;
+}
+
+/* ========== Parsování Overpass výsledku do "routes" (zastávky + polyline) ========== */
+function buildRoutesFromOverpass(data){
+  // Clear previous
+  appState.routes = [];
+  routeLayerGroup.clearLayers();
+  stopsLayerGroup.clearLayers();
+  actorsLayerGroup.clearLayers();
+  appState.dirtyTimers.forEach(h => clearInterval(h));
+  appState.dirtyTimers = [];
+
+  const nodesMap = {};
+  for(const el of data.elements || []){
+    if(el.type === 'node') nodesMap[el.id] = el;
+  }
+
+  const relations = (data.elements || []).filter(e => e.type === 'relation');
+
+  // Filter and take first N relations with nodes
+  const good = [];
+  for(const r of relations){
+    if(good.length >= MAX_RELATIONS) break;
+    if(!r.members || r.members.length === 0) continue;
+    // accept relations which have node members (stops)
+    if(r.members.some(m => m.type === 'node')) good.push(r);
+  }
+
+  for(const rel of good){
+    // gather node members in order (role stop/platform/stop_position preferred)
+    const stopMembers = rel.members.filter(m => m.type === 'node' && /stop|platform|stop_position/i.test(m.role || ''));
+    const fallback = rel.members.filter(m => m.type === 'node');
+    const chosen = stopMembers.length ? stopMembers : fallback;
+
+    const stops = [];
+    for(const m of chosen){
+      const node = nodesMap[m.ref];
+      if(!node) continue;
+      stops.push({
+        id: node.id,
+        lat: node.lat,
+        lon: node.lon,
+        name: node.tags && node.tags.name ? node.tags.name : `stop ${node.id}`,
+        cleanliness: 40 + Math.random()*50, // start 40..90
+        marker: null,
+        cleaning: false
+      });
+    }
+
+    if(stops.length < 2) continue; // skip tiny relations
+
+    // create route object
+    const type = detectRouteType(rel.tags || {});
+    const route = {
+      id: rel.id,
+      ref: rel.tags && rel.tags.ref ? rel.tags.ref : (rel.tags && rel.tags.name ? rel.tags.name : 'r' + rel.id),
+      name: rel.tags && rel.tags.name ? rel.tags.name : `Route ${rel.id}`,
+      tags: rel.tags || {},
+      type,
+      stops,
+      polyCoords: stops.map(s => [s.lat, s.lon])
+    };
+    appState.routes.push(route);
+  }
+
+  // Draw
+  appState.routes.forEach(route => {
+    const color = (route.type === 'sbahn' || route.type === 'ubahn') ? '#ff4d4d' : '#44aaff';
+    L.polyline(route.polyCoords, { color, weight: 3, opacity: 0.8 }).addTo(routeLayerGroup).bindPopup(`<strong>${route.ref}</strong><br>${route.name}<br>type: ${route.type}`);
+
+    // stops
+    route.stops.forEach(s => {
+      const cm = L.circleMarker([s.lat, s.lon], { radius: 7, color: colorByClean(s.cleanliness), fillColor: colorByClean(s.cleanliness), fillOpacity: .95 }).addTo(stopsLayerGroup);
+      cm.bindTooltip(`${s.name}<br>Čistota: ${Math.round(s.cleanliness)}%`, { direction:'top' });
+      cm.on('click', ()=> {
+        startManualClean(s);
+      });
+      s.marker = cm;
+    });
+  });
+
+  // fit map
+  const allCoords = appState.routes.flatMap(r => r.polyCoords);
+  if(allCoords.length) map.fitBounds(allCoords, { padding:[40,40] });
+
+  // start dirtying system
+  setupDirtying();
+}
+
+/* detect route type from tags (simple heuristic) */
+function detectRouteType(tags){
+  if(!tags) return 'other';
+  const name = (tags.name || '') + ' ' + (tags.network || '') + ' ' + (tags.ref || '');
+  if(/S-Bahn|S Bahn|Sbahn|S-Bahn Berlin/i.test(name) || (tags.service && /s-bahn/i.test(tags.service))) return 'sbahn';
+  if(/U-Bahn|U Bahn|Ubahn|U-Bahn Berlin/i.test(name) || /subway/i.test(tags.route||'')) return 'ubahn';
+  // fallback by route tag
+  const rt = (tags.route || '').toLowerCase();
+  if(rt.includes('subway')) return 'ubahn';
+  if(rt.includes('rail')) return 'sbahn';
+  return 'other';
+}
+
+/* ========== Dirtying (time-based) ========== */
+function setupDirtying(){
+  // clear previous timers
+  appState.dirtyTimers.forEach(h => clearInterval(h));
+  appState.dirtyTimers = [];
+
+  // make a timer per route for demo
+  appState.routes.forEach(route => {
+    // speed factor: sbahn/ubahn -> faster
+    let speed = 1;
+    if(route.type === 'sbahn' || route.type === 'ubahn') speed = 1.4;
+    if(route.type === 'other') speed = 1.0;
+    const interval = 80 * 1000 / speed; // every X ms lower cleanliness slightly
+    const h = setInterval(()=> {
+      route.stops.forEach(s => {
+        if(s.cleaning) return;
+        s.cleanliness = Math.max(0, s.cleanliness - (0.5 + Math.random()*2.2) * (speed/1.1));
+        if(s.marker){
+          s.marker.setStyle({ color: colorByClean(s.cleanliness), fillColor: colorByClean(s.cleanliness) });
+          s.marker.setTooltipContent(`${s.name}<br>Čistota: ${Math.round(s.cleanliness)}%`);
+        }
+      });
+      // small reputation penalty if many very dirty stops
+      const allStops = appState.routes.flatMap(r => r.stops);
+      const veryDirty = allStops.filter(x => x.cleanliness < 20).length;
+      if(veryDirty > Math.max(4, allStops.length*0.12)) {
+        appState.reputation = Math.max(0, appState.reputation - 0.35);
+        updateHUD();
+      }
+    }, interval);
+    appState.dirtyTimers.push(h);
+  });
+}
+
+/* ========== Manual cleaning (click) ========== */
+function startManualClean(stop){
+  if(stop.cleaning) return;
+  stop.cleaning = true;
+  const prev = stop.cleanliness;
+  const start = Date.now();
+  const anim = setInterval(()=> {
+    const t = Math.min(1, (Date.now()-start) / CLEAN_TIME_MS);
+    stop.cleanliness = prev + (100 - prev) * t;
+    if(stop.marker){
+      stop.marker.setStyle({ color: colorByClean(stop.cleanliness), fillColor: colorByClean(stop.cleanliness) });
+      stop.marker.setTooltipContent(`${stop.name}<br>Čistota: ${Math.round(stop.cleanliness)}%`);
+    }
+    if(t >= 1){
+      clearInterval(anim);
+      stop.cleaning = false;
+    }
+  }, 250);
+}
+
+/* ========== Runner (player/employees) ========== */
+/* runner: { id, name, marker (moving icon), routeId, idx, active, nextTimer } */
+function createActorMarker(lat, lon, label){
+  const m = L.marker([lat, lon], {
+    title: label,
+    icon: L.divIcon({ className: 'actor-icon', html: `<div style="padding:6px;border-radius:8px;background:#111;color:#fff;font-weight:700;font-size:12px">${label}</div>` })
+  }).addTo(actorsLayerGroup);
+  return m;
+}
+
+function startRunner(runner, routeId, isPlayer = false){
+  const route = appState.routes.find(r => r.id === routeId);
+  if(!route) return;
+  runner.routeId = routeId;
+  runner.idx = runner.idx || 0;
+  runner.active = true;
+  runner.state = 'travel'; // travel | clean
+  if(!runner.marker){
+    const startStop = route.stops[runner.idx % route.stops.length];
+    runner.marker = createActorMarker(startStop.lat, startStop.lon, isPlayer ? 'YOU' : runner.name);
+  }
+
+  // runner move logic with smooth interpolation
+  function step(){
+  if(!runner.active) return;
+  const r = appState.routes.find(x => x.id === runner.routeId);
+  if(!r) { runner.active = false; return; }
+  const curIdx = runner.idx;
+  const curStop = r.stops[curIdx];
+
+  if(runner.state === 'travel'){
+    const targetLatLng = L.latLng(curStop.lat, curStop.lon);
+    const startLatLng = runner.marker.getLatLng();
+    const startTime = Date.now();
+    const duration = TRAVEL_TIME_MS;
+    const animId = setInterval(()=> {
+      const t = Math.min(1, (Date.now() - startTime) / duration);
+      const lat = startLatLng.lat + (targetLatLng.lat - startLatLng.lat) * t;
+      const lng = startLatLng.lng + (targetLatLng.lng - startLatLng.lng) * t;
+      runner.marker.setLatLng([lat, lng]);
+      if(t >= 1) clearInterval(animId);
+    }, 120);
+
+    runner.nextTimer = setTimeout(()=> {
+      runner.state = 'clean';
+      step();
+    }, duration + 50);
+
+  } else if(runner.state === 'clean'){
+    if(!curStop.cleaning){
+      curStop.cleaning = true;
+      const prev = curStop.cleanliness;
+      const start = Date.now();
+      const anim2 = setInterval(()=> {
+        const t = Math.min(1, (Date.now() - start) / CLEAN_TIME_MS);
+        curStop.cleanliness = prev + (100 - prev) * t;
+        if(curStop.marker){
+          curStop.marker.setStyle({ color: colorByClean(curStop.cleanliness), fillColor: colorByClean(curStop.cleanliness) });
+          curStop.marker.setTooltipContent(`${curStop.name}<br>Čistota: ${Math.round(curStop.cleanliness)}%`);
+        }
+        if(t >= 1){
+          clearInterval(anim2);
+          curStop.cleaning = false;
+          addMoney(CLEAN_REWARD); // 💰 odměna za úklid
+        }
+      }, 250);
+    }
+
+    runner.nextTimer = setTimeout(()=> {
+      if(runner.idx + 1 >= r.stops.length){
+        // jsme na konečné -> zastavit
+        runner.active = false;
+        console.log("Zastavil na konečné:", curStop.name);
+        // tady můžeš vyvolat UI pro nové instrukce
+      } else {
+        runner.idx++;
+        runner.state = 'travel';
+        step();
+      }
+    }, CLEAN_TIME_MS + 50);
+  }
+}
+
+function stopRunner(runner){
+  runner.active = false;
+  if(runner.nextTimer) clearTimeout(runner.nextTimer);
+  // remove marker?
+  if(runner.marker){
+    actorsLayerGroup.removeLayer(runner.marker);
+    runner.marker = null;
+  }
+}
+
+/* ========== UI handlers ========== */
+const menu = document.getElementById('menu');
+document.getElementById('hambtn').addEventListener('click', ()=> {
+  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+});
+
+document.getElementById('loadRoutesBtn').addEventListener('click', async ()=> {
+  routeLayerGroup.clearLayers();
+  stopsLayerGroup.clearLayers();
+  actorsLayerGroup.clearLayers();
+  document.getElementById('routesList').innerHTML = '<div class="small">Načítám… (může to chvíli trvat)</div>';
+  try {
+    const data = await fetchOverpassUS();
+    buildRoutesFromOverpass(data);
+    renderRoutesList();
+    alert('Hotovo: načteno ' + appState.routes.length + ' link(ek).');
+  } catch(e){
+    console.error(e);
+    alert('Chyba při načítání: ' + e.message);
+    document.getElementById('routesList').innerHTML = '<div class="small">Chyba při načítání.</div>';
+  }
+});
+
+document.getElementById('clearRoutesBtn').addEventListener('click', ()=> {
+  appState.routes = [];
+  routeLayerGroup.clearLayers();
+  stopsLayerGroup.clearLayers();
+  actorsLayerGroup.clearLayers();
+  document.getElementById('routesList').innerHTML = '<div class="small">Vyčištěno.</div>';
+});
+
+function renderRoutesList(){
+  const container = document.getElementById('routesList');
+  container.innerHTML = '';
+  if(appState.routes.length === 0){
+    container.innerHTML = '<div class="small">Žádné linky (stiskni "Načti linky").</div>';
+    return;
+  }
+  appState.routes.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'route-item';
+    div.innerHTML = `<div>
+      <div><strong>${r.ref}</strong> · <span class="route-meta">${r.name}</span></div>
+      <div class="route-meta">stops: ${r.stops.length} · type: ${r.type}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+      <button class="btn" data-id="${r.id}">Center</button>
+      <button class="btn secondary" data-assign="${r.id}">Přiřadit</button>
+    </div>`;
+    container.appendChild(div);
+
+    div.querySelector('[data-id]').addEventListener('click', ()=> {
+      if(r.polyCoords && r.polyCoords.length) map.fitBounds(r.polyCoords, { padding:[30,30] });
+    });
+    div.querySelector('[data-assign]').addEventListener('click', ()=> {
+      const emp = appState.employees.find(e => !e.routeId);
+      if(!emp){ alert('Žádný volný zaměstnanec — nejdřív najmi.'); return; }
+      startRunner(emp, r.id, false);
+      emp.routeId = r.id;
+      alert(`Zaměstnanec ${emp.name} přiřazen na ${r.ref}`);
+      updateHUD();
+    });
+  });
+}
+
+document.getElementById('startPlayerBtn').addEventListener('click', ()=> {
+  if(appState.routes.length === 0){ alert('Nejsou načtené žádné linky.'); return; }
+  // choose route with most stops by default
+  const route = appState.routes.reduce((a,b) => (b.stops.length > (a.stops.length||0) ? b : a), appState.routes[0]);
+  appState.player = appState.player || { id: 'player', name: 'Hráč' };
+  // stop previous marker if exists
+  if(appState.player.marker){ actorsLayerGroup.removeLayer(appState.player.marker); appState.player.marker = null; }
+  startRunner(appState.player, route.id, true);
+  alert(`Hráč jede ${route.ref} (${route.name}) — travel ${TRAVEL_TIME_MS/1000}s, clean ${CLEAN_TIME_MS/1000}s`);
+});
+
+document.getElementById('stopPlayerBtn').addEventListener('click', ()=> {
+  if(appState.player) stopRunner(appState.player);
+  appState.player = null;
+  alert('Hráč zastaven.');
+});
+
+document.getElementById('hireBtn').addEventListener('click', ()=> {
+  if(appState.money < 200) { alert('Nemáš dost peněz (€200).'); return; }
+  const id = Date.now();
+  const emp = { id: id, name: 'Emp#' + (appState.employees.length + 1), routeId: null, idx: 0, active:false, marker: null };
+  appState.employees.push(emp);
+  appState.money -= 200;
+  updateHUD();
+  renderEmployeeToast(emp.name + ' najat.');
+});
+
+document.getElementById('assignBtn').addEventListener('click', ()=> {
+  if(appState.employees.length === 0){ alert('Nejsou zaměstnanci — nejdřív najmi.'); return; }
+  if(appState.routes.length === 0){ alert('Nejsou linky.'); return; }
+  const emp = appState.employees[0];
+  const route = appState.routes[0];
+  startRunner(emp, route.id, false);
+  emp.routeId = route.id;
+  alert(`${emp.name} obsluhuje ${route.ref}`);
+  updateHUD();
+});
+
+function renderEmployeeToast(msg){
+  const f = document.querySelector('footer.hint');
+  const old = f.textContent;
+  f.textContent = msg;
+  setTimeout(()=> f.textContent = old, 2500);
+}
+
+/* ========== Autosave (localStorage jednoduché) ========== */
+setInterval(()=> {
+  try {
+    localStorage.setItem('cleanup_demo_state', JSON.stringify({
+      money: appState.money,
+      reputation: appState.reputation,
+      employees: appState.employees.map(e => ({id:e.id,name:e.name,routeId:e.routeId}))
+    }));
+  } catch(e){}
+}, 5000);
+
+/* ========== init ========== */
+updateHUD();
+
+/* ========== Notes for you ==========
+ - Pokud Overpass nevrací data (CORS/timeout), zkus dotaz znovu nebo jiný Overpass mirror.
+ - MAX_RELATIONS lze zvětšit (pozor na výkon).
+ - TRAVEL_TIME_MS / CLEAN_TIME_MS vylepši dle difficulty.
+ - Dál můžeme přidat: lepší ikony, plánovač tras, nastavení přestupů a priority.
+=================================== */
+
+</script>
+</body>
+</html>
