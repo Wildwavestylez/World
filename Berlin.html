@@ -1,362 +1,497 @@
 <!doctype html>
 
-<html lang="cs">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Berlínský Úklid MHD — Prototype</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <title>Berlin Cleaner Simulator — Prototype</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
-    html,body{height:100%;margin:0}
-    #map{height:100%;width:100%}
-    #hamburger{position:absolute;top:12px;left:12px;z-index:1200;background:#222;color:#fff;padding:8px;border-radius:6px;cursor:pointer}
-    #menu{position:absolute;top:52px;left:12px;z-index:1200;background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.2);display:none;min-width:220px}
-    #menu h3{margin:0 0 6px}
-    .panel{margin-bottom:8px}
-    .station-marker{width:12px;height:12px;border-radius:50%;border:2px solid #fff}
-    .status-red{background:#e74c3c}
-    .status-green{background:#2ecc71}
-    .status-yellow{background:#f1c40f}
-    #log{position:absolute;right:12px;top:12px;z-index:1200;background:rgba(255,255,255,0.95);padding:8px;border-radius:8px;max-width:320px;max-height:60vh;overflow:auto;display:none}
-    #controls{position:absolute;right:12px;bottom:12px;z-index:1200;background:#fff;padding:8px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,0.15)}
-    button{cursor:pointer}
+    html,body,#map { height:100%; margin:0; padding:0; }
+    .hamburger { position:absolute; left:10px; top:10px; z-index:1000; background:white;border-radius:6px;padding:8px;box-shadow:0 2px 6px rgba(0,0,0,.3); }
+    .panel{ position:absolute; left:10px; top:60px; z-index:1000; width:320px; max-height:86vh; overflow:auto; background:rgba(255,255,255,0.98); padding:12px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.25);} 
+    h3{ margin:6px 0; }
+    button,select{ font-size:14px; }
+    .station-popup{ min-width:220px }
+    .marker-label{ background:rgba(255,255,255,0.9); padding:4px 6px; border-radius:4px; font-weight:600; }
+    .employee-row{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div id="hamburger">☰</div>
-  <div id="menu">
-    <h3>Berlínský Úklid — Menu</h3>
-    <div class="panel">
-      <strong>Finance:</strong>
-      <div>Peněženka: <span id="money">€100</span></div>
+  <div class="hamburger">
+    <button id="togglePanel">☰ Menu</button>
+  </div>
+  <div id="panel" class="panel" style="display:none">
+    <h3>Berlin Cleaner Simulator (Prototype)</h3>
+    <div>
+      <label>Lines loaded: <span id="lineCount">0</span></label>
     </div>
-    <div class="panel">
-      <strong>Zaměstnanci</strong>
-      <div id="employees-list">(žádní)</div>
-      <button id="hire-btn">Najmout zaměstnance (€200)</button>
+    <hr/>
+    <div>
+      <label for="lineSelect">Pick a line to drive (player):</label>
+      <select id="lineSelect"><option value="">(loading...)</option></select>
+      <div style="margin-top:8px;">
+        <button id="startDrive">Start driving</button>
+        <button id="stopDrive" disabled>Stop</button>
+      </div>
     </div>
-    <div class="panel">
-      <strong>Trasy</strong>
-      <div>Vyber linku: <select id="route-select"></select></div>
-      <button id="drive-btn">Jít jako hráč</button>
-      <button id="assign-btn">Přiřadit zaměstnanci</button>
+    <hr/>
+    <div>
+      <h4>Employees</h4>
+      <div id="employeesList"></div>
+      <div style="margin-top:8px;">
+        <input id="employeeName" placeholder="Name (e.g. Erkan)" />
+        <select id="employeeLine"><option value="">Choose line</option></select>
+        <button id="hireBtn">Hire (2000€)</button>
+      </div>
     </div>
-    <div class="panel">
-      <button id="save-btn">Uložit hru</button>
-      <button id="load-btn">Načíst hru</button>
-      <button id="reset-btn">Reset (vymazat)</button>
+    <hr/>
+    <div>
+      <h4>Finances</h4>
+      <div>€ <span id="money">5000</span></div>
     </div>
-  </div>  <div id="log"></div>
-  <div id="controls">
-    <button id="toggle-log">Zobrazit log</button>
-  </div>  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>  <script>
-    // ======= Základní nastavení mapy =======
-    const map = L.map('map').setView([52.52,13.405], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+    <hr/>
+    <div>
+      <small>Prototype uses Overpass API to fetch U-Bahn, S-Bahn (approx) and tram route relations for Berlin. Some relations may be large — please be patient while loading.</small>
+    </div>
+  </div>  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>  <script>
+    // Berlin bbox center
+    const map = L.map('map').setView([52.5208,13.4050], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19 }).addTo(map);
 
-    // UI prvky
-    const hamburger = document.getElementById('hamburger');
-    const menu = document.getElementById('menu');
-    const moneyEl = document.getElementById('money');
-    const hireBtn = document.getElementById('hire-btn');
-    const employeesList = document.getElementById('employees-list');
-    const routeSelect = document.getElementById('route-select');
-    const driveBtn = document.getElementById('drive-btn');
-    const assignBtn = document.getElementById('assign-btn');
-    const logEl = document.getElementById('log');
-    const toggleLogBtn = document.getElementById('toggle-log');
-    const saveBtn = document.getElementById('save-btn');
-    const loadBtn = document.getElementById('load-btn');
-    const resetBtn = document.getElementById('reset-btn');
+    // UI
+    const panel = document.getElementById('panel');
+    document.getElementById('togglePanel').onclick = ()=> panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 
-    hamburger.onclick = () => { menu.style.display = menu.style.display === 'block' ? 'none' : 'block'; };
+    const lineSelect = document.getElementById('lineSelect');
+    const employeeLine = document.getElementById('employeeLine');
+    const startDriveBtn = document.getElementById('startDrive');
+    const stopDriveBtn = document.getElementById('stopDrive');
+    const lineCountSpan = document.getElementById('lineCount');
+    const employeesList = document.getElementById('employeesList');
+    const hireBtn = document.getElementById('hireBtn');
+    const employeeNameInput = document.getElementById('employeeName');
+    const moneySpan = document.getElementById('money');
 
-    toggleLogBtn.onclick = () => { logEl.style.display = logEl.style.display === 'block' ? 'none' : 'block'; };
+    let money = 5000;
+    function updateMoney(v){ money = v; moneySpan.textContent = Math.round(money); }
 
-    // ======= Herní stav =======
-    const GAME_STATE_KEY = 'berlin_cleaner_save_v1';
-    let state = {
-      money: 100,
-      stations: {}, // id -> {lat,lng,name,cleanPercent,lastClean}
-      routes: {}, // id -> {name,stops:[stationIds],polyline}
-      employees: [], // {id,name,routeId,posIndex,working}
-      player: {routeId:null,posIndex:0,driving:false}
-    };
+    // Data structures
+    const LINES = {}; // id -> {id,name,type,stops:[{id,lat,lng,name,cleanPercent,marker}] , polyline}
+    const EMPLOYEES = [];
+    let playerRunner = null;
 
-    function saveState(){ localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state)); log('Hra uložena'); }
-    function loadState(){
-      const s = localStorage.getItem(GAME_STATE_KEY);
-      if(s){ state = JSON.parse(s); applyStateToUI(); log('Hra načtena'); }
-      else log('Žádné uložené hry');
-    }
-    function resetState(){ localStorage.removeItem(GAME_STATE_KEY); location.reload(); }
+    // Helpers to create Overpass queries
+    function overpassQueryBerlin() {
+  const query = `
+    [out:json][timeout:60];
 
-    saveBtn.onclick = saveState; loadBtn.onclick = loadState; resetBtn.onclick = resetState;
+    // Berlin area
+    area["name"="Berlin"]["boundary"="administrative"]->.berlin;
 
-    function log(t){ const p = document.createElement('div'); p.textContent = '['+new Date().toLocaleTimeString()+'] '+t; logEl.prepend(p); }
+    // U-Bahn
+    relation(area.berlin)[route=subway]->.ubahn;
 
-    // ======= Overpass: načtení linek (relationy) a stanic =======
-    // Snažíme se stáhnout relationy pro U-Bahn, S-Bahn a tram v Berlíně.
-    // Pokud request selže / data nebudou použitelná, padneme na vestavěné zkušební trasy.
+    // Tram
+    relation(area.berlin)[route=tram]->.tram;
 
-    async function fetchOverpass(){
-      log('Stahuju data z Overpass API...');
-      // nejprve najdeme area id Berlín
-      const areaQ = `[out:json][timeout:25];area["name"~"Berlin|Berliner"]["admin_level"="4"]->.searchArea;`;
-      // poté relationy pro tram/subway/train (S-Bahn jako train nebo light_rail depends)
-      const query = `${areaQ}(
-        relation["route"="subway"](area.searchArea);
-        relation["route"="tram"](area.searchArea);
-        relation["route"="train"]["operator"~"S-Bahn|DB|S-Bahn Berlin"](area.searchArea);
-      );out body;>;out skel qt;`;
+    // S-Bahn
+    relation(area.berlin)[route=rail][network~"S-Bahn|S-Bahn Berlin|S Bahn"]->.sbahn;
 
-      try{
-        const res = await fetch('https://overpass-api.de/api/interpreter', {method:'POST',body:query});
-        const data = await res.json();
-        log('Overpass odpověděl, zpracovávám...');
-        return data;
-      }catch(e){
-        console.warn('Overpass fetch failed',e);
-        log('Chyba při stahování Overpass — použiji testovací data');
-        return null;
+    // všechny dohromady
+    (.ubahn;.tram;.sbahn;);
+    out body;
+    >;
+    out body qt;
+  `;
+
+  const url = 'https://overpass-api.de/api/interpreter';
+  return fetch(url, {
+    method: 'POST',
+    body: 'data=' + encodeURIComponent(query)
+  }).then(res => res.json());
+}
+
+// Použití
+(async () => {
+  try {
+    const osmData = await overpassQueryBerlin();
+    processOverpassResult(osmData);
+  } catch (e) {
+    console.error('Overpass error', e);
+    alert('Nepodařilo se načíst data z Overpass API.');
+  }
+})();
+    // Convert Overpass result (relations + nodes) into LINES structure
+    function processOverpassResult(osm){
+  // map of nodes
+  const nodes = {};
+  for(const el of osm.elements){
+    if(el.type === 'node') nodes[el.id] = el;
+  }
+
+  const relations = osm.elements.filter(e=>e.type==='relation');
+
+  for(const rel of relations){
+    const id = 'rel/' + rel.id;
+    const name = rel.tags && (rel.tags.ref ? (rel.tags.ref + (rel.tags.name ? ' — '+rel.tags.name : '')) : (rel.tags.name || id));
+    const routeType = rel.tags && rel.tags.route ? rel.tags.route : 'unknown';
+
+    // extract ordered stop nodes
+    const stops = [];
+    if(rel.members){
+      for(const m of rel.members){
+        if(m.type==='node' && (m.role==='stop' || m.role==='stop_entry' || m.role==='platform' || m.role==='') && nodes[m.ref]){
+          const n = nodes[m.ref];
+          stops.push({ 
+            id:n.id, 
+            lat:n.lat, 
+            lng:n.lon, 
+            name:n.tags && (n.tags.name || n.tags['local_ref'] || ('stop '+n.id)),
+            cleanPercent:0,  // start 0%
+            marker:null,
+            cleanElem:null,
+            dirtInterval:null
+          });
+        }
       }
     }
 
-    // Pomocná: fallback trasy (jednoduché ukázky se souřadnicemi)
-    const FALLBACK = {
-      routes:[
-        {id:'U5_demo',name:'U5 (demo)',stops:[
-          {id:'hönow',name:'Hönow',lat:52.5106,lng:13.6933},
-          {id:'koppenstr',name:'Koppenstraße',lat:52.5149,lng:13.7098},
-          {id:'alex',name:'Alexanderplatz',lat:52.5219,lng:13.4132}
-        ]},
-        {id:'S1_demo',name:'S1 (demo)',stops:[
-          {id:'s1_east',name:'S1 East',lat:52.5400,lng:13.4000},
-          {id:'s1_mid',name:'S1 Mid',lat:52.5200,lng:13.3889},
-          {id:'s1_west',name:'S1 West',lat:52.5000,lng:13.3500}
-        ]}
-      ]
-    };
+    // de-duplicate
+    const uniq = [];
+    const seen = new Set();
+    for(const s of stops){ if(!seen.has(s.id)){ seen.add(s.id); uniq.push(s); } }
 
-    // ======= Renderování stanic a tras =======
-    const stationMarkers = {};
-    const polylines = {};
-
-    function addStation(st){
-      const id = st.id;
-      if(state.stations[id]) return id;
-      state.stations[id] = {
-        id:id, name:st.name||('st-'+id), lat:st.lat, lng:st.lng,
-        cleanPercent:100, lastClean:Date.now()
-      };
-      const el = L.divIcon({className:'', html:`<div class="station-marker status-green" title="${state.stations[id].name}"></div>`});
-      const m = L.marker([st.lat,st.lng],{icon:el}).addTo(map);
-      m.on('click',()=> openCleaningPopup(id,m));
-      stationMarkers[id]=m;
-      return id;
+    if(uniq.length>1){
+      LINES[id] = { id, name, type:routeType, stops:uniq, raw:rel };
     }
+  }
 
-    function updateStationMarker(id){
-      const st = state.stations[id];
-      if(!st) return;
-      const el = stationMarkers[id].getElement();
-      if(el) {
-        if(st.cleanPercent>=80) el.className = 'station-marker status-green';
-        else if(st.cleanPercent>=40) el.className = 'station-marker status-yellow';
-        else el.className = 'station-marker status-red';
-        stationMarkers[id].bindTooltip(`${st.name} — ${Math.round(st.cleanPercent)}%`).openTooltip();
+  // draw lines and markers
+  for(const k in LINES){
+    const ln = LINES[k];
+    const latlngs = ln.stops.map(s=>[s.lat,s.lng]);
+    ln.polyline = L.polyline(latlngs,{ weight:3, opacity:0.6 }).addTo(map);
+
+    ln.stops.forEach((s,i)=>{
+      // vytvoření markeru s počáteční červenou
+      s.cleanPercent = 0;
+      const marker = L.circleMarker([s.lat,s.lng],{
+        radius:7, color:'red', fillColor:'red', fillOpacity:0.9
+      }).addTo(map);
+      marker.bindTooltip(`${s.name} — Čistota: ${s.cleanPercent} %`, { direction:'top' });
+      marker.on('click',()=> openStationPopup(ln.id,i));
+      s.marker = marker;
+
+      // start špinění
+      startDirt(s);
+    });
+  }
+
+  // aktualizace selectů a počtu linek
+  refreshLineSelects();
+  lineCountSpan.textContent = Object.keys(LINES).length;
+}
+  
+  // inicializace: všechny stanice začínají špinavé (0 %)
+function initStationsDirty() {
+  for (const lineId in LINES) {
+    const ln = LINES[lineId];
+    ln.stops.forEach(st => {
+      st.cleanPercent = 0;
+      updateMarkerColor(st);
+    });
+  }
+}
+
+    function refreshLineSelects(){
+      lineSelect.innerHTML = '<option value="">-- select line --</option>';
+      employeeLine.innerHTML = '<option value="">-- select line --</option>';
+      for(const id in LINES){
+        const opt = document.createElement('option'); opt.value = id; opt.textContent = LINES[id].name + ' ('+LINES[id].type+')';
+        lineSelect.appendChild(opt);
+        const opt2 = opt.cloneNode(true); employeeLine.appendChild(opt2);
       }
     }
 
-    function addRoute(r){
-      if(state.routes[r.id]) return;
-      const stops = [];
-      const latlngs = [];
-      r.stops.forEach(s => {
-        const sid = addStation(s);
-        stops.push(sid);
-        latlngs.push([s.lat,s.lng]);
-      });
-      state.routes[r.id] = {id:r.id,name:r.name,stops:stops};
-      const poly = L.polyline(latlngs,{weight:4,opacity:0.6}).addTo(map);
-      polylines[r.id]=poly;
-      const opt = document.createElement('option'); opt.value = r.id; opt.textContent = r.name; routeSelect.appendChild(opt);
+    // updateMarkerColor - rozšíříme o update textu v popupu
+function updateMarkerColor(st) {
+  // barva podle aktuální čistoty
+  const color = st.cleanPercent >= 75 ? 'green' 
+               : (st.cleanPercent >= 50 ? 'orange' : 'red');
+
+  st.marker.setStyle({ color: color, fillColor: color });
+
+  // tooltip na mapě
+  st.marker.bindTooltip(`${st.name} — Čistota: ${Math.round(st.cleanPercent)} %`, { permanent: false });
+
+  // pokud existuje popup element, aktualizujeme i tam
+  if (st.cleanElem) {
+    st.cleanElem.textContent = `Čistota: ${Math.round(st.cleanPercent)} %`;
+  }
+}
+
+// funkce na spuštění špinění
+function startDirt(st) {
+  if (st.dirtInterval) clearInterval(st.dirtInterval);
+
+  st.dirtInterval = setInterval(() => {
+    if (st.cleanPercent <= 0) {
+      st.cleanPercent = 0;
+      clearInterval(st.dirtInterval);
+      st.dirtInterval = null;
+      updateMarkerColor(st);
+      return;
     }
 
-    // ======= Cleaning popup (checkbox-based) =======
-    function openCleaningPopup(stationId, marker){
-      const st = state.stations[stationId];
-      const tasks = [
-        {key:'cig',label:'Zamést vajgly',time:2,reward:20},
-        {key:'bins',label:'Vysypat koše',time:3,reward:30},
-        {key:'bottles',label:'Posbírat lahve',time:1,reward:10},
-        {key:'graff',label:'Odstranit graffiti',time:5,reward:50,rand:true}
-      ];
-      let html = `<div style="min-width:220px"><strong>${st.name}</strong><br/><div style='margin-top:6px'>`;
-      tasks.forEach(t=>{
-        if(t.rand && Math.random()>0.5) return; // graffiti se neobjeví vždy
-        html += `<label><input type='checkbox' data-task='${t.key}'/> ${t.label} (${t.reward}€)</label><br/>`;
-      });
-      html += `<div style='margin-top:8px'><button id='clean-do'>Hotovo</button></div></div>`;
-      marker.bindPopup(html).openPopup();
+    // lineární ubývání: 100 % → 0 % za 10 minut (600 s)
+    const decayPerSecond = 100 / 600; 
+    st.cleanPercent -= decayPerSecond;
+    if (st.cleanPercent < 0) st.cleanPercent = 0;
 
-      setTimeout(()=>{
-        const btn = document.getElementById('clean-do');
-        if(!btn) return;
-        btn.onclick = ()=>{
-          // spočítat odškrtané
-          const ch = marker.getPopup().getElement().querySelectorAll('input[type=checkbox]');
-          let total=0, tasksCount=0;
-          ch.forEach(c=>{ if(c.checked){ tasksCount++; const t = tasks.find(tt=>tt.key===c.dataset.task); if(t) total+=t.reward; }});
-          // zvýšit čistotu a peníze
-          if(tasksCount>0){ state.stations[stationId].cleanPercent = Math.min(100, state.stations[stationId].cleanPercent + tasksCount*30);
-            state.stations[stationId].lastClean = Date.now();
-            state.money += total; moneyEl.textContent = '€'+Math.round(state.money);
-            updateStationMarker(stationId);
-            log(`Uklizena stanice ${st.name} (+€${total})`);
-          } else { log('Nic nebylo odkliknuto'); }
-          marker.closePopup();
-        };
-      },200);
+    updateMarkerColor(st); // aktualizuje barvu, tooltip i popup
+  }, 1000);
+}
+
+// popup se stavem
+function openStationPopup(lineId, stationIdx, actorName) {
+  const ln = LINES[lineId];
+  const st = ln.stops[stationIdx];
+
+  const content = document.createElement('div');
+  content.className = 'station-popup';
+
+  // Název stanice
+  const title = document.createElement('div');
+  title.innerHTML = `<strong>${st.name}</strong> (${ln.name})`;
+  content.appendChild(title);
+
+  // Čistota v popupu
+  const cleanDiv = document.createElement('div');
+  cleanDiv.style.marginTop = '4px';
+  st.cleanElem = cleanDiv; // reference pro aktualizaci
+  content.appendChild(cleanDiv);
+  updateMarkerColor(st);   // hned vyplní hodnotu
+
+  // Úkoly
+  const tasks = ['zamést vajgly','vysypat koše','posbírat láhve','otřít sedačky'];
+  const taskElems = [];
+  const list = document.createElement('div');
+  list.style.marginTop = '6px';
+  const taskCount = Math.max(1, Math.round((100 - st.cleanPercent)/20) + 1);
+  for (let i = 0; i < taskCount; i++) {
+    const div = document.createElement('div');
+    const cb = document.createElement('input'); cb.type = 'checkbox';
+    const lbl = document.createElement('label'); lbl.textContent = ' ' + tasks[i % tasks.length];
+    div.appendChild(cb); div.appendChild(lbl);
+    list.appendChild(div);
+    taskElems.push(cb);
+  }
+  content.appendChild(list);
+
+  // Tlačítko dokončení úklidu
+  const btn = document.createElement('button');
+  btn.textContent = 'Dokončit úklid';
+  btn.disabled = true;
+  btn.style.marginTop = '8px';
+  content.appendChild(btn);
+
+  // Aktivace tlačítka když jsou všechny checkboxy zaškrtnuté
+  taskElems.forEach(cb => cb.addEventListener('change', () => {
+    btn.disabled = !taskElems.every(c => c.checked);
+  }));
+
+  // Funkce po kliknutí
+  btn.onclick = () => {
+    st.cleanPercent = 100;
+    updateMarkerColor(st);
+    startDirt(st); // pustí progresivní špinění z 100 %
+    popup.remove();
+
+    if (actorName === 'PLAYER' && playerRunner) playerRunner.nextStation();
+  };
+
+  // Vytvoření popupu
+  const popup = L.popup({ maxWidth: 300 })
+    .setLatLng([st.lat, st.lng])
+    .setContent(content)
+    .openOn(map);
+}
+
+  
+  
+// úklid stanice
+function cleanStation(st) {
+  st.cleanPercent = 100;
+  updateMarkerColor(st);
+
+  // stopni starý interval (pokud běžel)
+  if (st.dirtInterval) {
+    clearInterval(st.dirtInterval);
+  }
+
+  // špinění z 100 → 0 za 10 minut (600 sekund)
+  let ticks = 600;
+  st.dirtInterval = setInterval(() => {
+    ticks--;
+    st.cleanPercent = Math.max(0, (ticks / 600) * 100);
+    updateMarkerColor(st);
+
+    if (ticks <= 0) {
+      clearInterval(st.dirtInterval);
+    }
+  }, 1000); // každou sekundu
+}
+    // Player runner: drives selected line, stops at each station and opens popup
+    class Runner{
+      constructor(lineId){ this.lineId=lineId; this.index=0; this.running=false; }
+      start(){ this.running=true; this.index=0; this.driveTo(this.index); }
+      stop(){ this.running=false; }
+      driveTo(idx){
+        const ln = LINES[this.lineId];
+        if(!ln) return;
+        const s = ln.stops[idx];
+        // pan map
+        map.panTo([s.lat,s.lng]);
+        // open popup and wait for player to finish (actorName PLAYER)
+        openStationPopup(this.lineId, idx, 'PLAYER');
+      }
+      nextStation(){
+        if(!this.running) return;
+        const ln = LINES[this.lineId];
+        this.index++;
+        if(this.index >= ln.stops.length){
+          // finished a full run
+          this.index = 0; // loop back
+          // pay bonus
+          updateMoney(money + 100);
+          alert('Hotovo! Dokončil jsi celé kolo linky ' + ln.name + '. Získal jsi 100€ bonus.');
+        }
+        this.driveTo(this.index);
+      }
     }
 
-    // ======= Employees (simple AI) =======
-    function hireEmployee(){
-      if(state.money < 200){ log('Nemáš dost peněz na najmout zaměstnance'); return; }
-      state.money -= 200; moneyEl.textContent = '€'+Math.round(state.money);
-      const id = 'emp_'+Date.now();
-      const emp = {id:id,name:'Zaměstnanec '+(state.employees.length+1),routeId:null,posIndex:0,working:false};
-      state.employees.push(emp);
-      renderEmployees();
-      log('Najat '+emp.name);
-    }
-    hireBtn.onclick = hireEmployee;
+    // Employees AI
+    // helper: vybere random jinou linku než current
+function pickRandomLine(currentId) {
+  const keys = Object.keys(LINES).filter(id => id !== currentId);
+  if (keys.length === 0) return currentId; // fallback: zůstane stejná linka
+  return keys[Math.floor(Math.random() * keys.length)];
+}
 
+class Employee {
+  constructor(name, lineId) {
+    this.name = name;
+    this.lineId = lineId;
+    this.index = 0;
+    this.hiredAt = Date.now();
+    this.marker = null;
+    this.active = true;
+    this.speedFactor = 1 + Math.random() * 0.5;
+  }
+
+  start() { this.step(); }
+
+  step() {
+    if (!this.active) return;
+    const ln = LINES[this.lineId];
+    if (!ln || !ln.stops || ln.stops.length === 0) return;
+
+    const st = ln.stops[this.index];
+
+    // ensure marker
+    if (!this.marker) {
+      this.marker = L.marker([st.lat, st.lng], { title: this.name }).addTo(map);
+    }
+
+    // pevný čas na úklid (10s)
+    const taskTime = 10000;
+
+    this.marker.bindTooltip(
+  this.name + ' — uklízí ' + (st.name || 'neznámou stanici'),
+  { permanent: false }
+).openTooltip();
+    setTimeout(() => {
+      if (!this.active) return;
+
+      // complete tasks
+      st.cleanPercent = Math.min(100, st.cleanPercent + 100);
+      // spustit progresivní špinění
+      startDirt(st);
+
+      updateMarkerColor(st);
+      updateMoney(money + 56);
+
+      // posun indexu
+      this.index++;
+
+      // dojeli jsme konec linky?
+      if (this.index >= ln.stops.length) {
+        // vyber novou linku
+        const newLineId = pickRandomLine(this.lineId);
+        this.lineId = newLineId;
+        this.index = 0;
+        console.log(this.name + " mění trasu na " + LINES[newLineId].name);
+      }
+
+      // přesun na další zastávku (10s delay)
+      const nextLn = LINES[this.lineId];
+      const next = nextLn.stops[this.index];
+      const travelTime = 10000;
+
+      setTimeout(() => {
+        if (!this.active) return;
+        this.marker.setLatLng([next.lat, next.lng]);
+        this.step();
+      }, travelTime);
+
+    }, taskTime);
+  }
+
+  stop() { this.active = false; if (this.marker) map.removeLayer(this.marker); }
+}
     function renderEmployees(){
-      if(state.employees.length===0) employeesList.textContent = '(žádní)';
-      else{
-        employeesList.innerHTML = '';
-        state.employees.forEach(e=>{
-          const d = document.createElement('div');
-          d.textContent = `${e.name} — ${e.routeId || '(bez trasy)'}`;
-          employeesList.appendChild(d);
-        });
+      employeesList.innerHTML='';
+      for(const e of EMPLOYEES){
+        const div = document.createElement('div'); div.className='employee-row';
+        div.innerHTML = `<div style="flex:1"><strong>${e.name}</strong><br/><small>${LINES[e.lineId] ? LINES[e.lineId].name : '—'}</small></div>`;
+        const btn = document.createElement('button'); btn.textContent='Stop'; btn.onclick = ()=>{ e.stop(); renderEmployees(); };
+        div.appendChild(btn);
+        employeesList.appendChild(div);
       }
     }
 
-    assignBtn.onclick = ()=>{
-      const rid = routeSelect.value; if(!rid){ log('Vyber trasu'); return; }
-      if(state.employees.length===0){ log('Nemáš zaměstnance'); return; }
-      const emp = state.employees[0]; // jednoduchě přiřadíme 1. zaměstnance
-      emp.routeId = rid; emp.posIndex = 0; emp.working = true;
-      renderEmployees(); log(`Přiřazena trasa ${state.routes[rid].name} zaměstnanci ${emp.name}`);
-    };
-
-    // Player drive
-    driveBtn.onclick = ()=>{
-      const rid = routeSelect.value; if(!rid){ log('Vyber trasu'); return; }
-      state.player.routeId = rid; state.player.posIndex = 0; state.player.driving = true; log('Hraješ trasu '+state.routes[rid].name);
-      playerStep();
-    };
-
-    // Movement loops
-    function playerStep(){
-      if(!state.player.driving) return;
-      const route = state.routes[state.player.routeId];
-      if(!route) return;
-      const idx = state.player.posIndex;
-      const stationId = route.stops[idx];
-      const marker = stationMarkers[stationId];
-      map.panTo([state.stations[stationId].lat,state.stations[stationId].lng]);
-      openCleaningPopup(stationId, marker);
-      state.player.posIndex = (idx+1) % route.stops.length;
-      // čekej krátce než jede dál (simulace času)
-      setTimeout(()=>{
-        if(state.player.driving) playerStep();
-      }, 3000);
+    hireBtn.onclick = ()=>{
+      const name = employeeNameInput.value.trim() || ('E'+(EMPLOYEES.length+1));
+      const lineId = employeeLine.value;
+      if(!lineId){ alert('Vyber linku pro zaměstnance'); return; }
+      if(money < 2000){ alert('Nemáš dost peněz (2000€ potřeba)'); return; }
+      updateMoney(money - 2000);
+      const emp = new Employee(name,lineId);
+      EMPLOYEES.push(emp);
+      emp.start();
+      renderEmployees();
     }
 
-    function employeesStep(){
-      state.employees.forEach(emp=>{
-        if(!emp.working || !emp.routeId) return;
-        const route = state.routes[emp.routeId];
-        if(!route) return;
-        const idx = emp.posIndex;
-        const stationId = route.stops[idx];
-        // zaměstnanec odkliká automaticky některé úkoly (50-100%)
-        const st = state.stations[stationId];
-        const chance = Math.random();
-        const cleaned = (chance>0.4) ? 60 : 30; // jednoduchost
-        st.cleanPercent = Math.min(100, st.cleanPercent + cleaned);
-        st.lastClean = Date.now();
-        updateStationMarker(stationId);
-        log(`${emp.name} uklidil ${state.stations[stationId].name} (${Math.round(st.cleanPercent)}%)`);
-        emp.posIndex = (idx+1) % route.stops.length;
-      });
+    // Start/stop player
+    startDriveBtn.onclick = ()=>{
+      const id = lineSelect.value; if(!id) { alert('Vyber linku'); return; }
+      if(!LINES[id]){ alert('Linka ještě není načtena'); return; }
+      if(playerRunner){ playerRunner.stop(); playerRunner=null; }
+      playerRunner = new Runner(id);
+      playerRunner.start();
+      startDriveBtn.disabled = true; stopDriveBtn.disabled = false;
     }
+    stopDriveBtn.onclick = ()=>{ if(playerRunner){ playerRunner.stop(); playerRunner=null; } startDriveBtn.disabled=false; stopDriveBtn.disabled=true; }
 
-    // Clean decay: stanice se postupně zašpiní
-    function decayLoop(){
-      const now = Date.now();
-      Object.values(state.stations).forEach(st=>{
-        const mins = (now - st.lastClean)/1000/60;
-        // každých 20 min ztrácí např. 40%
-        const decay = Math.floor(mins/20)*40;
-        const newp = Math.max(0, Math.round(100 - decay));
-        if(newp !== st.cleanPercent){ st.cleanPercent = newp; updateStationMarker(st.id); }
-      });
-    }
-
-    // Periodické ticky
-    setInterval(()=>{ employeesStep(); saveState(); }, 1000*20); // zaměstnanci jedou co 20s
-    setInterval(()=>{ decayLoop(); }, 1000*10);
-
-    // ======= Inicializace: stáhni Overpass a vykresli =======
+    // initial fetch
     (async ()=>{
-      const data = await fetchOverpass();
-      if(!data){ // fallback
-        FALLBACK.routes.forEach(r=> addRoute(r));
-        renderEmployees();
-        saveState();
-        return;
-      }
-      // Pokusíme se z dat extrahovat relationy se seznamy node souřadnic
-      // Overpass returns elements - nodes, ways, relations. We'll build node map.
-      const nodes = {};
-      (data.elements||[]).forEach(el=>{ if(el.type==='node') nodes[el.id] = el; });
-      const relations = (data.elements||[]).filter(e=>e.type==='relation');
-      if(relations.length===0){ FALLBACK.routes.forEach(r=> addRoute(r)); renderEmployees(); saveState(); return; }
-
-      // Create simple routes from relations that have 'members' of type 'node' or 'way' with role 'stop' or 'platform'
-      let created = 0;
-      relations.forEach(rel=>{
-        try{
-          const name = rel.tags && (rel.tags.ref || rel.tags.name) || ('route_'+rel.id);
-          const stops = [];
-          if(rel.members){
-            rel.members.forEach(m=>{
-              if(m.type==='node' && nodes[m.ref]){
-                const n = nodes[m.ref];
-                stops.push({id:'n'+n.id,name: n.tags && (n.tags.name||n.tags.ref) || 'st-'+n.id, lat:n.lat, lng:n.lon});
-              }
-            });
-          }
-          if(stops.length>=2){ addRoute({id:'r'+rel.id,name:name,stops:stops}); created++; }
-        }catch(e){ console.warn('rel parse err',e); }
-      });
-
-      if(created===0){ FALLBACK.routes.forEach(r=> addRoute(r)); }
-      renderEmployees(); saveState();
+      try{
+        const res = await overpassQuery(multiQuery);
+        processOverpassResult(res);
+      }catch(e){ console.error('Overpass error', e); alert('Nepovedlo se načíst data z Overpass API — zkuste znovu nebo pomaleji (API může být zahlceno).'); }
     })();
 
-    // Try autoload saved state on start
-    (function tryLoad(){ const s = localStorage.getItem(GAME_STATE_KEY); if(s) { loadState(); } })();
-
-    // Make sure markers update periodically
-    setInterval(()=>{ Object.keys(stationMarkers).forEach(updateStationMarker); },3000);
-
-    // expose for debugging
-    window.__game_state = state;
   </script></body>
 </html>
