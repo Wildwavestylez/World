@@ -87,7 +87,7 @@
   const query = `
   [out:json][timeout:90];
 
-  // NRW area
+  // celá NRW oblast
   area["name"="Nordrhein-Westfalen"]["boundary"="administrative"]->.nrw;
 
   // U-Bahn
@@ -99,21 +99,17 @@
   // S-Bahn
   relation(area.nrw)[route=rail][network~"S-Bahn"]->.sbahn;
 
-  // Regionální vlaky (service=regional nebo commuter)
-  relation(area.nrw)[route=rail][service~"regional|commuter"]->.regional1;
-
-  // Regionální vlaky RB/RE podle ref
-  relation(area.nrw)[route=rail][ref~"^(RB|RE)"]->.regional2;
-
-  // Regionální vlaky DB Regio (někdy tagují přes network)
-  relation(area.nrw)[route=rail][network~"DB Regio"]->.regional3;
+  // Regionální vlaky (RB/RE)
+  relation(area.nrw)[route=rail][ref~"^(RB|RE)"]->.regional;
 
   // všechny dohromady
-  (.ubahn;.tram;.sbahn;.regional1;.regional2;.regional3;);
+  (.ubahn;.tram;.sbahn;.regional;);
   out body;
   >;
   out body qt;
 `;
+
+
   const url = 'https://overpass-api.de/api/interpreter';
   return fetch(url, {
     method: 'POST',
