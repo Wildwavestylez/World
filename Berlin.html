@@ -83,118 +83,107 @@
     let playerRunner = null;
 
     // Helpers to create Overpass queries
-    function overpassQueryBerlin() {
-  const query = `
+    function overpassQuery(q){
+      const url = 'https://overpass-api.de/api/interpreter';
+      return fetch(url, { method:'POST', body: 'data='+encodeURIComponent(q) }).then(r=>r.json());
+    }
+
+    // Build area id for Berlin
+    const areaQuery = 'area[name="Berlin"];';
+
+    // We'll fetch route relations: subway (U-Bahn), tram, and rail with network containing "S-Bahn"
+    const multiQuery = `
 [out:json][timeout:90];
 
-// oblasti: Praha, Středočeský kraj, Jihočeský kraj
-area["name"="Praha"]["boundary"="administrative"]->.praha;
-area["name"="Středočeský kraj"]["boundary"="administrative"]->.stredocesky;
-area["name"="Jihočeský kraj"]["boundary"="administrative"]->.jihocesky;
+// Definujeme oblast NRW
+area["name"="Nordrhein-Westfalen"]["boundary"="administrative"]->.searchArea;
 
-// Slučíme oblasti do jedné množiny
-(.praha;.stredocesky;.jihocesky;)->.region;
+// U-Bahn
+(
+  relation[route=subway](area.searchArea);
+)->.ubahn;
 
-// načti relace vlakových tratí v této oblasti
-// použijeme route=rail a případně ref tag pro regionální/vlaky
-relation(area.region)[route=rail][network~".*"]->.rail_rels;
+// Tramvaje
+(
+  relation[route=tram](area.searchArea);
+)->.tram;
 
-// případně filtrovat podle ref, pokud chceš jen určité typy
-// relation(area.region)[route=rail][ref~"^(R|Os|Sp|GW)"]->.regional; // ukázka, uprav podle značek v ČR
+// S-Bahn (všechny sítě, které obsahují "S-Bahn")
+(
+  relation[route=train][network~"S-Bahn"](area.searchArea);
+)->.sbahn;
 
-(.rail_rels;);
+// Regionální vlaky RE a RB
+(
+  relation[route=train][ref~"^RE|^RB"](area.searchArea);
+)->.regional;
+
+// Sloučíme vše dohromady
+(.ubahn;.tram;.sbahn;.regional;);
 out body;
 >;
 out body qt;
 `;
-
-  const url = 'https://overpass-api.de/api/interpreter';
-  return fetch(url, {
-    method: 'POST',
-    body: 'data=' + encodeURIComponent(query)
-  }).then(res => res.json());
-}
-
-// Použití
-(async () => {
-  try {
-    const osmData = await overpassQueryBerlin();
-    processOverpassResult(osmData);
-  } catch (e) {
-    console.error('Overpass error', e);
-    alert('Nepodařilo se načíst data z Overpass API.');
-  }
-})();
-    // Convert Overpass result (relations + nodes) into LINES structure
+  // Convert Overpass result (relations + nodes) into LINES structure
     function processOverpassResult(osm){
-  // map of nodes
-  const nodes = {};
-  for(const el of osm.elements){
-    if(el.type === 'node') nodes[el.id] = el;
-  }
-
-  const relations = osm.elements.filter(e=>e.type==='relation');
-
-  for(const rel of relations){
-    const id = 'rel/' + rel.id;
-    const name = rel.tags && (rel.tags.ref ? (rel.tags.ref + (rel.tags.name ? ' — '+rel.tags.name : '')) : (rel.tags.name || id));
-    const routeType = rel.tags && rel.tags.route ? rel.tags.route : 'unknown';
-
-    // extract ordered stop nodes
-    const stops = [];
-    if(rel.members){
-      for(const m of rel.members){
-        if(m.type==='node' && (m.role==='stop' || m.role==='stop_entry' || m.role==='platform' || m.role==='') && nodes[m.ref]){
-          const n = nodes[m.ref];
-          stops.push({ 
-            id:n.id, 
-            lat:n.lat, 
-            lng:n.lon, 
-            name:n.tags && (n.tags.name || n.tags['local_ref'] || ('stop '+n.id)),
-            cleanPercent:0,  // start 0%
-            marker:null,
-            cleanElem:null,
-            dirtInterval:null
-          });
+      // Build map of nodes
+      const nodes = {};
+      for(const el of osm.elements){
+        if(el.type === 'node') nodes[el.id] = el;
+      }
+      const relations = osm.elements.filter(e=>e.type==='relation');
+      for(const rel of relations){
+        const id = 'rel/'+rel.id;
+        const name = rel.tags && (rel.tags.ref ? (rel.tags.ref + (rel.tags.name ? ' — '+rel.tags.name : '')) : (rel.tags.name||id));
+        const routeType = rel.tags && rel.tags.route ? rel.tags.route : 'unknown';
+        // extract ordered stop nodes from members
+        const stops = [];
+        if(rel.members){
+          for(const m of rel.members){
+            if(m.type==='node' && (m.role==='stop' || m.role==='stop_entry' || m.role==='platform' || m.role==='') && nodes[m.ref]){
+              const n = nodes[m.ref];
+              stops.push({ id: n.id, lat:n.lat, lng:n.lon, name: n.tags && (n.tags.name || n.tags['local_ref'] || ('stop '+n.id)), cleanPercent: Math.floor(Math.random()*40)+60 });
+            }
+          }
+        }
+        // de-duplicate and keep order
+        const uniq = [];
+        const seen = new Set();
+        for(const s of stops){ if(!seen.has(s.id)){ seen.add(s.id); uniq.push(s); } }
+        if(uniq.length>1){
+          LINES[id] = { id, name, type:routeType, stops:uniq, raw:rel };
         }
       }
+      // Draw lines and markers
+      let idx = 0;
+      for(const k in LINES){
+        const ln = LINES[k];
+        const latlngs = ln.stops.map(s=>[s.lat,s.lng]);
+        ln.polyline = L.polyline(latlngs,{ weight:3, opacity:0.6 }).addTo(map);
+        ln.stops.forEach((s,i)=>{
+  // na startu 0 % a červená
+  s.cleanPercent = 0;
+
+  const marker = L.circleMarker([s.lat,s.lng],{ 
+    radius:7, 
+    color:'red', 
+    fillColor:'red', 
+    fillOpacity:0.9 
+  }).addTo(map);
+
+  marker.bindTooltip(`${s.name} — Čistota: ${s.cleanPercent} %`,{direction:'top'});
+  marker.on('click',()=> openStationPopup(ln.id,i));
+  s.marker = marker;
+
+  // spustíme špinění timer (už od nuly to nepojede dolů, ale jen udrží systém konzistentní)
+  startDirt(s);
+});
+        idx++;
+      }
+      // Populate UI selects
+      refreshLineSelects();
+      lineCountSpan.textContent = Object.keys(LINES).length;
     }
-
-    // de-duplicate
-    const uniq = [];
-    const seen = new Set();
-    for(const s of stops){ if(!seen.has(s.id)){ seen.add(s.id); uniq.push(s); } }
-
-    if(uniq.length>1){
-      LINES[id] = { id, name, type:routeType, stops:uniq, raw:rel };
-    }
-  }
-
-  // draw lines and markers
-  for(const k in LINES){
-    const ln = LINES[k];
-    const latlngs = ln.stops.map(s=>[s.lat,s.lng]);
-    ln.polyline = L.polyline(latlngs,{ weight:3, opacity:0.6 }).addTo(map);
-
-    ln.stops.forEach((s,i)=>{
-      // vytvoření markeru s počáteční červenou
-      s.cleanPercent = 0;
-      const marker = L.circleMarker([s.lat,s.lng],{
-        radius:7, color:'red', fillColor:'red', fillOpacity:0.9
-      }).addTo(map);
-      marker.bindTooltip(`${s.name} — Čistota: ${s.cleanPercent} %`, { direction:'top' });
-      marker.on('click',()=> openStationPopup(ln.id,i));
-      s.marker = marker;
-
-      // start špinění
-      startDirt(s);
-    });
-  }
-
-  // aktualizace selectů a počtu linek
-  refreshLineSelects();
-  lineCountSpan.textContent = Object.keys(LINES).length;
-}
   
   // inicializace: všechny stanice začínají špinavé (0 %)
 function initStationsDirty() {
@@ -219,16 +208,14 @@ function initStationsDirty() {
 
     // updateMarkerColor - rozšíříme o update textu v popupu
 function updateMarkerColor(st) {
-  // barva podle aktuální čistoty
   const color = st.cleanPercent >= 75 ? 'green' 
                : (st.cleanPercent >= 50 ? 'orange' : 'red');
-
   st.marker.setStyle({ color: color, fillColor: color });
 
   // tooltip na mapě
   st.marker.bindTooltip(`${st.name} — Čistota: ${Math.round(st.cleanPercent)} %`, { permanent: false });
 
-  // pokud existuje popup element, aktualizujeme i tam
+  // pokud má popup element, aktualizujeme i tam
   if (st.cleanElem) {
     st.cleanElem.textContent = `Čistota: ${Math.round(st.cleanPercent)} %`;
   }
@@ -237,22 +224,13 @@ function updateMarkerColor(st) {
 // funkce na spuštění špinění
 function startDirt(st) {
   if (st.dirtInterval) clearInterval(st.dirtInterval);
-
   st.dirtInterval = setInterval(() => {
+    st.cleanPercent -= 100 / 600; // každou sekundu -0.166 %
     if (st.cleanPercent <= 0) {
       st.cleanPercent = 0;
       clearInterval(st.dirtInterval);
-      st.dirtInterval = null;
-      updateMarkerColor(st);
-      return;
     }
-
-    // lineární ubývání: 100 % → 0 % za 10 minut (600 s)
-    const decayPerSecond = 100 / 6000; 
-    st.cleanPercent -= decayPerSecond;
-    if (st.cleanPercent < 0) st.cleanPercent = 0;
-
-    updateMarkerColor(st); // aktualizuje barvu, tooltip i popup
+    updateMarkerColor(st);
   }, 1000);
 }
 
@@ -264,62 +242,58 @@ function openStationPopup(lineId, stationIdx, actorName) {
   const content = document.createElement('div');
   content.className = 'station-popup';
 
-  // Název stanice
   const title = document.createElement('div');
   title.innerHTML = `<strong>${st.name}</strong> (${ln.name})`;
   content.appendChild(title);
 
-  // Čistota v popupu
+  // ✅ ukázka čistoty v popupu
   const cleanDiv = document.createElement('div');
   cleanDiv.style.marginTop = '4px';
-  st.cleanElem = cleanDiv; // reference pro aktualizaci
+  st.cleanElem = cleanDiv; // uložíme referenci
   content.appendChild(cleanDiv);
-  updateMarkerColor(st);   // hned vyplní hodnotu
+  updateMarkerColor(st);   // hned vyplníme hodnotu
 
-  // Úkoly
+  // úkoly
   const tasks = ['zamést vajgly','vysypat koše','posbírat láhve','otřít sedačky'];
   const taskElems = [];
-  const list = document.createElement('div');
-  list.style.marginTop = '6px';
-  const taskCount = Math.max(1, Math.round((100 - st.cleanPercent)/20) + 1);
-  for (let i = 0; i < taskCount; i++) {
+  const list = document.createElement('div'); list.style.marginTop='6px';
+
+  const taskCount = Math.max(1, Math.round((100-st.cleanPercent)/20)+1);
+  for (let i=0; i<taskCount; i++) {
     const div = document.createElement('div');
-    const cb = document.createElement('input'); cb.type = 'checkbox';
-    const lbl = document.createElement('label'); lbl.textContent = ' ' + tasks[i % tasks.length];
+    const cb = document.createElement('input'); cb.type='checkbox';
+    const lbl = document.createElement('label'); lbl.textContent = ' ' + tasks[i%tasks.length];
     div.appendChild(cb); div.appendChild(lbl);
     list.appendChild(div);
     taskElems.push(cb);
   }
   content.appendChild(list);
 
-  // Tlačítko dokončení úklidu
   const btn = document.createElement('button');
   btn.textContent = 'Dokončit úklid';
   btn.disabled = true;
   btn.style.marginTop = '8px';
   content.appendChild(btn);
 
-  // Aktivace tlačítka když jsou všechny checkboxy zaškrtnuté
-  taskElems.forEach(cb => cb.addEventListener('change', () => {
-    btn.disabled = !taskElems.every(c => c.checked);
+  taskElems.forEach(cb => cb.addEventListener('change',()=>{
+    btn.disabled = !taskElems.every(c=>c.checked);
   }));
 
-  // Funkce po kliknutí
-  btn.onclick = () => {
+  btn.onclick = ()=>{
     st.cleanPercent = 100;
     updateMarkerColor(st);
-    startDirt(st); // pustí progresivní špinění z 100 %
+    startDirt(st); // pustí nové špinění
     popup.remove();
 
-    if (actorName === 'PLAYER' && playerRunner) playerRunner.nextStation();
+    if(actorName === 'PLAYER' && playerRunner) playerRunner.nextStation();
   };
 
-  // Vytvoření popupu
-  const popup = L.popup({ maxWidth: 300 })
-    .setLatLng([st.lat, st.lng])
+  const popup = L.popup({ maxWidth:300 })
+    .setLatLng([st.lat,st.lng])
     .setContent(content)
     .openOn(map);
 }
+
 
   
   
@@ -334,10 +308,10 @@ function cleanStation(st) {
   }
 
   // špinění z 100 → 0 za 10 minut (600 sekund)
-  let ticks = 6000;
+  let ticks = 12000;
   st.dirtInterval = setInterval(() => {
     ticks--;
-    st.cleanPercent = Math.max(0, (ticks / 600) * 100);
+    st.cleanPercent = Math.max(0, (ticks / 12000) * 100);
     updateMarkerColor(st);
 
     if (ticks <= 0) {
@@ -419,9 +393,6 @@ class Employee {
 
       // complete tasks
       st.cleanPercent = Math.min(100, st.cleanPercent + 100);
-      // spustit progresivní špinění
-      startDirt(st);
-
       updateMarkerColor(st);
       updateMoney(money + 56);
 
