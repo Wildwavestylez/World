@@ -85,30 +85,23 @@
     // Helpers to create Overpass queries
     function overpassQueryBerlin() {
   const query = `
-  [out:json][timeout:90];
+[out:json][timeout:90];
 
-  // celá NRW oblast
-  area["name"="Nordrhein-Westfalen"]["boundary"="administrative"]->.nrw;
+// NRW oblast
+area["name"="Nordrhein-Westfalen"]["boundary"="administrative"]->.nrw;
 
-  // U-Bahn
-  relation(area.nrw)[route=subway]->.ubahn;
+// S-Bahn (všechny S-Bahn linky v NRW)
+relation(area.nrw)[route=rail][network~"S-Bahn"]->.sbahn;
 
-  // Tram / Stadtbahn
-  relation(area.nrw)[route=tram]->.tram;
+// Regionální vlaky (RB a RE linky)
+relation(area.nrw)[route=rail][ref~"^(RB|RE)"]->.regional;
 
-  // S-Bahn
-  relation(area.nrw)[route=rail][network~"S-Bahn"]->.sbahn;
-
-  // Regionální vlaky (RB/RE)
-  relation(area.nrw)[route=rail][ref~"^(RB|RE)"]->.regional;
-
-  // všechny dohromady
-  (.ubahn;.tram;.sbahn;.regional;);
-  out body;
-  >;
-  out body qt;
+// vše dohromady
+(.sbahn;.regional;);
+out body;
+>;
+out body qt;
 `;
-
 
   const url = 'https://overpass-api.de/api/interpreter';
   return fetch(url, {
