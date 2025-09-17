@@ -95,8 +95,8 @@
     const multiQuery = `
 [out:json][timeout:90];
 
-// Definujeme oblast NRW
-area["name"="Nordrhein-Westfalen"]["boundary"="administrative"]->.searchArea;
+// Definujeme oblast Bavorsko
+area["name"="Bayern"]["boundary"="administrative"]->.searchArea;
 
 // U-Bahn
 (
@@ -108,7 +108,7 @@ area["name"="Nordrhein-Westfalen"]["boundary"="administrative"]->.searchArea;
   relation[route=tram](area.searchArea);
 )->.tram;
 
-// S-Bahn (všechny sítě, které obsahují "S-Bahn")
+// S-Bahn (všechny sítě obsahující "S-Bahn")
 (
   relation[route=train][network~"S-Bahn"](area.searchArea);
 )->.sbahn;
@@ -124,6 +124,8 @@ out body;
 >;
 out body qt;
 `;
+
+
   // Convert Overpass result (relations + nodes) into LINES structure
     function processOverpassResult(osm){
       // Build map of nodes
