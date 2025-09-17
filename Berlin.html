@@ -243,7 +243,7 @@ function startDirt(st) {
     }
 
     // lineární ubývání: 100 % → 0 % za 10 minut (600 s)
-    const decayPerSecond = 100 / 600; 
+    const decayPerSecond = 100 / 6000; 
     st.cleanPercent -= decayPerSecond;
     if (st.cleanPercent < 0) st.cleanPercent = 0;
 
