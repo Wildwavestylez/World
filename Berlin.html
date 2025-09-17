@@ -340,7 +340,7 @@ function cleanStation(st) {
   }
 
   // špinění z 100 → 0 za 10 minut (600 sekund)
-  let ticks = 600;
+  let ticks = 6000;
   st.dirtInterval = setInterval(() => {
     ticks--;
     st.cleanPercent = Math.max(0, (ticks / 600) * 100);
