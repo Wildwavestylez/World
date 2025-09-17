@@ -87,16 +87,17 @@
   const query = `
 [out:json][timeout:90];
 
-// NRW oblast
-area["name"="Nordrhein-Westfalen"]["boundary"="administrative"]->.nrw;
+// Najdi relaci pro NRW a z ní udělej area
+relation["boundary"="administrative"]["name"="Nordrhein-Westfalen"]->.reg;
+.reg area->.nrw;
 
-// S-Bahn (všechny S-Bahn linky v NRW)
-relation(area.nrw)[route=rail][network~"S-Bahn"]->.sbahn;
+// S-Bahn linky (network obsahuje S-Bahn)
+relation(area.nrw)["route"="train"]["network"~"S-Bahn"]->.sbahn;
 
-// Regionální vlaky (RB a RE linky)
-relation(area.nrw)[route=rail][ref~"^(RB|RE)"]->.regional;
+// RB/RE linky (ref začíná RB nebo RE)
+relation(area.nrw)["route"="train"]["ref"~"^(RB|RE)"]->.regional;
 
-// vše dohromady
+// Spojit dohromady
 (.sbahn;.regional;);
 out body;
 >;
