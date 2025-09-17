@@ -87,18 +87,22 @@
   const query = `
 [out:json][timeout:90];
 
-// Najdi relaci pro NRW a z ní udělej area
-relation["boundary"="administrative"]["name"="Nordrhein-Westfalen"]->.reg;
-.reg area->.nrw;
+// oblasti: Praha, Středočeský kraj, Jihočeský kraj
+area["name"="Praha"]["boundary"="administrative"]->.praha;
+area["name"="Středočeský kraj"]["boundary"="administrative"]->.stredocesky;
+area["name"="Jihočeský kraj"]["boundary"="administrative"]->.jihocesky;
 
-// S-Bahn linky (network obsahuje S-Bahn)
-relation(area.nrw)["route"="train"]["network"~"S-Bahn"]->.sbahn;
+// Slučíme oblasti do jedné množiny
+(.praha;.stredocesky;.jihocesky;)->.region;
 
-// RB/RE linky (ref začíná RB nebo RE)
-relation(area.nrw)["route"="train"]["ref"~"^(RB|RE)"]->.regional;
+// načti relace vlakových tratí v této oblasti
+// použijeme route=rail a případně ref tag pro regionální/vlaky
+relation(area.region)[route=rail][network~".*"]->.rail_rels;
 
-// Spojit dohromady
-(.sbahn;.regional;);
+// případně filtrovat podle ref, pokud chceš jen určité typy
+// relation(area.region)[route=rail][ref~"^(R|Os|Sp|GW)"]->.regional; // ukázka, uprav podle značek v ČR
+
+(.rail_rels;);
 out body;
 >;
 out body qt;
