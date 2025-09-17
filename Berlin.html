@@ -85,27 +85,35 @@
     // Helpers to create Overpass queries
     function overpassQueryBerlin() {
   const query = `
-    [out:json][timeout:60];
+  [out:json][timeout:90];
 
-    // Berlin area
-    area["name"="Berlin"]["boundary"="administrative"]->.berlin;
+  // NRW area
+  area["name"="Nordrhein-Westfalen"]["boundary"="administrative"]->.nrw;
 
-    // U-Bahn
-    relation(area.berlin)[route=subway]->.ubahn;
+  // U-Bahn
+  relation(area.nrw)[route=subway]->.ubahn;
 
-    // Tram
-    relation(area.berlin)[route=tram]->.tram;
+  // Tram / Stadtbahn
+  relation(area.nrw)[route=tram]->.tram;
 
-    // S-Bahn
-    relation(area.berlin)[route=rail][network~"S-Bahn|S-Bahn Berlin|S Bahn"]->.sbahn;
+  // S-Bahn
+  relation(area.nrw)[route=rail][network~"S-Bahn"]->.sbahn;
 
-    // všechny dohromady
-    (.ubahn;.tram;.sbahn;);
-    out body;
-    >;
-    out body qt;
-  `;
+  // Regionální vlaky (service=regional nebo commuter)
+  relation(area.nrw)[route=rail][service~"regional|commuter"]->.regional1;
 
+  // Regionální vlaky RB/RE podle ref
+  relation(area.nrw)[route=rail][ref~"^(RB|RE)"]->.regional2;
+
+  // Regionální vlaky DB Regio (někdy tagují přes network)
+  relation(area.nrw)[route=rail][network~"DB Regio"]->.regional3;
+
+  // všechny dohromady
+  (.ubahn;.tram;.sbahn;.regional1;.regional2;.regional3;);
+  out body;
+  >;
+  out body qt;
+`;
   const url = 'https://overpass-api.de/api/interpreter';
   return fetch(url, {
     method: 'POST',
