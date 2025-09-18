@@ -91,40 +91,43 @@
     // Build area id for Berlin
     const areaQuery = 'area[name="Berlin"];';
 
-    // We'll fetch route relations: subway (U-Bahn), tram, and rail with network containing "S-Bahn"
-    const multiQuery = `
+  const multiQuery = `
 [out:json][timeout:90];
 
-// Definujeme oblast Bavorsko
-area["name"="Bayern"]["boundary"="administrative"]->.searchArea;
+// Definujeme oblast Jihočeský kraj
+area["name"="Jihočeský kraj"]["boundary"="administrative"]->.searchArea;
 
-// U-Bahn
+// Vlaky (všechny typy)
 (
-  relation[route=subway](area.searchArea);
-)->.ubahn;
+  relation[route=train](area.searchArea);
+)->.trains;
+
+// Autobusy (MHD i dálková doprava)
+(
+  relation[route=bus](area.searchArea);
+)->.buses;
 
 // Tramvaje
 (
   relation[route=tram](area.searchArea);
-)->.tram;
+)->.trams;
 
-// S-Bahn (všechny sítě obsahující "S-Bahn")
+// Trolejbusy
 (
-  relation[route=train][network~"S-Bahn"](area.searchArea);
-)->.sbahn;
+  relation[route=trolleybus](area.searchArea);
+)->.trolleys;
 
-// Regionální vlaky RE a RB
+// Metro (kdyby náhodou, v ČB není, ale pro jistotu)
 (
-  relation[route=train][ref~"^RE|^RB"](area.searchArea);
-)->.regional;
+  relation[route=subway](area.searchArea);
+)->.subways;
 
 // Sloučíme vše dohromady
-(.ubahn;.tram;.sbahn;.regional;);
+(.trains;.buses;.trams;.trolleys;.subways;);
 out body;
 >;
 out body qt;
 `;
-
 
   // Convert Overpass result (relations + nodes) into LINES structure
     function processOverpassResult(osm){
