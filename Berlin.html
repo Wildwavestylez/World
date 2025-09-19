@@ -91,39 +91,16 @@
     // Build area id for Berlin
     const areaQuery = 'area[name="Berlin"];';
 
-  const multiQuery = `
+ const multiQuery = `
 [out:json][timeout:90];
 
 // Definujeme oblast Jihočeský kraj
 area["name"="Jihočeský kraj"]["boundary"="administrative"]->.searchArea;
 
-// Vlaky (všechny typy)
+// Všechny typy dopravy
 (
-  relation[route=train](area.searchArea);
-)->.trains;
-
-// Autobusy (MHD i dálková doprava)
-(
-  relation[route=bus](area.searchArea);
-)->.buses;
-
-// Tramvaje
-(
-  relation[route=tram](area.searchArea);
-)->.trams;
-
-// Trolejbusy
-(
-  relation[route=trolleybus](area.searchArea);
-)->.trolleys;
-
-// Metro (kdyby náhodou, v ČB není, ale pro jistotu)
-(
-  relation[route=subway](area.searchArea);
-)->.subways;
-
-// Sloučíme vše dohromady
-(.trains;.buses;.trams;.trolleys;.subways;);
+  relation[route](area.searchArea);
+);
 out body;
 >;
 out body qt;
