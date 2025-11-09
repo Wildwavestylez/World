@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <title>Simulace láhve do moře</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100%; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([49.8, 15.5], 8); // širší výchozí pohled
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+let bottleMarker = null;
+let visitedNodes = new Set();
+let riverGraph = {};
+let currentNode = null;
+let pathCoords = [];
+let simulationRunning = false;
+
+async function fetchRiverData(lat, lon, radiusKm = 30) {
+  const query = `
+    [out:json][timeout:60];
+    (
+      way["waterway"~"river|stream"](around:${radiusKm*1000},${lat},${lon});
+    );
+    (._;>;);
+    out body;
+  `;
+
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: query
+    });
+
+    const text = await res.text(); // načti jako text
+
+    // zkus převést na JSON
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.warn("⚠️ Overpass API vrátilo neplatnou odpověď (možná HTML):", text.slice(0, 200));
+      return { elements: [] }; // vrať prázdná data, ať simulace pokračuje
+    }
+
+  } catch (err) {
+    console.error("Chyba při fetchRiverData:", err);
+    return { elements: [] };
+  }
+}
+    
+    
+ // Vytvoří graf toku (směrový podle pořadí uzlů ve way)
+function buildGraph(osmData) {
+  const nodes = {};
+  osmData.elements.forEach(el => {
+    if (el.type === 'node') {
+      nodes[el.id] = { lat: el.lat, lon: el.lon, next: [] };
+    }
+  });
+  osmData.elements.forEach(el => {
+    if (el.type === 'way' && el.nodes.length > 1) {
+      for (let i = 0; i < el.nodes.length - 1; i++) {
+        nodes[el.nodes[i]].next.push(el.nodes[i+1]);
+      }
+    }
+  });
+  return nodes;
+}
+   
+    
+function distance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
+            Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function findNearestNode(lat, lon, nodes) {
+  let minDist = Infinity, nearest = null;
+  for (const id in nodes) {
+    const d = distance(lat, lon, nodes[id].lat, nodes[id].lon);
+    if (d < minDist) {
+      minDist = d;
+      nearest = id;
+    }
+  }
+  return nearest;
+}
+
+let moveTimer = null; // přidáno: timer handler
+
+// Pohyb láhve
+async function moveBottle() {
+  if (!currentNode || !riverGraph[currentNode]) return;
+  visitedNodes.add(currentNode);
+  const nextNodes = riverGraph[currentNode].next.filter(n => !visitedNodes.has(n));
+
+  if (nextNodes.length === 0) {
+    // Došli jsme na konec — načteme další data
+    const { lat, lon } = riverGraph[currentNode];
+    const newData = await fetchRiverData(lat, lon);
+    const newGraph = buildGraph(newData);
+    riverGraph = { ...riverGraph, ...newGraph };
+    return moveBottle();
+  }
+
+  const nextNode = nextNodes[0];
+  const { lat, lon } = riverGraph[nextNode];
+  bottleMarker.setLatLng([lat, lon]);
+  pathCoords.push([lat, lon]);
+
+  // Vymažeme starou čáru a vykreslíme novou (jen jedna)
+  if (pathCoords.length > 1) {
+    if (window.pathLine) map.removeLayer(window.pathLine);
+    window.pathLine = L.polyline(pathCoords, { color: 'blue' }).addTo(map);
+  }
+
+  currentNode = nextNode;
+  moveTimer = setTimeout(moveBottle, 500);
+}
+
+// Kliknutí na mapu = start nebo přeskočení
+map.on('click', async (e) => {
+  const { lat, lng } = e.latlng;
+
+  // Zastav jakoukoli běžící simulaci
+  if (moveTimer) {
+    clearTimeout(moveTimer);
+    moveTimer = null;
+  }
+
+  if (!bottleMarker) {
+    // První klik → start
+    const data = await fetchRiverData(lat, lng);
+    riverGraph = buildGraph(data);
+    currentNode = findNearestNode(lat, lng, riverGraph);
+
+    if (!currentNode) {
+      alert("Nenalezena žádná řeka v okolí, zkus kliknout jinam!");
+      return;
+    }
+
+    const { lat: nodeLat, lon: nodeLon } = riverGraph[currentNode];
+    bottleMarker = L.marker([nodeLat, nodeLon]).addTo(map);
+    pathCoords = [[nodeLat, nodeLon]];
+    moveBottle();
+  } else {
+    // Další klik → přeskočení překážky
+    const newData = await fetchRiverData(lat, lng);
+    const newGraph = buildGraph(newData);
+    riverGraph = { ...riverGraph, ...newGraph };
+    currentNode = findNearestNode(lat, lng, riverGraph);
+
+    if (currentNode) {
+      const { lat: nodeLat, lon: nodeLon } = riverGraph[currentNode];
+      bottleMarker.setLatLng([nodeLat, nodeLon]);
+      pathCoords.push([nodeLat, nodeLon]);
+      moveBottle(); // pustíme znovu, ale už jen jednou
+    }
+  }
+});
+  
+</script>
+</body>
+</html>
