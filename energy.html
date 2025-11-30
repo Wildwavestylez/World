@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<title>Energy Dominion — Leaflet Full</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,Arial}
+  #map{position:fixed;inset:0}
+  /* Hamburger + panel */
+  #hamburger {
+    position: fixed; top: 12px; left: 12px; z-index: 10000;
+  }
+  #hamburger button{
+    background:#111;color:#fff;border:0;padding:8px 10px;border-radius:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.35); cursor:pointer;
+  }
+  #panel {
+    position: fixed; top: 12px; left: 60px; z-index:10000;
+    background: rgba(255,255,255,0.95); padding:12px; border-radius:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.25); width:320px;
+  }
+  #panel.hidden{ display:none; }
+  #panel h3{ margin:0 0 8px 0; font-size:16px; }
+  .row{ display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+  button.control{ padding:8px 10px; border-radius:8px; border:0; cursor:pointer; background:#0077ff; color:#fff; }
+  button.warn{ background:#ff6b6b; }
+  button.ghost{ background:#f0f0f0; color:#111; }
+  select,input{ padding:6px; border-radius:6px; border:1px solid #ddd; }
+  .small{ font-size:13px; color:#333; }
+  #legend{ font-size:13px; margin-top:10px; color:#222;}
+  .node-gen{ color:#00c; }
+  .node-amp{ color:#ff7f00; }
+  .node-plain{ color:#666; }
+</style>
+</head>
+<body>
+  <div id="hamburger">
+    <button id="hambtn">☰ Menu</button>
+  </div>
+
+  <div id="panel">
+    <h3>Energy Dominion — Full</h3>
+
+    <div class="row">
+      <div>💰 <strong id="money">0</strong> Kč</div>
+      <div class="small">(+<span id="mps">0</span>/s)</div>
+    </div>
+
+    <div class="row">
+      <button id="toggleDraw" class="control">Start/Stop kreslení</button>
+      <button id="finishLine" class="ghost">Ukončit větev</button>
+      <button id="clearBtn" class="warn">Smazat vše</button>
+    </div>
+
+    <div class="row">
+      <button id="placeGenerator" class="control">Umístit Generátor</button>
+      <button id="placeAmplifier" class="control">Umístit Zesilovač</button>
+    </div>
+
+    <div class="row">
+      <label class="small">Start kreslení z: </label>
+      <select id="startSelect"><option value="">(klik na mapu)</option></select>
+    </div>
+
+    <div class="row">
+      <label class="small">Grid size:</label>
+      <div class="small">~700 × 700 m</div>
+    </div>
+
+    <div id="legend">
+      <div><strong>Legenda:</strong></div>
+      <div>🔵 Generator (start) | 🟠 Amplifier (obnoví sílu) | ⚪ Node (uzel)</div>
+      <div>🟥 Linka (kabel) | 🟩 Energized grid (světle zelený)</div>
+    </div>
+  </div>
+
+<div id="map"></div>
+
+<script>
+/* ================== CONFIG ================== */
+const GRID_METERS = 700;               // cílená velikost gridu
+const SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minut auto-save
+const COST_PER_M = 1;                  // 1 Kč / m
+const GENERATOR_COST = 10000;          // příklad cena
+const AMPLIFIER_COST = 3000;           // příklad cena
+
+// Minimum zoom at which nodes are visible (adjustable)
+const NODE_MIN_ZOOM_VISIBLE = 14;
+/* ============================================ */
+
+/* ===== Leaflet map ===== */
+const map = L.map('map').setView([49.2, 14.4], 7);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+/* ===== State ===== */
+// ekonomika: začíná s 5000 Kč
+let player = { money: 5000, moneyPerSecond: 0 }; 
+let nodes = [];   // každý node = { id, lat, lng, type: 'gen'|'amp'|'node', powered: bool }
+let edges = [];   // každý edge = { id, a, b, length, energized: bool }
+let ownedCells = {}; // cellId -> true
+let energizedCells = {}; // cellId -> true
+let drawing = false;
+let currentStartNode = null; // index into nodes (or null => click to create)
+let lastNodeIndex = null;    // last node while drawing
+let tempLine = null;         // L.polyline for preview
+let nodeMarkers = L.layerGroup().addTo(map);
+let edgeLayer = L.layerGroup().addTo(map);
+let cellLayer = L.layerGroup().addTo(map);
+
+/* ===== IndexedDB basic ===== */
+let db;
+const dbReq = indexedDB.open('energyDominionDB', 1);
+dbReq.onupgradeneeded = ev => {
+  const idb = ev.target.result;
+  if(!idb.objectStoreNames.contains('player')) idb.createObjectStore('player', { keyPath: 'id' });
+  if(!idb.objectStoreNames.contains('nodes')) idb.createObjectStore('nodes', { keyPath: 'id' });
+  if(!idb.objectStoreNames.contains('edges')) idb.createObjectStore('edges', { keyPath: 'id' });
+  if(!idb.objectStoreNames.contains('cells')) idb.createObjectStore('cells', { keyPath: 'id' });
+};
+dbReq.onsuccess = ev => { db = ev.target.result; loadAll(); };
+dbReq.onerror = () => console.warn('DB error');
+
+/* ===== Helpers: ID / projection / grid ===== */
+function newId(prefix='id'){ return prefix + '_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
+
+function projectLatLng(lat,lng){
+  // returns point in meters on EPSG3857
+  return L.CRS.EPSG3857.project(L.latLng(lat,lng));
+}
+
+function cellIdForLatLng(lat,lng){
+  const p = projectLatLng(lat,lng);
+  const gx = Math.floor(p.x / GRID_METERS);
+  const gy = Math.floor(p.y / GRID_METERS);
+  return gx + '_' + gy;
+}
+function cellBoundsLatLngFromCellId(cellId){
+  const [gx,gy] = cellId.split('_').map(Number);
+  const x1 = gx * GRID_METERS;
+  const y1 = gy * GRID_METERS;
+  const x2 = (gx+1) * GRID_METERS;
+  const y2 = (gy+1) * GRID_METERS;
+  const sw = L.CRS.EPSG3857.unproject(L.point(x1, y1));
+  const ne = L.CRS.EPSG3857.unproject(L.point(x2, y2));
+  // return [southWestLatLng, northEastLatLng] for rectangle
+  return [[sw.lat, sw.lng], [ne.lat, ne.lng]];
+}
+
+/* ===== UI refs ===== */
+const moneyEl = document.getElementById('money');
+const mpsEl = document.getElementById('mps');
+const toggleDrawBtn = document.getElementById('toggleDraw');
+const finishLineBtn = document.getElementById('finishLine');
+const clearBtn = document.getElementById('clearBtn');
+const placeGenBtn = document.getElementById('placeGenerator');
+const placeAmpBtn = document.getElementById('placeAmplifier');
+const startSelect = document.getElementById('startSelect');
+const hambtn = document.getElementById('hambtn');
+const panel = document.getElementById('panel');
+
+/* ===== Hamburger toggle ===== */
+hambtn.addEventListener('click', () => { panel.classList.toggle('hidden'); });
+
+/* ===== UI update ===== */
+function updateUI(){
+  // show money with two decimals if needed
+  moneyEl.textContent = Math.round(player.money * 100) / 100;
+  // show money per second with at most 2 decimals
+  mpsEl.textContent = (Math.round(player.moneyPerSecond * 100) / 100).toFixed(2);
+  populateStartSelect();
+}
+
+/* ===== Node + Edge drawing & management ===== */
+function addNode(lat, lng, type='node'){
+  // snap to existing node if close
+  const THRESH_METERS = 20; // if closer than 20m, reuse
+  for(let i=0;i<nodes.length;i++){
+    const n = nodes[i];
+    const d = map.distance([n.lat,n.lng],[lat,lng]);
+    if(d < THRESH_METERS) return i;
+  }
+  const id = newId('node');
+  const idx = nodes.length;
+  nodes.push({ id, lat, lng, type, powered: (type === 'gen') });
+  drawNode(idx);
+  scheduleSave();
+  return idx;
+}
+
+function drawNode(index){
+  const n = nodes[index];
+  // create marker; color by type
+  const color = n.type === 'gen' ? '#0077ff' : (n.type === 'amp' ? '#ff7f00' : '#888');
+  const r = n.type === 'gen' ? 10 : (n.type === 'amp' ? 8 : 6);
+
+  // create circleMarker with options we can toggle later
+  const marker = L.circleMarker([n.lat, n.lng], {
+    radius: r,
+    color: color,
+    fillColor: color,
+    fillOpacity: 1,
+    opacity: 1
+  }).addTo(nodeMarkers)
+    .bindTooltip(`${n.type.toUpperCase()} (${indexLabel(index)})`, {permanent:false});
+
+  // store index and default radius so we can restore after hiding
+  marker._nodeIndex = index;
+  marker._defaultRadius = r;
+
+  marker.on('click', (ev) => {
+    // If currently drawing, use existing drawing logic
+    if(drawing){
+      handleNodeClick(index);
+      return;
+    }
+    // If not drawing -> start drawing from this specific node
+    // Set the clicked node as the current start and enable drawing mode
+    currentStartNode = index;
+    lastNodeIndex = index;   // we start drawing from this node
+    drawing = true;
+    toggleDrawBtn.textContent = 'Kreslím... (klikni na uzly)';
+    populateStartSelect();
+  });
+}
+
+function indexLabel(i){ return i; }
+
+function addEdge(aIndex, bIndex){
+  // compute length and cost
+  const from = nodes[aIndex], to = nodes[bIndex];
+  const len = map.distance([from.lat,from.lng],[to.lat,to.lng]);
+  const cost = len * COST_PER_M;
+
+  // check funds
+  if(player.money < cost){
+    alert(`Nedostatek prostředků: potřeba ${Math.round(cost*100)/100} Kč, máš ${Math.round(player.money*100)/100} Kč`);
+    return;
+  }
+
+  // avoid duplicates
+  for(const e of edges){
+    if((e.a===aIndex && e.b===bIndex) || (e.a===bIndex && e.b===aIndex)) return;
+  }
+
+  // deduct cost and create edge
+  player.money -= cost;
+  const id = newId('edge');
+  const edge = { id, a: aIndex, b: bIndex, length: len, energized: false };
+  edges.push(edge);
+  drawEdge(edge);
+  // rebuild powered graph after adding edge
+  recomputePowerAndEnergize();
+  scheduleSave();
+  updateUI();
+}
+
+function drawEdge(edge){
+  const a = nodes[edge.a], b = nodes[edge.b];
+  const col = edge.energized ? '#ffcc00' : '#d33';
+  L.polyline([[a.lat,a.lng],[b.lat,b.lng]], { color: col, weight: 4 }).addTo(edgeLayer);
+}
+
+/* ===== drawing control ===== */
+toggleDrawBtn.addEventListener('click', () => {
+  drawing = !drawing;
+  if(!drawing){
+    lastNodeIndex = null;
+    if(tempLine){ map.removeLayer(tempLine); tempLine = null; }
+  } else {
+    // if starting drawing without a currentStartNode, clear last so first click selects
+    if(currentStartNode === null) lastNodeIndex = null;
+  }
+  toggleDrawBtn.textContent = drawing ? 'Kreslím... (klikni na uzly)' : 'Start/Stop kreslení';
+});
+
+finishLineBtn.addEventListener('click', () => {
+  lastNodeIndex = null;
+  if(tempLine){ map.removeLayer(tempLine); tempLine = null; }
+  drawing = false;
+  toggleDrawBtn.textContent = 'Start/Stop kreslení';
+});
+
+/* ===== place generator / amplifier mode ===== */
+let placingMode = null; // 'gen' | 'amp' | null
+placeGenBtn.addEventListener('click', () => { placingMode = 'gen'; alert('Klikni na mapu, kde chceš umístit generátor.'); });
+placeAmpBtn.addEventListener('click', () => { placingMode = 'amp'; alert('Klikni na mapu, kde chceš umístit zesilovač.'); });
+
+/* ===== map click handler ===== */
+map.on('click', (e) => {
+  const lat = e.latlng.lat, lng = e.latlng.lng;
+
+  if(placingMode){
+    if(placingMode === 'gen'){
+      if(player.money < GENERATOR_COST){ alert('Nedostatek Kč pro generátor'); placingMode = null; return; }
+      player.money -= GENERATOR_COST;
+      const idx = addNode(lat,lng,'gen');
+      nodes[idx].powered = true;
+      placingMode = null;
+      updateUI();
+      recomputePowerAndEnergize();
+      return;
+    } else if(placingMode === 'amp'){
+      if(player.money < AMPLIFIER_COST){ alert('Nedostatek Kč pro zesilovač'); placingMode = null; return; }
+      player.money -= AMPLIFIER_COST;
+      addNode(lat,lng,'amp');
+      placingMode = null;
+      updateUI();
+      recomputePowerAndEnergize();
+      return;
+    }
+  }
+
+  // if drawing: clicking on empty map creates a new node and behaves as node click
+  if(drawing){
+    const idx = addNode(lat, lng, 'node');
+    handleNodeClick(idx);
+  } else {
+    // not drawing: set as currentStartNode (player chooses start point)
+    const idx = addNode(lat, lng, 'node');
+    currentStartNode = idx;
+    lastNodeIndex = null;
+    populateStartSelect();
+  }
+});
+
+/* ===== handle node click while drawing ===== */
+function handleNodeClick(idx){
+  if(lastNodeIndex === null){
+    // start a new branch from either selected start node or clicked node
+    if(currentStartNode !== null){
+      // if currentStartNode exists and differs -> if clicked different node, create edge from start->clicked
+      if(currentStartNode !== idx){
+        addEdge(currentStartNode, idx);
+        lastNodeIndex = idx;
+      } else {
+        // starting at same node: simply set lastNodeIndex to idx to continue
+        lastNodeIndex = idx;
+      }
+    } else {
+      // no preselected start => set lastNodeIndex to clicked node to begin chain
+      lastNodeIndex = idx;
+    }
+  } else {
+    // create edge from lastNodeIndex to this idx (branching supported)
+    if(lastNodeIndex !== idx){
+      addEdge(lastNodeIndex, idx);
+      lastNodeIndex = idx;
+    } else {
+      // clicked same node as last -> do nothing or toggle
+      lastNodeIndex = idx;
+    }
+  }
+}
+
+/* ===== recompute powered nodes and energize segments ===== */
+function recomputePowerAndEnergize(){
+  // Build adjacency
+  const adj = nodes.map(()=>[]);
+  for(const e of edges){
+    if(e.a < nodes.length && e.b < nodes.length){
+      adj[e.a].push({to:e.b, id:e.id});
+      adj[e.b].push({to:e.a, id:e.id});
+    }
+    // reset energized flags now; will set to true if edge is in powered component
+    e.energized = false;
+  }
+
+  // BFS from all generators
+  const powered = new Array(nodes.length).fill(false);
+  const q = [];
+  for(let i=0;i<nodes.length;i++){
+    if(nodes[i].type === 'gen'){
+      powered[i] = true;
+      q.push(i);
+    }
+  }
+
+  while(q.length){
+    const u = q.shift();
+    for(const nei of adj[u]){
+      if(!powered[nei.to]){
+        powered[nei.to] = true;
+        q.push(nei.to);
+      }
+    }
+  }
+
+  // Now mark edges as energized if both endpoints are powered
+  for(const e of edges){
+    if(e.a < powered.length && e.b < powered.length && powered[e.a] && powered[e.b]){
+      e.energized = true;
+    } else {
+      e.energized = false;
+    }
+  }
+
+  // update nodes powered property
+  for(let i=0;i<nodes.length;i++) nodes[i].powered = !!powered[i];
+
+  // refresh visuals: edges color, and energize cells along energized edges
+  refreshEdgeLayer();
+  energizeAllPoweredEdges();
+  redrawNodeMarkers();
+  scheduleSave();
+}
+
+/* ===== visuals helpers ===== */
+function refreshEdgeLayer(){
+  edgeLayer.clearLayers();
+  for(const e of edges){
+    drawEdge(e);
+  }
+}
+
+function redrawNodeMarkers(){
+  nodeMarkers.clearLayers();
+  for(let i=0;i<nodes.length;i++) drawNode(i);
+  updateNodeVisibility(); // keep visibility state consistent after redraw
+}
+
+/* ===== energize grids along energized edges ===== */
+function energizeAllPoweredEdges(){
+  // Clear energizedCells first? We keep previously energized cells (they persist until cleared by game rules)
+  // We only add new cells for currently energized edges
+  for(const e of edges){
+    if(!e.energized) continue;
+    const a = nodes[e.a], b = nodes[e.b];
+    if(!a || !b) continue;
+    energizeGridsAlongSegment([a.lat,a.lng],[b.lat,b.lng]);
+  }
+}
+
+function energizeGridsAlongSegment(start, end){
+  const distance = map.distance(start, end);
+  // choose step so we don't miss any cell: step ~ GRID_METERS/4 in meters
+  const step = Math.max( Math.min(GRID_METERS/4, distance/10), 10 );
+  const steps = Math.ceil(distance / step);
+  for(let i=0;i<=steps;i++){
+    const t = i/steps;
+    const lat = start[0] + (end[0]-start[0]) * t;
+    const lng = start[1] + (end[1]-start[1]) * t;
+    const cid = cellIdForLatLng(lat,lng);
+    if(!energizedCells[cid]){
+      energizedCells[cid] = true;
+      drawCell(cid);
+    }
+  }
+}
+
+/* ===== draw cell once ===== */
+function drawCell(cellId){
+  if(cellLayer._cells && cellLayer._cells[cellId]) return;
+  if(!cellLayer._cells) cellLayer._cells = {};
+  const bounds = cellBoundsLatLngFromCellId(cellId); // [[swLat,swLng],[neLat,neLng]]
+  const rect = L.rectangle([[bounds[0][0],bounds[0][1]],[bounds[1][0],bounds[1][1]]], {
+    color: '#00c44a',
+    weight: 1,
+    fillColor: '#8cff98',
+    fillOpacity: 0.55,
+    interactive:false
+  }).addTo(cellLayer);
+  cellLayer._cells[cellId] = rect;
+}
+
+/* ===== node visibility by zoom ===== */
+function updateNodeVisibility(){
+  const show = map.getZoom() >= NODE_MIN_ZOOM_VISIBLE;
+  if(show){
+    if(!map.hasLayer(nodeMarkers)) map.addLayer(nodeMarkers);
+  } else {
+    if(map.hasLayer(nodeMarkers)) map.removeLayer(nodeMarkers);
+  }
+}
+
+// run once and on zoom changes
+map.on('zoomend', updateNodeVisibility);
+map.whenReady(updateNodeVisibility);
+
+/* ===== populate start select ===== */
+function populateStartSelect(){
+  startSelect.innerHTML = '<option value="">(klik na mapu)</option>';
+  for(let i=0;i<nodes.length;i++){
+    const n = nodes[i];
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${i} — ${n.type} ${(n.powered? ' (P)': '')}`;
+    if(currentStartNode === i) opt.selected = true;
+    startSelect.appendChild(opt);
+  }
+}
+startSelect.addEventListener('change', () => {
+  const v = startSelect.value;
+  if(v === '') currentStartNode = null;
+  else currentStartNode = Number(v);
+  lastNodeIndex = null;
+});
+
+/* ===== save/load functions ===== */
+function scheduleSave(){
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveAll(), 700);
+}
+let saveTimer = null;
+
+function saveAll(){
+  if(!db) return;
+  const tx = db.transaction(['player','nodes','edges','cells'],'readwrite');
+  tx.objectStore('player').put({ id:1, data: player });
+
+  // nodes: clear -> put all (wait for clear to finish before puts)
+  const ns = tx.objectStore('nodes');
+  const clearNodesReq = ns.clear();
+  clearNodesReq.onsuccess = () => {
+    nodes.forEach(n => ns.put({ id: n.id, data: n }));
+  };
+  clearNodesReq.onerror = (ev) => console.warn('Error clearing nodes store', ev);
+
+  const es = tx.objectStore('edges');
+  const clearEdgesReq = es.clear();
+  clearEdgesReq.onsuccess = () => {
+    edges.forEach(e => es.put({ id: e.id, data: e }));
+  };
+  clearEdgesReq.onerror = (ev) => console.warn('Error clearing edges store', ev);
+
+  const cs = tx.objectStore('cells');
+  const clearCellsReq = cs.clear();
+  clearCellsReq.onsuccess = () => {
+    for(const cid in energizedCells) cs.put({ id: cid });
+  };
+  clearCellsReq.onerror = (ev) => console.warn('Error clearing cells store', ev);
+
+  tx.oncomplete = () => { console.log('Saved state to IndexedDB'); };
+  tx.onerror = (ev) => { console.warn('Transaction error during saveAll', ev); };
+}
+
+function loadAll(){
+  if(!db) return;
+  const tx = db.transaction(['player','nodes','edges','cells'],'readonly');
+  tx.objectStore('player').get(1).onsuccess = e => {
+    const r = e.target.result;
+    if(r && r.data) player = r.data;
+    updateUI();
+  };
+  tx.objectStore('nodes').getAll().onsuccess = e => {
+    const res = e.target.result;
+    if(res && res.length){
+      nodes = res.map(o => o.data);
+    }
+    // draw nodes later
+    redrawNodeMarkers();
+    populateStartSelect();
+  };
+  tx.objectStore('edges').getAll().onsuccess = e => {
+    const res = e.target.result;
+    if(res && res.length){
+      edges = res.map(o => o.data);
+    }
+    refreshEdgeLayer();
+  };
+  tx.objectStore('cells').getAll().onsuccess = e => {
+    const res = e.target.result;
+    if(res && res.length){
+      energizedCells = {};
+      res.forEach(o => energizedCells[o.id] = true);
+      // draw all loaded cells
+      for(const cid in energizedCells) drawCell(cid);
+    }
+  };
+}
+
+/* ===== clear storage ===== */
+clearBtn.addEventListener('click', async () => {
+  if(!confirm('Smazat uloženou hru?')) return;
+  if(db) {
+    const req = indexedDB.deleteDatabase('energyDominionDB');
+    req.onsuccess = () => { location.reload(); };
+    req.onerror = () => alert('Chyba při mazání DB');
+  } else location.reload();
+});
+
+/* ===== autosave ===== */
+setInterval(() => { saveAll(); }, SAVE_INTERVAL_MS);
+
+/* ===== economic tick: 0.1 Kč / s per energized cell ===== */
+setInterval(() => {
+  const poweredCellCount = Object.keys(energizedCells).length;
+  const gainPerSec = poweredCellCount * 0.1; // 0.1 Kč per energized grid cell per second
+  if(gainPerSec > 0){
+    player.money += gainPerSec;
+  }
+  player.moneyPerSecond = gainPerSec;
+  updateUI();
+}, 1000);
+
+/* ===== initial demo generator at Prague edge ===== */
+map.whenReady(() => {
+  // create default generator in Prague if none exist
+  if(nodes.length === 0){
+    const idx = addNode(50.0755, 14.4378, 'gen'); // Prague
+    nodes[idx].powered = true;
+  }
+  // render initial stuff
+  recomputePowerAndEnergize();
+  updateUI();
+});
+
+/* ===== keyboard: ESC to stop drawing ===== */
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape'){
+    drawing = false;
+    lastNodeIndex = null;
+    if(tempLine){ map.removeLayer(tempLine); tempLine = null; }
+    toggleDrawBtn.textContent = 'Start/Stop kreslení';
+  }
+});
+</script>
+</body>
+</html>
