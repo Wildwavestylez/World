@@ -97,7 +97,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).a
 
 /* ===== State ===== */
 // ekonomika: začíná s 5000 Kč
-let player = { money: 7000, moneyPerSecond: 0 }; 
+let player = { money: 7000, moneyPerSecond: 5 }; 
 let nodes = [];   // každý node = { id, lat, lng, type: 'gen'|'amp'|'node', powered: bool }
 let edges = [];   // každý edge = { id, a, b, length, energized: bool }
 let ownedCells = {}; // cellId -> true
