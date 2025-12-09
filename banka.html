@@ -3,538 +3,268 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Continental Trust Bank — Online Banking</title>
+<title>Skákající dolárky 🎈</title>
 <style>
   :root{
-    --bg:#0b2540;
-    --card:#0f3a5a;
-    --accent:#18c37b;
-    --muted:#9fb3c9;
-    --glass: rgba(255,255,255,0.04);
-    --glass-2: rgba(255,255,255,0.02);
-    --gold: #f5c26b;
-    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    --bg:#f6fbff;
+    --card:#ffffff;
+    --accent:#2b9cff;
+    --accent-dark:#1673d1;
+    --shadow: 0 6px 18px rgba(20,40,80,0.08);
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
   }
-  *{box-sizing:border-box}
-  body{
-    margin:0;
-    min-height:100vh;
-    background:
-      radial-gradient(ellipse at 10% 20%, rgba(24,195,123,0.06), transparent 15%),
-      radial-gradient(ellipse at 90% 80%, rgba(245,194,107,0.03), transparent 10%),
-      var(--bg);
-    color:#eaf6ff;
-    -webkit-font-smoothing:antialiased;
-    -moz-osx-font-smoothing:grayscale;
-    padding:32px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:24px;
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#e8f4ff 0%,var(--bg) 100%);color:#0b2540}
+  .wrap{
+    max-width:1000px;margin:28px auto;padding:18px;
   }
-
-  .bank-ui{
-    width:100%;
-    max-width:1100px;
-    display:grid;
-    grid-template-columns: 420px 1fr;
-    gap:24px;
-    align-items:start;
+  header{
+    display:flex;align-items:center;gap:16px;
+    background:var(--card);padding:12px;border-radius:12px;box-shadow:var(--shadow);
   }
-
-  /* Left card (main account) */
-  .card{
-    background: linear-gradient(180deg,var(--card), rgba(5,30,45,0.6));
-    border-radius:14px;
-    padding:22px;
-    box-shadow: 0 10px 30px rgba(2,12,22,0.6);
-    border: 1px solid rgba(255,255,255,0.03);
-  }
-
-  .brand{
-    display:flex;
-    align-items:center;
-    gap:12px;
-    margin-bottom:12px;
-  }
-  .logo{
-    width:56px;
-    height:56px;
-    border-radius:10px;
-    background:linear-gradient(135deg,#0db27a,#145bff);
-    display:grid;
-    place-items:center;
-    font-weight:700;
-    font-size:20px;
-    box-shadow: inset 0 -6px 18px rgba(0,0,0,0.2);
-  }
-  .brand h1{
-    margin:0;
-    font-size:18px;
-    letter-spacing:0.4px;
-  }
-  .brand p{margin:0;color:var(--muted);font-size:13px}
-
-  .account{
-    margin-top:8px;
-    padding:16px;
-    border-radius:10px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    border:1px solid rgba(255,255,255,0.03);
-  }
-
-  .name-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-  }
-  .holder{
-    font-size:20px;
-    font-weight:700;
-    letter-spacing:0.2px;
-  }
-  .id{
-    color:var(--muted);
-    font-size:13px;
-  }
-
-  .balance{
-    margin-top:14px;
-    display:flex;
-    align-items:center;
-    gap:12px;
-  }
-  .balance .big{
-    font-size:38px;
-    font-weight:800;
-    letter-spacing:0.6px;
-    line-height:1;
-  }
-  .balance .meta{
-    color:var(--muted);
-    font-size:13px;
-  }
-
-  .badges{
-    margin-top:14px;
-    display:flex;
-    gap:10px;
-  }
-  .badge{
-    background:var(--glass);
-    padding:8px 10px;
-    border-radius:10px;
-    font-size:13px;
-    color:var(--muted);
-    border:1px solid rgba(255,255,255,0.02);
-    display:flex;
-    gap:8px;
-    align-items:center;
-  }
-
-  .grow{
-    color:var(--accent);
-    font-weight:700;
-  }
-
-  /* Right panel (activity) */
-  .right{
-    display:flex;
-    flex-direction:column;
-    gap:14px;
-  }
-  .panel{
-    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    border-radius:12px;
-    padding:14px;
-    border:1px solid rgba(255,255,255,0.03);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-  }
-  .panel h2{
-    margin:0 0 10px 0;
-    font-size:16px;
-  }
-
-  .transactions{
-    max-height:360px;
-    overflow:auto;
-    padding-right:6px;
-  }
-  .tx{
-    display:flex;
-    justify-content:space-between;
-    gap:12px;
-    padding:10px 8px;
-    border-radius:8px;
-    align-items:center;
-    transition:background .16s;
-  }
-  .tx + .tx{margin-top:8px}
-  .tx:hover{background:var(--glass-2)}
-
-  .tx .left{
-    display:flex;
-    gap:12px;
-    align-items:center;
-  }
-  .dot{
-    width:44px;
-    height:44px;
-    border-radius:8px;
-    display:grid;
-    place-items:center;
-    background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.04));
-    font-weight:700;
-  }
-  .desc{font-size:13px}
-  .time{color:var(--muted);font-size:12px}
-
-  .amount{
-    font-weight:800;
-    font-size:15px;
-  }
-  .amount.positive{color:var(--accent)}
-  .amount.small{font-size:13px;font-weight:700}
-
+  header h1{margin:0;font-size:20px}
+  header p{margin:0;color:#35506b;opacity:.9}
   .controls{
-    display:flex;
-    gap:10px;
-    margin-top:12px;
+    margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;
   }
   .btn{
-    background:transparent;
-    border:1px solid rgba(255,255,255,0.06);
-    padding:10px 12px;
-    border-radius:10px;
-    color:var(--muted);
-    cursor:pointer;
-    font-weight:700;
+    background:linear-gradient(180deg,var(--accent),var(--accent-dark));
+    color:white;padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600;
+    box-shadow: 0 6px 12px rgba(35,120,220,0.18);
   }
-  .btn.primary{
-    background:linear-gradient(90deg,#0db27a,#14a3ff);
-    color:#012;
-    border: none;
+  .btn.secondary{
+    background:transparent;color:var(--accent-dark);border:2px solid rgba(20,115,209,0.12);box-shadow:none;
   }
-  .foot{
-    margin-top:12px;
-    color:var(--muted);
-    font-size:12px;
+  .arena{
+    position:relative;height:60vh;border-radius:14px;margin-top:16px;background:
+      radial-gradient( circle at 10% 10%, rgba(255,255,255,0.6), transparent 10%),
+      linear-gradient(180deg, rgba(255,255,255,0.6), transparent);
+    box-shadow:var(--shadow);overflow:hidden;padding:10px;
   }
-
-  /* subtle animation for "serious" bank vibe */
-  .secure{
-    display:inline-flex;
-    gap:8px;
-    align-items:center;
-    background:rgba(255,255,255,0.02);
-    padding:8px 10px;
-    border-radius:999px;
-    font-size:13px;
-    color:var(--muted);
+  .scoreboard{
+    position:absolute;left:12px;top:12px;background:rgba(255,255,255,0.85);padding:8px 12px;border-radius:999px;font-weight:700;
+    box-shadow:0 4px 10px rgba(10,30,60,0.08);
   }
 
-  /* small sparkline canvas */
-  #spark{
-    width:100%;
-    height:50px;
-    display:block;
-    margin-top:12px;
-    border-radius:8px;
-    background: linear-gradient(180deg, rgba(0,0,0,0.02), transparent);
-    border:1px solid rgba(255,255,255,0.02);
+  /* bubble style */
+  .bubble{
+    position:absolute;display:inline-grid;place-items:center;
+    min-width:64px;padding:10px 12px;border-radius:999px;
+    background:linear-gradient(180deg,#fff,#f0fbff);
+    border:2px solid rgba(0,0,0,0.06);
+    box-shadow: 0 8px 18px rgba(30,80,140,0.12);
+    font-weight:800;color:#073a6b;cursor:pointer;
+    user-select:none;
+    transform-origin:center;
   }
 
-  /* responsive */
-  @media (max-width:980px){
-    .bank-ui{grid-template-columns:1fr; padding:0 8px}
+  /* float + bounce */
+  @keyframes floatUp {
+    0% { transform: translateY(0) scale(0.98); opacity:1; }
+    20% { transform: translateY(-8px) scale(1.02); }
+    60% { transform: translateY(-40vh) scale(1.03); opacity:0.95;}
+    100% { transform: translateY(-110vh) scale(1.05); opacity:0; }
+  }
+  @keyframes pop {
+    0% { transform: scale(1); opacity:1; }
+    60% { transform: scale(1.6); opacity:0.9; }
+    100% { transform: scale(0); opacity:0; }
+  }
+
+  .floating{ animation-name: floatUp; animation-timing-function: cubic-bezier(.15,.9,.32,1); animation-fill-mode:forwards; }
+  .popping{ animation: pop .35s ease-out forwards; }
+
+  footer{margin-top:12px;color:#26445f;opacity:.9}
+  .small{font-size:13px;opacity:.85}
+  .info{
+    margin-left:auto;text-align:right;color:#365b7c;
+  }
+
+  /* mobile tweak */
+  @media (max-width:600px){
+    .wrap{padding:12px}
+    header h1{font-size:18px}
   }
 </style>
 </head>
 <body>
-  <div class="bank-ui" role="main" aria-label="Fiktivní bankovní rozhraní">
-    <div class="card" aria-hidden="false">
-      <div class="brand">
-        <div class="logo" aria-hidden="true">CT</div>
-        <div>
-          <h1>Continental Trust Bank</h1>
-          <p>Privátní účet — Online banking</p>
-        </div>
+  <div class="wrap">
+    <header>
+      <div style="font-size:34px;line-height:1">💸</div>
+      <div>
+        <h1>Skákající dolárky — chytni je!</h1>
+        <p class="small">Klikni na bublinu a přidej si body. Random částky, náhodné skákání — pro děti i blázny.</p>
       </div>
-
-      <div class="account" role="region" aria-label="Účet klienta">
-        <div class="name-row">
-          <div>
-            <div class="holder" id="holder-name">Jiří Kubáň</div>
-            <div class="id" id="acct-number">IBAN: CZ78 5000 0000 0009 4459 5658</div>
-          </div>
-          <div class="secure" title="Verified Secure">
-            🔒 <span style="opacity:.9">Verified</span>
-          </div>
-        </div>
-
-        <div class="balance" aria-live="polite">
-          <div>
-            <div class="big" id="balance">€100,000.00</div>
-            <div class="meta" id="subtext">Available balance</div>
-          </div>
-          <div style="margin-left:auto;text-align:right">
-            <div class="badges" style="flex-direction:column;align-items:flex-end">
-              <div class="badge">Real-time feed</div>
-              <div class="badge"><span style="color:var(--gold);font-weight:800">Platinum</span> • VIP</div>
-            </div>
-          </div>
-        </div>
-
-        <canvas id="spark" aria-hidden="true"></canvas>
-
-        <div class="badges" style="margin-top:14px">
-          <div class="badge">Branch: Prague City Center</div>
-          <div class="badge">Sort code: 300-201</div>
-          <div class="badge">Customer ID: CTB-00934</div>
-        </div>
+      <div class="info" aria-hidden="true">
+        <div style="font-weight:800;font-size:18px" id="speedLabel">Rychlost: normální</div>
+        <div class="small">Tip: zkus změnit rychlost spawnování a pohybu.</div>
       </div>
+    </header>
 
-      <div style="margin-top:14px; display:flex; gap:10px;">
-        <button class="btn" id="pause">Požádat o pujčku</button>
-        <button class="btn primary" id="reset">INVESTOVAT</button>
-      </div>
-
-      <div class="foot">
-        <div style="margin-top:8px">DISCLAIMER: <span style="color:var(--muted)">All amounts are attributed in accordance with the legal regulations of the European Union and individual member states..</span></div>
-      </div>
+    <div class="controls">
+      <button class="btn" id="startBtn">Start</button>
+      <button class="btn secondary" id="stopBtn">Stop</button>
+      <label style="display:inline-flex;align-items:center;gap:8px;">
+        <span class="small">Spawn ms</span>
+        <input type="range" id="spawnRange" min="200" max="1500" value="550" />
+      </label>
+      <label style="display:inline-flex;align-items:center;gap:8px;">
+        <span class="small">Speed</span>
+        <input type="range" id="speedRange" min="6" max="20" value="12" />
+      </label>
+      <button class="btn secondary" id="clearBtn">Vyčistit bubliny</button>
     </div>
 
-    <div class="right">
-      <div class="panel">
-        <h2>Poslední transakce</h2>
-        <div class="transactions" id="tx-feed" aria-live="polite" aria-atomic="false">
-          <!-- transactions appear here -->
-        </div>
-
-        <div class="controls">
-          <button class="btn" id="add-now">Přidat jednorázově + náhodně</button>
-          <button class="btn" id="big-jump">Velké štěstí (+500 €)</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>Účet detailně</h2>
-        <p style="color:var(--muted);margin:0 0 10px 0">Vlastník: <strong>Kamil Kalivoda</strong></p>
-        <p style="color:var(--muted);margin:0 0 8px 0">Stav účtu (aktuální): <span id="detail-balance" style="font-weight:800">€100,000.00</span></p>
-        <p style="color:var(--muted);margin:0">Rychlost růstu: každé 2 vteřiny + náhodně 2–5 €</p>
-      </div>
+    <div class="arena" id="arena" role="main" aria-label="Aréna skákajících dolárků">
+      <div class="scoreboard" id="scoreboard">Score: 0</div>
     </div>
+
+    <footer>
+      <div class="small">Vytvořeno pro zábavu — žádné skutečné peníze. Bav se a buď opatrný při klikání! 😉</div>
+    </footer>
   </div>
 
 <script>
 (function(){
-  // initial state
-  let balance = 100000.00;
-  const initial = balance;
-  const balanceEl = document.getElementById('balance');
-  const detailEl = document.getElementById('detail-balance');
-  const txFeed = document.getElementById('tx-feed');
-  const pauseBtn = document.getElementById('pause');
-  const resetBtn = document.getElementById('reset');
-  const addNow = document.getElementById('add-now');
-  const bigJump = document.getElementById('big-jump');
+  const arena = document.getElementById('arena');
+  const scoreboard = document.getElementById('scoreboard');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const spawnRange = document.getElementById('spawnRange');
+  const speedRange = document.getElementById('speedRange');
+  const speedLabel = document.getElementById('speedLabel');
 
-  // animation helper for smooth number transition
-  function animateNumber(from, to, duration=600){
-    const start = performance.now();
-    return new Promise(resolve=>{
-      function frame(now){
-        const t = Math.min(1, (now - start) / duration);
-        // smoothstep
-        const eased = t*(2-t);
-        const value = from + (to-from) * eased;
-        updateDisplays(value);
-        if(t < 1) requestAnimationFrame(frame);
-        else resolve();
+  let spawnTimer = null;
+  let score = 0;
+  let bubbleId = 0;
+  const maxBubbles = 50;
+
+  function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+  function setSpeedLabel(){
+    const v = parseInt(speedRange.value,10);
+    if(v < 9) speedLabel.textContent = 'Rychlost: pomalá';
+    else if(v < 14) speedLabel.textContent = 'Rychlost: normální';
+    else speedLabel.textContent = 'Rychlost: rychlá';
+  }
+  setSpeedLabel();
+
+  function spawnBubble(){
+    if(arena.querySelectorAll('.bubble').length >= maxBubbles) return;
+
+    const id = ++bubbleId;
+    const value = rand(1,100); // random "dollars"
+    const leftPct = rand(3,92);
+    const size = rand(56,110);
+    const hue = rand(180,260);
+    const floatSeconds = (40 - parseInt(speedRange.value,10)) / 6 + rand(8,18)/10; // variable float time
+
+    const el = document.createElement('div');
+    el.className = 'bubble floating';
+    el.dataset.id = id;
+    el.dataset.value = value;
+    el.style.left = leftPct + '%';
+    el.style.bottom = '-20px';
+    el.style.width = size + 'px';
+    el.style.height = size + 'px';
+    el.style.fontSize = Math.max(14, Math.round(size/5)) + 'px';
+    el.style.borderColor = `rgba(10,20,40,0.06)`;
+    el.style.background = `linear-gradient(180deg,hsl(${hue}deg 80% 95%), hsl(${hue}deg 85% 88%))`;
+    el.style.color = `hsl(${hue-80}deg 70% 20%)`;
+    el.style.animationDuration = floatSeconds + 's';
+    el.innerHTML = `<span style="pointer-events:none;">$${value}</span>`;
+
+    // click handler (pop)
+    el.addEventListener('click', function popHandler(e){
+      e.stopPropagation();
+      // prevent double-click collection
+      if(el.classList.contains('popping')) return;
+      el.classList.remove('floating');
+      el.classList.add('popping');
+      // add little plus feedback
+      const plus = document.createElement('div');
+      plus.textContent = `+${value}`;
+      plus.style.position='absolute';
+      plus.style.left='50%'; plus.style.top='10%';
+      plus.style.transform='translateX(-50%)';
+      plus.style.fontWeight='800';
+      plus.style.fontSize='14px';
+      plus.style.color='#0b3b6b';
+      el.appendChild(plus);
+
+      // increment score
+      score += value;
+      scoreboard.textContent = 'Score: ' + score;
+
+      // remove after animation
+      setTimeout(()=>{ el.remove(); }, 400);
+    });
+
+    // remove if animation ends (floated away)
+    el.addEventListener('animationend', (ev)=>{
+      if(ev.animationName === 'floatUp') {
+        if(el.parentElement) el.remove();
       }
-      requestAnimationFrame(frame);
+    });
+
+    arena.appendChild(el);
+
+    // small randomized starting bounce (translateY)
+    requestAnimationFrame(()=> {
+      el.style.transform = `translateY(0)`;
     });
   }
 
-  function formatEUR(v){
-    // use CS format but keep € in front for clarity
-    // We'll format with grouping and two decimals
-    const parts = v.toFixed(2).split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    return '€' + parts.join('.');
+  function startSpawning(){
+    if(spawnTimer) return;
+    spawnTimer = setInterval(spawnBubble, parseInt(spawnRange.value,10));
+    startBtn.disabled = true; stopBtn.disabled = false;
+  }
+  function stopSpawning(){
+    if(spawnTimer) { clearInterval(spawnTimer); spawnTimer = null; }
+    startBtn.disabled = false; stopBtn.disabled = true;
   }
 
-  function updateDisplays(val){
-    balanceEl.textContent = formatEUR(val);
-    detailEl.textContent = formatEUR(val);
-  }
-
-  // transaction feed
-  function addTx(amount, note = "Automatický příjem"){
-    const tx = document.createElement('div');
-    tx.className = 'tx';
-    const left = document.createElement('div'); left.className='left';
-    const dot = document.createElement('div'); dot.className='dot';
-    dot.textContent = 'CT';
-    const desc = document.createElement('div');
-    desc.innerHTML = `<div class="desc">${note}</div><div class="time">${new Date().toLocaleString()}</div>`;
-    left.appendChild(dot); left.appendChild(desc);
-    const amt = document.createElement('div');
-    amt.className = 'amount positive';
-    amt.textContent = '+'+formatEUR(amount);
-    tx.appendChild(left); tx.appendChild(amt);
-    txFeed.insertBefore(tx, txFeed.firstChild);
-
-    // keep feed to reasonable length
-    const items = txFeed.querySelectorAll('.tx');
-    if(items.length > 80){
-      txFeed.removeChild(txFeed.lastChild);
-    }
-  }
-
-  // sparkline
-  const canvas = document.getElementById('spark');
-  const ctx = canvas.getContext('2d');
-  let points = [];
-  function resizeCanvas(){
-    canvas.width = canvas.clientWidth * devicePixelRatio;
-    canvas.height = canvas.clientHeight * devicePixelRatio;
-    ctx.scale(devicePixelRatio, devicePixelRatio);
-    drawSpark();
-  }
-  window.addEventListener('resize', () => {
-    resizeCanvas();
+  // UI events
+  startBtn.addEventListener('click', startSpawning);
+  stopBtn.addEventListener('click', stopSpawning);
+  clearBtn.addEventListener('click', ()=> {
+    document.querySelectorAll('.bubble').forEach(b => b.remove());
   });
 
-  function drawSpark(){
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    ctx.clearRect(0,0,w,h);
-    if(points.length < 2) return;
-    // background gradient
-    const grad = ctx.createLinearGradient(0,0,0,h);
-    grad.addColorStop(0, 'rgba(20,60,120,0.18)');
-    grad.addColorStop(1, 'rgba(10,20,40,0.02)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0,0,w,h);
-
-    // draw line
-    ctx.beginPath();
-    const min = Math.min(...points);
-    const max = Math.max(...points);
-    const range = Math.max(1, max - min);
-    points.forEach((p,i)=>{
-      const x = (i/(points.length-1)) * (w-12) + 6;
-      const y = h - ((p - min) / range) * (h - 16) - 8;
-      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  spawnRange.addEventListener('input', ()=> {
+    if(spawnTimer){
+      clearInterval(spawnTimer);
+      spawnTimer = setInterval(spawnBubble, parseInt(spawnRange.value,10));
+    }
+  });
+  speedRange.addEventListener('input', ()=>{
+    // adjust speed label immediately
+    setSpeedLabel();
+    // also slightly nudge all existing bubbles' duration (will not rewind, but new ones will follow)
+    document.querySelectorAll('.bubble').forEach(b=>{
+      const newDur = (40 - parseInt(speedRange.value,10)) / 6 + rand(8,18)/10;
+      b.style.animationDuration = newDur + 's';
     });
-    ctx.strokeStyle = '#18c37b';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // small glow
-    ctx.beginPath();
-    const lastX = ( (points.length-1)/(points.length-1) )*(w-12)+6;
-    const lastY = h - ((points[points.length-1]-min)/range)*(h-16)-8;
-    ctx.fillStyle = 'rgba(24,195,123,0.08)';
-    ctx.arc(lastX, lastY, 10, 0, Math.PI*2);
-    ctx.fill();
-  }
-
-  // random increment between 2 and 5 euros (inclusive of decimal)
-  function randomInc(){
-    // produce float between 2.00 and 5.00 with 2 decimals
-    return Math.round((2 + Math.random()*3)*100)/100;
-  }
-
-  let running = true;
-  let timer = null;
-
-  async function tickAdd(amount, note){
-    const from = balance;
-    const to = Math.round((balance + amount)*100)/100;
-    balance = to;
-    // update spark points
-    points.push(balance);
-    if(points.length > 40) points.shift();
-    drawSpark();
-    await animateNumber(from, to, 700);
-    addTx(amount, note);
-    // small pulse
-    balanceEl.animate([
-      { transform: 'scale(1)' },
-      { transform: 'scale(1.02)' },
-      { transform: 'scale(1)' }
-    ], { duration: 350, easing: 'ease-out' });
-  }
-
-  function scheduleLoop(){
-    if(timer) clearInterval(timer);
-    timer = setInterval(()=>{
-      if(!running) return;
-      const inc = randomInc();
-      tickAdd(inc, 'Automatický příjem — úrok / výnos');
-    }, 2000);
-  }
-
-  // init
-  updateDisplays(balance);
-  points = [balance, balance + 10, balance + 30, balance + 60]; // start shape
-  resizeCanvas();
-  drawSpark();
-  scheduleLoop();
-
-  // controls
-  pauseBtn.addEventListener('click', ()=>{
-    running = !running;
-    pauseBtn.textContent = running ? 'Pozastavit' : 'Spustit';
-    pauseBtn.classList.toggle('primary', !running);
   });
 
-  resetBtn.addEventListener('click', async ()=>{
-    const confirmReset = true; // prank, we won't ask the user — instant reset
-    if(confirmReset){
-      const old = balance;
-      balance = initial;
-      points = [balance];
-      await animateNumber(old, balance, 800);
-      addTx(0, 'Reset účtu (demo)');
-      drawSpark();
-    }
-  });
+  // spawn a few to start (preview)
+  for(let i=0;i<6;i++){
+    setTimeout(spawnBubble, i*220);
+  }
 
-  addNow.addEventListener('click', ()=>{
-    const inc = randomInc();
-    tickAdd(inc, 'Jednorázový příjem (ručně)');
-  });
-
-  bigJump.addEventListener('click', ()=>{
-    tickAdd(500, 'Velké štěstí — bonus');
-  });
-
-  // keyboard cheeky cheat: press K to add random extra
+  // keyboard fun: space = clear, s = start, x = stop
   window.addEventListener('keydown', (e)=>{
-    if(e.key.toLowerCase() === 'k'){
-      const inc = Math.round((10 + Math.random()*200)*100)/100;
-      tickAdd(inc, 'Systémový bonus (hotkey K)');
-    }
+    if(e.code === 'Space'){ e.preventDefault(); document.querySelectorAll('.bubble').forEach(b=>b.remove()); }
+    if(e.key.toLowerCase() === 's') startSpawning();
+    if(e.key.toLowerCase() === 'x') stopSpawning();
   });
 
-  // add a few initial transactions to make it look real
-  (async function seed(){
-    const seeds = [
-      {a: 3.25, n:'Denní výnos'},
-      {a: 4.10, n:'Dividendový výnos'},
-      {a: 2.50, n:'Mikrozisk z úspor'},
-      {a: 5.00, n:'Referral bonus'}
-    ];
-    for(let s of seeds){
-      await tickAdd(s.a, s.n);
-      await new Promise(r=>setTimeout(r, 220));
-    }
-  })();
-
+  // accessibility: click arena to spawn one
+  arena.addEventListener('click', (e)=>{
+    // only spawn if clicked on arena background (not on a bubble)
+    if(e.target === arena) spawnBubble();
+  });
 })();
 </script>
 </body>
