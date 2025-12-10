@@ -1,271 +1,67 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="cs">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Skákající dolárky 🎈</title>
+<meta charset="UTF-8">
+<title>Wall Street Blink Blink</title>
 <style>
-  :root{
-    --bg:#f6fbff;
-    --card:#ffffff;
-    --accent:#2b9cff;
-    --accent-dark:#1673d1;
-    --shadow: 0 6px 18px rgba(20,40,80,0.08);
-    font-family: "Segoe UI", Roboto, Arial, sans-serif;
-  }
-  html,body{height:100%;margin:0;background:linear-gradient(180deg,#e8f4ff 0%,var(--bg) 100%);color:#0b2540}
-  .wrap{
-    max-width:1000px;margin:28px auto;padding:18px;
-  }
-  header{
-    display:flex;align-items:center;gap:16px;
-    background:var(--card);padding:12px;border-radius:12px;box-shadow:var(--shadow);
-  }
-  header h1{margin:0;font-size:20px}
-  header p{margin:0;color:#35506b;opacity:.9}
-  .controls{
-    margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;
-  }
-  .btn{
-    background:linear-gradient(180deg,var(--accent),var(--accent-dark));
-    color:white;padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600;
-    box-shadow: 0 6px 12px rgba(35,120,220,0.18);
-  }
-  .btn.secondary{
-    background:transparent;color:var(--accent-dark);border:2px solid rgba(20,115,209,0.12);box-shadow:none;
-  }
-  .arena{
-    position:relative;height:60vh;border-radius:14px;margin-top:16px;background:
-      radial-gradient( circle at 10% 10%, rgba(255,255,255,0.6), transparent 10%),
-      linear-gradient(180deg, rgba(255,255,255,0.6), transparent);
-    box-shadow:var(--shadow);overflow:hidden;padding:10px;
-  }
-  .scoreboard{
-    position:absolute;left:12px;top:12px;background:rgba(255,255,255,0.85);padding:8px 12px;border-radius:999px;font-weight:700;
-    box-shadow:0 4px 10px rgba(10,30,60,0.08);
-  }
+    body {
+        background: #0a0a0a;
+        color: #00ff1a;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+    }
 
-  /* bubble style */
-  .bubble{
-    position:absolute;display:inline-grid;place-items:center;
-    min-width:64px;padding:10px 12px;border-radius:999px;
-    background:linear-gradient(180deg,#fff,#f0fbff);
-    border:2px solid rgba(0,0,0,0.06);
-    box-shadow: 0 8px 18px rgba(30,80,140,0.12);
-    font-weight:800;color:#073a6b;cursor:pointer;
-    user-select:none;
-    transform-origin:center;
-  }
+    .money {
+        position: absolute;
+        font-size: 30px;
+        color: #00ff37;
+        animation: float 3s linear infinite;
+        user-select: none;
+    }
 
-  /* float + bounce */
-  @keyframes floatUp {
-    0% { transform: translateY(0) scale(0.98); opacity:1; }
-    20% { transform: translateY(-8px) scale(1.02); }
-    60% { transform: translateY(-40vh) scale(1.03); opacity:0.95;}
-    100% { transform: translateY(-110vh) scale(1.05); opacity:0; }
-  }
-  @keyframes pop {
-    0% { transform: scale(1); opacity:1; }
-    60% { transform: scale(1.6); opacity:0.9; }
-    100% { transform: scale(0); opacity:0; }
-  }
+    @keyframes float {
+        0% { transform: translateY(100vh) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(-120vh) rotate(360deg); opacity: 0; }
+    }
 
-  .floating{ animation-name: floatUp; animation-timing-function: cubic-bezier(.15,.9,.32,1); animation-fill-mode:forwards; }
-  .popping{ animation: pop .35s ease-out forwards; }
+    #frajer {
+        position: fixed;
+        top: 20px;
+        width: 100%;
+        text-align: center;
+        font-size: 40px;
+        font-weight: bold;
+        animation: blink 0.3s infinite;
+        color: #ffde00;
+        text-shadow: 0 0 15px #ff9900, 0 0 20px #ffaa00;
+    }
 
-  footer{margin-top:12px;color:#26445f;opacity:.9}
-  .small{font-size:13px;opacity:.85}
-  .info{
-    margin-left:auto;text-align:right;color:#365b7c;
-  }
-
-  /* mobile tweak */
-  @media (max-width:600px){
-    .wrap{padding:12px}
-    header h1{font-size:18px}
-  }
+    @keyframes blink {
+        0% { opacity: 1; }
+        50% { opacity: 0; }
+        100% { opacity: 1; }
+    }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div style="font-size:34px;line-height:1">💸</div>
-      <div>
-        <h1>Skákající dolárky — chytni je!</h1>
-        <p class="small">Klikni na bublinu a přidej si body. Random částky, náhodné skákání — pro děti i blázny.</p>
-      </div>
-      <div class="info" aria-hidden="true">
-        <div style="font-weight:800;font-size:18px" id="speedLabel">Rychlost: normální</div>
-        <div class="small">Tip: zkus změnit rychlost spawnování a pohybu.</div>
-      </div>
-    </header>
 
-    <div class="controls">
-      <button class="btn" id="startBtn">Start</button>
-      <button class="btn secondary" id="stopBtn">Stop</button>
-      <label style="display:inline-flex;align-items:center;gap:8px;">
-        <span class="small">Spawn ms</span>
-        <input type="range" id="spawnRange" min="200" max="1500" value="550" />
-      </label>
-      <label style="display:inline-flex;align-items:center;gap:8px;">
-        <span class="small">Speed</span>
-        <input type="range" id="speedRange" min="6" max="20" value="12" />
-      </label>
-      <button class="btn secondary" id="clearBtn">Vyčistit bubliny</button>
-    </div>
-
-    <div class="arena" id="arena" role="main" aria-label="Aréna skákajících dolárků">
-      <div class="scoreboard" id="scoreboard">Score: 0</div>
-    </div>
-
-    <footer>
-      <div class="small">Vytvořeno pro zábavu — žádné skutečné peníze. Bav se a buď opatrný při klikání! 😉</div>
-    </footer>
-  </div>
+<div id="frajer">JIRKA JE NEJVĚTŠÍ
+  FRAJER Z WALL STREET. VRAŤTE MU JEHO PENÍZE</div>
 
 <script>
-(function(){
-  const arena = document.getElementById('arena');
-  const scoreboard = document.getElementById('scoreboard');
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const clearBtn = document.getElementById('clearBtn');
-  const spawnRange = document.getElementById('spawnRange');
-  const speedRange = document.getElementById('speedRange');
-  const speedLabel = document.getElementById('speedLabel');
+function spawnMoney() {
+    const m = document.createElement("div");
+    m.className = "money";
+    m.textContent = "$" + Math.floor(Math.random() * 999);
+    m.style.left = Math.random() * 100 + "vw";
+    m.style.animationDuration = (2 + Math.random() * 3) + "s";
+    document.body.appendChild(m);
 
-  let spawnTimer = null;
-  let score = 0;
-  let bubbleId = 0;
-  const maxBubbles = 50;
+    setTimeout(() => m.remove(), 5000);
+}
 
-  function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
-
-  function setSpeedLabel(){
-    const v = parseInt(speedRange.value,10);
-    if(v < 9) speedLabel.textContent = 'Rychlost: pomalá';
-    else if(v < 14) speedLabel.textContent = 'Rychlost: normální';
-    else speedLabel.textContent = 'Rychlost: rychlá';
-  }
-  setSpeedLabel();
-
-  function spawnBubble(){
-    if(arena.querySelectorAll('.bubble').length >= maxBubbles) return;
-
-    const id = ++bubbleId;
-    const value = rand(1,100); // random "dollars"
-    const leftPct = rand(3,92);
-    const size = rand(56,110);
-    const hue = rand(180,260);
-    const floatSeconds = (40 - parseInt(speedRange.value,10)) / 6 + rand(8,18)/10; // variable float time
-
-    const el = document.createElement('div');
-    el.className = 'bubble floating';
-    el.dataset.id = id;
-    el.dataset.value = value;
-    el.style.left = leftPct + '%';
-    el.style.bottom = '-20px';
-    el.style.width = size + 'px';
-    el.style.height = size + 'px';
-    el.style.fontSize = Math.max(14, Math.round(size/5)) + 'px';
-    el.style.borderColor = `rgba(10,20,40,0.06)`;
-    el.style.background = `linear-gradient(180deg,hsl(${hue}deg 80% 95%), hsl(${hue}deg 85% 88%))`;
-    el.style.color = `hsl(${hue-80}deg 70% 20%)`;
-    el.style.animationDuration = floatSeconds + 's';
-    el.innerHTML = `<span style="pointer-events:none;">$${value}</span>`;
-
-    // click handler (pop)
-    el.addEventListener('click', function popHandler(e){
-      e.stopPropagation();
-      // prevent double-click collection
-      if(el.classList.contains('popping')) return;
-      el.classList.remove('floating');
-      el.classList.add('popping');
-      // add little plus feedback
-      const plus = document.createElement('div');
-      plus.textContent = `+${value}`;
-      plus.style.position='absolute';
-      plus.style.left='50%'; plus.style.top='10%';
-      plus.style.transform='translateX(-50%)';
-      plus.style.fontWeight='800';
-      plus.style.fontSize='14px';
-      plus.style.color='#0b3b6b';
-      el.appendChild(plus);
-
-      // increment score
-      score += value;
-      scoreboard.textContent = 'Score: ' + score;
-
-      // remove after animation
-      setTimeout(()=>{ el.remove(); }, 400);
-    });
-
-    // remove if animation ends (floated away)
-    el.addEventListener('animationend', (ev)=>{
-      if(ev.animationName === 'floatUp') {
-        if(el.parentElement) el.remove();
-      }
-    });
-
-    arena.appendChild(el);
-
-    // small randomized starting bounce (translateY)
-    requestAnimationFrame(()=> {
-      el.style.transform = `translateY(0)`;
-    });
-  }
-
-  function startSpawning(){
-    if(spawnTimer) return;
-    spawnTimer = setInterval(spawnBubble, parseInt(spawnRange.value,10));
-    startBtn.disabled = true; stopBtn.disabled = false;
-  }
-  function stopSpawning(){
-    if(spawnTimer) { clearInterval(spawnTimer); spawnTimer = null; }
-    startBtn.disabled = false; stopBtn.disabled = true;
-  }
-
-  // UI events
-  startBtn.addEventListener('click', startSpawning);
-  stopBtn.addEventListener('click', stopSpawning);
-  clearBtn.addEventListener('click', ()=> {
-    document.querySelectorAll('.bubble').forEach(b => b.remove());
-  });
-
-  spawnRange.addEventListener('input', ()=> {
-    if(spawnTimer){
-      clearInterval(spawnTimer);
-      spawnTimer = setInterval(spawnBubble, parseInt(spawnRange.value,10));
-    }
-  });
-  speedRange.addEventListener('input', ()=>{
-    // adjust speed label immediately
-    setSpeedLabel();
-    // also slightly nudge all existing bubbles' duration (will not rewind, but new ones will follow)
-    document.querySelectorAll('.bubble').forEach(b=>{
-      const newDur = (40 - parseInt(speedRange.value,10)) / 6 + rand(8,18)/10;
-      b.style.animationDuration = newDur + 's';
-    });
-  });
-
-  // spawn a few to start (preview)
-  for(let i=0;i<6;i++){
-    setTimeout(spawnBubble, i*220);
-  }
-
-  // keyboard fun: space = clear, s = start, x = stop
-  window.addEventListener('keydown', (e)=>{
-    if(e.code === 'Space'){ e.preventDefault(); document.querySelectorAll('.bubble').forEach(b=>b.remove()); }
-    if(e.key.toLowerCase() === 's') startSpawning();
-    if(e.key.toLowerCase() === 'x') stopSpawning();
-  });
-
-  // accessibility: click arena to spawn one
-  arena.addEventListener('click', (e)=>{
-    // only spawn if clicked on arena background (not on a bubble)
-    if(e.target === arena) spawnBubble();
-  });
-})();
+setInterval(spawnMoney, 150);
 </script>
+
 </body>
 </html>
