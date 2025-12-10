@@ -2,38 +2,26 @@
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
-<title>Wall Street Blink Blink</title>
+<title>Zombie Piškora – Zachraň je!</title>
 <style>
     body {
-        background: #0a0a0a;
-        color: #00ff1a;
+        background: #000;
         overflow: hidden;
-        font-family: Arial, sans-serif;
-    }
-
-    .money {
-        position: absolute;
-        font-size: 30px;
-        color: #00ff37;
-        animation: float 3s linear infinite;
-        user-select: none;
-    }
-
-    @keyframes float {
-        0% { transform: translateY(100vh) rotate(0deg); opacity: 1; }
-        100% { transform: translateY(-120vh) rotate(360deg); opacity: 0; }
+        margin: 0;
+        font-family: Arial;
+        color: #00ff1a;
     }
 
     #frajer {
         position: fixed;
-        top: 20px;
+        top: 10px;
         width: 100%;
         text-align: center;
         font-size: 40px;
-        font-weight: bold;
-        animation: blink 0.3s infinite;
         color: #ffde00;
-        text-shadow: 0 0 15px #ff9900, 0 0 20px #ffaa00;
+        animation: blink 0.3s infinite;
+        text-shadow: 0 0 15px #ffaa00;
+        z-index: 2000;
     }
 
     @keyframes blink {
@@ -41,27 +29,112 @@
         50% { opacity: 0; }
         100% { opacity: 1; }
     }
+
+    .money {
+        position: absolute;
+        font-size: 30px;
+        color: #00ff37;
+        text-shadow: 0 0 10px #00ff37;
+    }
+
+    .zombie {
+        position: absolute;
+        font-size: 90px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        user-select: none;
+        z-index: 1000;
+    }
+
+    /* efekt když je zombie zachráněn */
+    .saved {
+        transform: translateY(-150vh) scale(1.2);
+        opacity: 0;
+    }
 </style>
 </head>
 <body>
 
-<div id="frajer">JIRKA JE NEJVĚTŠÍ
-  FRAJER Z WALL STREET. VRAŤTE MU JEHO PENÍZE</div>
+<div id="frajer">ZACHRAŇTE PIŠKORY!</div>
 
 <script>
+
+// 💸 Spawn penízků
 function spawnMoney() {
     const m = document.createElement("div");
     m.className = "money";
-    m.textContent = "$" + Math.floor(Math.random() * 999);
+    m.textContent = "$" + (Math.floor(Math.random() * 200) + 1);
+
     m.style.left = Math.random() * 100 + "vw";
-    m.style.animationDuration = (2 + Math.random() * 3) + "s";
+    m.style.top = "110vh";
+
     document.body.appendChild(m);
 
-    setTimeout(() => m.remove(), 5000);
+    const fallTime = 3000 + Math.random() * 3000;
+    const start = Date.now();
+
+    function fall() {
+        const t = (Date.now() - start) / fallTime;
+        m.style.top = (110 - t * 130) + "vh";
+        if (t < 1) requestAnimationFrame(fall);
+        else m.remove();
+    }
+    fall();
 }
 
-setInterval(spawnMoney, 150);
-</script>
+setInterval(spawnMoney, 180);
 
+
+// 🧟 ZOMBIE / PIŠKORA FUNKCE
+function spawnZombie() {
+    const z = document.createElement("div");
+    z.className = "zombie";
+    const zombieFaces = ["🧟", "🧟‍♂️", "🧟‍♀️"];
+    z.textContent = zombieFaces[Math.floor(Math.random() * zombieFaces.length)];
+
+    z.style.left = Math.random() * 80 + 10 + "vw";
+    z.style.top = Math.random() * 40 + 30 + "vh";
+
+    document.body.appendChild(z);
+
+    // kliknutím ZACHRÁNÍŠ PIŠKORU
+    z.addEventListener("click", () => {
+        z.classList.add("saved");
+        setTimeout(() => z.remove(), 1000);
+    });
+
+    // Zombie žere peníze
+    const eatLoop = setInterval(() => {
+        if (!document.body.contains(z)) {
+            clearInterval(eatLoop);
+            return;
+        }
+
+        const zRect = z.getBoundingClientRect();
+        document.querySelectorAll(".money").forEach(m => {
+            const mRect = m.getBoundingClientRect();
+            if (
+                zRect.left < mRect.right &&
+                zRect.right > mRect.left &&
+                zRect.top < mRect.bottom &&
+                zRect.bottom > mRect.top
+            ) {
+                m.remove();
+            }
+        });
+    }, 50);
+
+    // Zombie se po 7s přesune jinam
+    setInterval(() => {
+        if (document.body.contains(z)) {
+            z.style.left = Math.random() * 80 + 10 + "vw";
+            z.style.top = Math.random() * 40 + 30 + "vh";
+        }
+    }, 1500);
+}
+
+setInterval(spawnZombie, 2500);
+
+</script>
 </body>
 </html>
