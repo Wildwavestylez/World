@@ -259,7 +259,7 @@ function addEdge(aIndex, bIndex){
 
 function drawEdge(edge){
   const a = nodes[edge.a], b = nodes[edge.b];
-  const col = edge.energized ? '#ffcc00' : '#d33';
+  const col = edge.energized ? '#FF0800' : '#d33';
   L.polyline([[a.lat,a.lng],[b.lat,b.lng]], { color: col, weight: 4 }).addTo(edgeLayer);
 }
 
