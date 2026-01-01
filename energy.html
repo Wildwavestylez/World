@@ -81,7 +81,7 @@
 
 <script>
 /* ================== CONFIG ================== */
-const GRID_METERS = 31000;               // cílená velikost gridu
+const GRID_METERS = 33000;               // cílená velikost gridu
 const SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minut auto-save
 const COST_PER_M = 0.7;                  // 1 Kč / m
 const GENERATOR_COST = 10000;          // příklad cena
@@ -92,12 +92,12 @@ const NODE_MIN_ZOOM_VISIBLE = 14;
 /* ============================================ */
 
 /* ===== Leaflet map ===== */
-const map = L.map('map').setView([49.2, 14.4], 7);
+const map = L.map('map').setView([49.2, 14.4], 9);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
 /* ===== State ===== */
 // ekonomika: začíná s 500 Kč
-let player = { money: 275000, moneyPerSecond: 5 }; 
+let player = { money: 150000, moneyPerSecond: 5 }; 
 let nodes = [];   // každý node = { id, lat, lng, type: 'gen'|'amp'|'node', powered: bool }
 let edges = [];   // každý edge = { id, a, b, length, energized: bool }
 let ownedCells = {}; // cellId -> true
