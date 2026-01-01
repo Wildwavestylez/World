@@ -83,7 +83,7 @@
 /* ================== CONFIG ================== */
 const GRID_METERS = 11000;               // cílená velikost gridu
 const SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minut auto-save
-const COST_PER_M = 0.3;                  // 1 Kč / m
+const COST_PER_M = 0.7;                  // 1 Kč / m
 const GENERATOR_COST = 10000;          // příklad cena
 const AMPLIFIER_COST = 3000;           // příklad cena
 
@@ -176,7 +176,7 @@ function updateUI(){
 /* ===== Node + Edge drawing & management ===== */
 function addNode(lat, lng, type='node'){
   // snap to existing node if close
-  const THRESH_METERS = 20; // if closer than 20m, reuse
+  const THRESH_METERS = 50; // if closer than 20m, reuse
   for(let i=0;i<nodes.length;i++){
     const n = nodes[i];
     const d = map.distance([n.lat,n.lng],[lat,lng]);
