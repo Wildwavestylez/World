@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>AutoBusCore V2.4 💙</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+html,body,#map{height:100%;margin:0}
+#panel{
+  position:absolute;top:10px;left:10px;
+  background:white;padding:10px;
+  z-index:1000;font-family:Arial;
+  box-shadow:0 2px 6px rgba(0,0,0,.3)
+}
+button{margin-top:5px;width:100%;}
+</style>
+</head>
+<body>
+
+<div id="panel">
+💰 Peníze: <span id="money"></span><br>
+🚌 Linky: <span id="lines"></span><br>
+🏁 Huby: <span id="hubs"></span>
+<button onclick="autoTick()">▶ Auto Tick</button>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ================== MAP ==================
+const map = L.map("map").setView([49.25548,13.9167],13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+// ================== DATA ==================
+let money = 6000;
+const hubs = [];
+const lines = [];
+const buses = [];
+
+// ================== CLASSES ==================
+class Hub{
+  constructor(name,lat,lon){
+    this.name=name;
+    this.lat=lat;
+    this.lon=lon;
+    this.stops=[];
+    this.lines=[]; // 👈 sledování linek
+    this.maxLines=5; // 👈 TADY ŠTELUJEŠ LIMIT
+    this.loaded=false;
+    this.loadedStopsIds=new Set();
+    this.marker=L.circleMarker([lat,lon],{radius:12,color:"red"}).addTo(map)
+      .bindPopup("💙 HUB: "+name);
+  }
+}
+
+class Stop{
+  constructor(id,lat,lon,name,price){
+    this.id=id; this.lat=lat; this.lon=lon;
+    this.name=name||"Zastávka";
+    this.price=price||Math.round(200+Math.random()*500);
+  }
+}
+
+    class Line{
+  constructor(hub,dir){
+    this.hub = hub;
+    this.dir = dir;
+    this.stops = [];
+    this.poly = L.polyline([[hub.lat, hub.lon]], {color:"blue"}).addTo(map);
+    this.buses = [];
+    hub.lines.push(this);
+  }
+
+  update(){
+    this.poly.setLatLngs([
+      [this.hub.lat, this.hub.lon],
+      ...this.stops.map(s => [s.lat, s.lon])
+    ]);
+  }
+}
+
+class Bus{
+  constructor(line){
+    this.line=line;
+    this.i=0;
+    this.dir=1;
+    this.p=0;
+    this.marker=L.circleMarker([line.stops[0].lat,line.stops[0].lon],
+      {radius:5,color:"orange"}).addTo(map);
+  }
+  tick(dt){
+    if(this.line.stops.length<2) return;
+    const a=this.line.stops[this.i];
+    const b=this.line.stops[this.i+this.dir];
+    const d=map.distance([a.lat,a.lon],[b.lat,b.lon]);
+    this.p+=dt*350*1000/d;
+    if(this.p>=1){
+      this.p=0;
+      this.i+=this.dir;
+      money+=Math.round(d*0.05); // vydělávání
+      if(this.i<=0||this.i>=this.line.stops.length-1) this.dir*=-1;
+
+      // 🟢 Nový hub z velké zastávky
+      maybeCreateHubAtStop(b);
+    }
+    this.marker.setLatLng([
+      a.lat+(b.lat-a.lat)*this.p,
+      a.lon+(b.lon-a.lon)*this.p
+    ]);
+  }
+}
+
+// ================== UTIL ==================
+function normalizeVector(v){
+  const l=Math.hypot(v.x,v.y);
+  return {x:v.x/l,y:v.y/l};
+}
+function dot(a,b){return a.x*b.x + a.y*b.y;}
+function distance(a,b){return map.distance([a.lat,a.lon],[b.lat,b.lon]);}
+
+// ================== OVERPASS ==================
+async function loadStopsForHub(hub, attempt=1){
+  if(hub.loaded) return;
+  hub.loaded = true;
+
+  const q = `
+[out:json][timeout:25];
+node(around:15000,${hub.lat},${hub.lon})
+["highway"="bus_stop"];
+out body;`;
+
+  try{
+    const r = await fetch("https://overpass-api.de/api/interpreter",{
+      method: "POST",
+      headers: {"Content-Type":"application/x-www-form-urlencoded"},
+      body: "data="+encodeURIComponent(q)
+    });
+
+    // pokud server pošle html místo json, throw
+    const text = await r.text();
+    let j;
+    try{
+      j = JSON.parse(text);
+    }catch(e){
+      throw new Error("Overpass nevrátil JSON");
+    }
+
+    const newStops = j.elements
+      .filter(e => !hub.loadedStopsIds.has(e.id))
+      .map(e => {
+        hub.loadedStopsIds.add(e.id);
+        const s = new Stop(e.id,e.lat,e.lon,e.tags?.name);
+        console.log("✅ Nová zastávka:", s.name, s.lat, s.lon);
+        return s;
+      });
+
+    hub.stops.push(...newStops);
+  }catch(e){
+    console.warn(`Overpass fail (attempt ${attempt}):`, e.message);
+    hub.loaded = false; // reset, aby se dalo zkusit znovu
+    if(attempt < 8){ // max 5 pokusů
+      setTimeout(() => loadStopsForHub(hub, attempt + 1), 3000 * attempt);
+    }
+  }
+}
+// ================== HUB LOGIC ==================
+function maybeCreateHubAtStop(stop){
+  const minDist = 8000;
+  if(stop.price < 300) return;
+  if(hubs.some(h=>distance({lat:h.lat,lon:h.lon},stop)<minDist)) return;
+
+  const newHub = new Hub("HUB_"+stop.name, stop.lat, stop.lon);
+  hubs.push(newHub);
+  console.log("🌟 Nový HUB založen:", newHub.name);
+
+  loadStopsForHub(newHub);
+
+  // generujeme více směrů pro linky
+  const directions = [];
+  for(let i=0; i<newHub.maxLines; i++){
+    directions.push(normalizeVector({x: Math.random()-0.5, y: Math.random()-0.5}));
+  }
+
+  directions.forEach(dir=>{
+    const newLine = new Line(newHub, dir);
+    lines.push(newLine);
+  });
+}
+// ================== EXPAND LINES ==================
+function expandLine(line){
+  // poslední zastávka – fallback na hub
+  const last = line.stops.length
+    ? line.stops[line.stops.length-1]
+    : line.hub;
+
+  // najdi kandidáta na rozšíření linky
+  const cand = line.hub.stops
+    .filter(s => {
+      if(line.stops.includes(s)) return false;
+      const v = {x: s.lon - last.lon, y: s.lat - last.lat};
+      const len = Math.hypot(v.x, v.y);
+      if(len < 0.00001) return false; // ochrana proti nulovému vektoru
+      return dot({x: v.x/len, y: v.y/len}, line.dir) > 0.7;
+    })
+    .sort((a,b) => {
+      const da = map.distance([last.lat,last.lon],[a.lat,a.lon]);
+      const db = map.distance([last.lat,last.lon],[b.lat,b.lon]);
+      return da - db;
+    })[0];
+
+  // pokud je kandidát a máme peníze
+  if(cand && money > 300){
+    money -= 300;
+    line.stops.push(cand);
+    line.update();
+
+    // přidání autobusů podle počtu zastávek
+    const expectedBuses = Math.floor(line.stops.length / 10) + 1; // první bus hned
+    while(line.buses.length < expectedBuses){
+      const bus = new Bus(line);
+      line.buses.push(bus);
+      buses.push(bus);
+      console.log("🚌 Nový autobus přidán na linku", line.stops.map(s => s.name));
+    }
+  }
+}
+// ================== INIT ==================
+const strak=new Hub("Strakonice",49.25548,13.9167);
+hubs.push(strak);
+loadStopsForHub(strak).then(()=>{
+  // např. 6 linek
+[[1,0],[0,1],[-1,0],[-1,-1],[1,-1],[1,1]].forEach(d=>{
+    const l=new Line(strak,normalizeVector({x:d[0],y:d[1]}));
+    lines.push(l);
+  });
+});
+
+// ================== AUTO TICK ==================
+function autoTick(){
+  buses.forEach(b=>b.tick(1/3600));
+  lines.forEach(l=>expandLine(l));
+  hubs.forEach(h=>loadStopsForHub(h));
+  document.getElementById("money").textContent=Math.round(money);
+  document.getElementById("lines").textContent=lines.length;
+  document.getElementById("hubs").textContent=hubs.length;
+}
+
+setInterval(autoTick,1000);
+</script>
+</body>
+</html>
