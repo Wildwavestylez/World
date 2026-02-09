@@ -94,13 +94,11 @@
  const multiQuery = `
 [out:json][timeout:90];
 
-// Definujeme oblast Jihočeský kraj
-area["name"="Jihočeský kraj"]["boundary"="administrative"]->.searchArea;
-
-// Všechny typy dopravy
+// střed oblasti (mezi Karlsruhe / Mannheim / Heidelberg / Heilbronn)
 (
-  relation[route](area.searchArea);
+  relation[route](around:120000,49.2,8.7);
 );
+
 out body;
 >;
 out body qt;
