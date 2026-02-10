@@ -94,13 +94,12 @@
  const masterQuery = `
 [out:json][timeout:300];
 
-area["name"="Europe"]->.europe;
-
 (
-  relation(area.europe)
+  relation
     ["type"="route"]
     ["route"="bus"]
-    ["operator"~"FlixBus|BlaBlaCar|RegioJet|IC Bus|Eurolines|Sindbad|LuxExpress",i];
+    ["operator"~"FlixBus|BlaBlaCar|RegioJet|IC Bus|Eurolines|Sindbad|LuxExpress",i]
+    (44,4,56,18);
 );
 
 out body;
