@@ -91,15 +91,16 @@
     // Build area id for Berlin
     const areaQuery = 'area[name="Berlin"];';
 
- const multiQuery = `
-[out:json][timeout:120];
+ const masterQuery = `
+[out:json][timeout:300];
 
-// Rhein-Neckar + Karlsruhe region bbox
+// Europe bbox
 (
   relation
     ["type"="route"]
-    ["route"~"train|light_rail|tram|subway"]
-    (47.3,7.1,50.8,11.7);
+    ["route"="bus"]
+    ["operator"~"FlixBus|BlaBlaCar|RegioJet|IC Bus|Eurolines|Sindbad|LuxExpress",i]
+    (34,-11,72,40);
 );
 
 out body;
