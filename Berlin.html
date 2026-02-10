@@ -92,16 +92,19 @@
     const areaQuery = 'area[name="Berlin"];';
 
  const multiQuery = `
-[out:json][timeout:90];
+[out:json][timeout:120];
 
-// střed oblasti (mezi Karlsruhe / Mannheim / Heidelberg / Heilbronn)
+// Rhein-Neckar + Karlsruhe region bbox
 (
-  relation[route](around:120000,49.2,8.7);
+  relation
+    ["type"="route"]
+    ["route"~"train|light_rail|tram|subway"]
+    (48.7,8.1,49.8,9.7);
 );
 
 out body;
 >;
-out body qt;
+out skel qt;
 `;
 
   // Convert Overpass result (relations + nodes) into LINES structure
