@@ -63,7 +63,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).a
 const multiQuery = `
 [out:json][timeout:120];
 (
-  relation["type"="route"]["route"~"train|light_rail|tram|subway"](48.7,6.1,49.8,13.7);
+  relation["type"="route"]["route"~"train|light_rail|tram|subway"](46.2,3.1,52.8,16.7);
 );
 out body;
 >;
