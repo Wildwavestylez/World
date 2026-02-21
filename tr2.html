@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>OpenRail Tycoon – Plynulý vlak</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+body, html {
+    margin: 0; padding: 0; height: 100%; font-family: Arial; background: #111; color: #eee;
+}
+#map { width: 100%; height: 100%; }
+#statusBox, #moneyBox, #offerBox {
+    position: absolute; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 6px;
+    font-size: 14px; z-index: 9999;
+}
+#statusBox { top: 10px; left: 10px; color: #0f0; border: 1px solid #0f0; text-shadow: 0 0 5px #0f0; min-width:160px;}
+#moneyBox { top: 10px; right: 10px; color: #ffd700; font-weight:bold; border:1px solid #ffd700; text-shadow:0 0 5px #ffd700;}
+#offerBox { top: 80px; left:10px; width:260px; display:none; border:1px solid #aaa; }
+#offerBox button { margin-top: 6px; width:48%; padding:6px; background:#222; color:#eee; border:1px solid #555; cursor:pointer;}
+#offerBox button:hover { background:#333; }
+</style>
+</head>
+<body>
+
+<div id="statusBox">Inicializace…</div>
+<div id="moneyBox">💰 500 000 Kč</div>
+<div id="offerBox"></div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+
+// ===============================================
+// GLOBÁLNÍ PROMĚNNÉ
+// ===============================================
+let money = 500000;
+function updateMoney() { document.getElementById("moneyBox").innerText = "💰 " + money.toLocaleString("cs-CZ") + " Kč"; }
+function setStatus(msg, color="#0f0") { const box = document.getElementById("statusBox"); box.innerText = msg; box.style.color=color; }
+
+const PRICE_PER_KM = 150;
+let cachedRoutes = [], ownedRoutes = [], currentOfferIndex = 0;
+let trains = [];
+
+// ===============================================
+// IKONA VLAKU
+// ===============================================
+const trainIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/1769/1769384.png",
+    iconSize: [28,28],
+    iconAnchor: [14,14]
+});
+
+// ===============================================
+// MAPA
+// ===============================================
+setStatus("Inicializace mapy…");
+const map = L.map('map').setView([49.2, 8.6], 10);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+// ===============================================
+// OVERPASS DOTAZ
+// ===============================================
+const multiQuery = `
+[out:json][timeout:120];
+(
+  relation["type"="route"]["route"~"train|light_rail|tram|subway"](48.7,6.1,49.8,13.7);
+);
+out body;
+>;
+out body qt;
+`;
+
+async function loadRoutes() {
+    setStatus("Stahuji data z Overpass API…");
+    try {
+        const url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(multiQuery);
+        const res = await fetch(url);
+        const json = await res.json();
+        setStatus("Zpracovávám data…");
+        prepareCache(json);
+        setStatus("Úřad připraven.");
+        offerNextRoute();
+        setInterval(offerNextRoute, 60000); // každou minutu nová nabídka
+    } catch(e) { console.error(e); setStatus("Chyba při načítání dat", "red"); }
+}
+
+// ===============================================
+// ZPRACOVÁNÍ DAT
+// ===============================================
+function prepareCache(osm) {
+    const nodes = {}, ways = {}, relations = [];
+    osm.elements.forEach(el => { if(el.type==="node") nodes[el.id]=el; if(el.type==="way") ways[el.id]=el; if(el.type==="relation") relations.push(el); });
+
+    relations.forEach(rel => {
+        const coords = [], stations = [];
+        rel.members.forEach(m => {
+            if(m.type==="way" && ways[m.ref]) ways[m.ref].nodes.forEach(nid=>{ if(nodes[nid]) coords.push([nodes[nid].lat, nodes[nid].lon]); });
+            if(m.type==="node" && nodes[m.ref]) { const n=nodes[m.ref]; stations.push([n.lat,n.lon]); }
+        });
+        if(coords.length>1 && stations.length>1) {
+            // zjednodušení trasy, aby se nezasekávalo
+            const simplified = simplifyRoute(coords, 3);
+            cachedRoutes.push({
+                id: rel.id,
+                name: rel.tags.name || "Neznámá linka",
+                ref: rel.tags.ref || "",
+                type: rel.tags.route || "",
+                coords: simplified,
+                stations,
+                fee: Math.floor(Math.random()*20000+8000)
+            });
+        }
+    });
+}
+
+// ===============================================
+// FUNKCE ZJEDNODUŠENÍ TRASY
+// ===============================================
+function simplifyRoute(coords, step=3) {
+    const simplified=[];
+    for(let i=0;i<coords.length;i+=step) simplified.push(coords[i]);
+    if(coords.length>0 && simplified[simplified.length-1]!==coords[coords.length-1]) simplified.push(coords[coords.length-1]);
+    return simplified;
+}
+
+// ===============================================
+// ÚŘAD – NABÍDKA LINEK
+// ===============================================
+function offerNextRoute() {
+    const box = document.getElementById("offerBox");
+    if(currentOfferIndex >= cachedRoutes.length) { box.style.display="none"; return; }
+    const r = cachedRoutes[currentOfferIndex];
+    box.innerHTML = `<b>Úřad ti nabízí:</b><br>
+        <h3>${r.name}</h3>
+        Správní poplatek: <b>${r.fee} Kč</b><br><br>
+        Chceš tuto linku provozovat?<br><br>
+        <button onclick="acceptRoute()">ANO</button>
+        <button onclick="denyRoute()">NE</button>`;
+    box.style.display="block";
+}
+
+function denyRoute() { currentOfferIndex++; offerNextRoute(); }
+
+// ===============================================
+// ANO – PŘEVEZME LINKU
+// ===============================================
+function acceptRoute() {
+    const r = cachedRoutes[currentOfferIndex];
+    if(money < r.fee){ alert("Nemáš dost peněz!"); return; }
+    if(r.coords.length<2){ alert("Linka nemá dost dat"); currentOfferIndex++; offerNextRoute(); return; }
+
+    money -= r.fee; updateMoney();
+    ownedRoutes.push(r);
+
+    // vykreslení trasy a stanic
+    L.polyline(r.coords, { color:"#00ff88", weight:4 }).addTo(map);
+    r.stations.forEach(s=>L.circleMarker(s,{radius:4,color:"#fff"}).addTo(map));
+
+    const train = { marker:L.marker(r.coords[0], {icon:trainIcon}).addTo(map), routeCoords:r.coords };
+    trains.push(train);
+    animateTrain(train);
+
+    currentOfferIndex++; offerNextRoute();
+}
+
+// ===============================================
+// ANIMACE VLAKU – NEKONEČNÝ LOOP
+// ===============================================
+function animateTrain(train) {
+    const speedKmH = 70;
+    const speedMs = speedKmH / 3.6; // km/h → m/s
+    const route = train.routeCoords;
+    let index = 0, forward = true;
+
+    function move() {
+        // určí další index podle směru
+        let nextIndex = forward ? index + 1 : index - 1;
+
+        // pokud jsme na konci nebo začátku trasy, otočíme směr
+        if(nextIndex >= route.length) { forward = false; nextIndex = index - 1; }
+        if(nextIndex < 0) { forward = true; nextIndex = index + 1; }
+
+        const from = route[index];
+        const to = route[nextIndex];
+        const segmentDist = map.distance(from, to); // v metrech
+        const segmentTime = segmentDist / speedMs;   // v sekundách
+        let startTime = null;
+
+        function step(timestamp) {
+            if(!startTime) startTime = timestamp;
+            const progress = (timestamp - startTime) / (segmentTime * 1000);
+
+            if(progress >= 1){
+                // přesun na další bod
+                train.marker.setLatLng(to);
+
+                // přidání peněz
+                money += Math.round((segmentDist/1000) * PRICE_PER_KM);
+                updateMoney();
+
+                // krátká pauza na stanici (volitelné, např. 0.5s)
+                setTimeout(() => {
+                    index = nextIndex;
+                    move(); // pokračujeme dalším segmentem
+                }, 500); 
+
+            } else {
+                // interpolace mezi body
+                const lat = from[0] + (to[0]-from[0]) * progress;
+                const lng = from[1] + (to[1]-from[1]) * progress;
+                train.marker.setLatLng([lat, lng]);
+
+                requestAnimationFrame(step);
+            }
+        }
+
+        requestAnimationFrame(step);
+    }
+
+    move();
+}
+// ===============================================
+// START
+// ===============================================
+loadRoutes();
+
+</script>
+</body>
+</html>
