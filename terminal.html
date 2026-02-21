@@ -191,7 +191,7 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   const query = `
     [out:json][timeout:25];
     (
-      node["place"~"village|town|hamlet"](around:${radiusKm * 1000},${terminalLat},${terminalLon});
+      node["place"~"village|town"](around:${radiusKm * 1000},${terminalLat},${terminalLon});
     );
     out body;
   `;
