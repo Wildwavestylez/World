@@ -249,7 +249,7 @@ function startGeneratingPassengers() {
     }
 
     renderDispatchTab();
-  }, 1);
+  }, 30);
 }
 
 
@@ -394,6 +394,8 @@ function renderVehicleList() {
     <button onclick="buyBus('mikrobus')">Koupit Mikrobus (5 000 Kč)</button>
     <button onclick="buyBus('minibus')">Koupit Minibus (50 000 Kč)</button>
     <button onclick="buyBus('autobus')">Koupit Autobus (100 000 Kč)</button>
+     <button onclick="buyBus('doubledecker')">Koupit Doubledecker (200 000 Kč)</button>
+  
   `;
   listContainer.appendChild(purchaseButtons);
 }
