@@ -238,7 +238,7 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   console.log("Aktualizované obce:", fetchedVillages);
   startGeneratingPassengers();
 }
-let money = 5000000;
+let money = 500000;
 
 // Spuštění generování cestujících
 let passengerGenerationStarted = false;
@@ -261,7 +261,7 @@ function startGeneratingPassengers() {
     }
 
     renderDispatchTab();
-  }, 1);
+  }, 0.1);
 }
 
 
