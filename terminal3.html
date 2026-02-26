@@ -187,8 +187,7 @@
 };
 
 
-let dispatchInitialized = false;
-let dispatchRenderScheduled = false;
+
    let searchRadiusKm = 5; // začínáme na 5 km 
     let fetchedVillages = [];
 const passengerGroups = {}; // { název obce: počet cestujících }
@@ -230,118 +229,100 @@ let money = 500000;
 // Spuštění generování cestujících
 let passengerGenerationStarted = false;
 
-function scheduleDispatchRender() {
-  if (dispatchRenderScheduled) return;
-
-  dispatchRenderScheduled = true;
-
-  setTimeout(() => {
-    renderDispatchTab();
-    dispatchRenderScheduled = false;
-  }, 1000);
-}
-
 function startGeneratingPassengers() {
-  if (passengerGenerationStarted) return;
+  if (passengerGenerationStarted) return; // zabrání spuštění víc intervalů
+
   passengerGenerationStarted = true;
 
   setInterval(() => {
     if (fetchedVillages.length === 0) return;
 
-    const SPAWN_BATCH = 220; // ← TADY ŘÍDÍŠ HUSTOTU
+    const randomIndex = Math.floor(Math.random() * fetchedVillages.length);
+    const destination = fetchedVillages[randomIndex].name;
 
-    for (let i = 0; i < SPAWN_BATCH; i++) {
-      const randomIndex = Math.floor(Math.random() * fetchedVillages.length);
-      const destination = fetchedVillages[randomIndex].name;
-
-      passengerGroups[destination] =
-        (passengerGroups[destination] || 0) + 1;
+    if (!passengerGroups[destination]) {
+      passengerGroups[destination] = 1;
+    } else {
+      passengerGroups[destination]++;
     }
 
-    scheduleDispatchRender();
-  }, 5000); // každých 5 sekund
+    renderDispatchTab();
+  }, 0.1);
 }
+
 
 // Přepis vykreslování obsahu Dispečinku
 function renderDispatchTab() {
   const activeTab = document.querySelector('.tab.active')?.dataset.tab;
   if (activeTab !== 'dispatch') return;
 
-  // 🔹 Vytvoření základní struktury jen jednou
-  if (!dispatchInitialized) {
-    tabContent.innerHTML = `
-      <h3>Dispečink</h3>
-      <div class="dispatch-scroll" 
-           style="max-height:170px; overflow-y:auto; border:1px solid #ccc; border-radius:8px;">
-        <table style="width:100%; border-collapse:collapse;">
-          <thead>
-            <tr>
-              <th style="text-align:left; padding:5px;">Cíl</th>
-              <th style="text-align:right; padding:5px;">Počet cestujících</th>
-            </tr>
-          </thead>
-          <tbody id="dispatch-body"></tbody>
-        </table>
-      </div>
-    `;
-    dispatchInitialized = true;
-  }
+  const entries = Object.entries(passengerGroups);
+  entries.sort((a, b) => b[1] - a[1]);
 
-  const tbody = document.getElementById('dispatch-body');
-  const scrollBox = tabContent.querySelector('.dispatch-scroll');
-  const savedScrollTop = scrollBox.scrollTop;
-
-  // 🔹 Seřadíme jen top 20 destinací
-  const entries = Object.entries(passengerGroups)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20);
-
-  // 🔹 Vyčistíme jen tbody (ne celý tab)
-  tbody.innerHTML = '';
+  let html = `<h3>Dispečink</h3>`;
 
   if (entries.length === 0) {
-    const tr = document.createElement('tr');
-    const td = document.createElement('td');
-    td.colSpan = 2;
-    td.textContent = 'Žádní cestující zatím nečekají.';
-    td.style.padding = '5px';
-    tr.appendChild(td);
-    tbody.appendChild(tr);
-  } else {
-    const fragment = document.createDocumentFragment();
-
-    entries.forEach(([destination, count]) => {
-      const tr = document.createElement('tr');
-
-      const tdName = document.createElement('td');
-      tdName.style.padding = '5px';
-      tdName.textContent = destination;
-
-      const button = document.createElement('button');
-      button.textContent = 'Vypravit autobus';
-      button.style.marginLeft = '10px';
-      button.onclick = () => openDispatchModal(destination, count);
-
-      tdName.appendChild(button);
-
-      const tdCount = document.createElement('td');
-      tdCount.style.padding = '5px';
-      tdCount.style.textAlign = 'right';
-      tdCount.textContent = count;
-
-      tr.appendChild(tdName);
-      tr.appendChild(tdCount);
-
-      fragment.appendChild(tr);
-    });
-
-    tbody.appendChild(fragment);
+    html += `<p>Žádní cestující zatím nečekají.</p>`;
+    tabContent.innerHTML = html;
+    return;
   }
 
-  // 🔹 Vrátíme scroll
-  scrollBox.scrollTop = savedScrollTop;
+  // Pokusíme se zachovat scroll pokud existuje
+  const existingScrollBox = tabContent.querySelector('.dispatch-scroll');
+  const savedScrollTop = existingScrollBox ? existingScrollBox.scrollTop : 0;
+  html += `
+    <div class="dispatch-scroll" style="max-height: 170px; overflow-y: auto; border: 1px solid #ccc; border-radius: 8px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 5px;">Cíl</th>
+            <th style="text-align: right; padding: 5px;">Počet cestujících</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  entries.forEach(([destination, count]) => {
+    html += `
+      <tr>
+        <td style="padding: 5px;">
+          ${destination}
+          <button onclick="openDispatchModal('${destination}', ${count})" style="margin-left: 10px;">Vypravit autobus</button>
+        </td>
+        <td style="padding: 5px; text-align: right;">${count}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  tabContent.innerHTML = html;
+
+  // Po přepsání obsahu vrátíme scroll zpět
+  const newScrollBox = tabContent.querySelector('.dispatch-scroll');
+  if (newScrollBox) {
+    newScrollBox.scrollTop = savedScrollTop;
+  }
 }
 
+  fetchNearbyVillages();
+
+    // Přepínání záložek
+    const tabs = document.querySelectorAll('.tab');
+    const tabContent = document.getElementById('tab-content');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const tabName = tab.dataset.tab;
+        renderTab(tabName);
+      });
+    });
 
   let ownedVehicles = [];
 
