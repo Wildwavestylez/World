@@ -706,4 +706,119 @@ function buyBus(type) {
   ownedVehicles.push(newBus);
 
   renderVehicleList(); // Aktualizujeme seznam vozidel
-// Zvýšíme rádius a přif
+// Zvýšíme rádius a přifetchneme nové obce
+  searchRadiusKm += 5;
+  fetchNearbyVillages(searchRadiusKm);
+}
+
+// Funkce pro vytvoření nového autobusu
+function createBus(type) {
+  const busDetails = busTypes[type];
+
+  const busName = `Bjouk ${ownedVehicles.length + 1}`; // Generování názvu
+  const newBus = {
+    id: Date.now(),
+    type: type,
+    name: busName,
+    capacity: busDetails.capacity,
+    speed: busDetails.speed,
+    status: 'volný',
+    kmDriven: 0,
+    kmToService: 20000,
+    destination: null,
+    iconUrl: busDetails.iconUrl
+  };
+  return newBus;
+}
+
+  const dbName = "DopravniTerminalDB";
+const storeName = "GameState";
+
+// Otevření nebo vytvoření databáze
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+
+    request.onupgradeneeded = event => {
+      const db = event.target.result;
+      db.createObjectStore(storeName);
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject("Nepodařilo se otevřít IndexedDB");
+  });
+}
+
+async function saveGameState() {
+  const db = await openDB();
+  const tx = db.transaction(storeName, "readwrite");
+  const store = tx.objectStore(storeName);
+
+  // Uložíme všechny potřebné informace včetně správného stavu vozidel a pasažérů
+  const gameState = {
+    money,
+    ownedVehicles: ownedVehicles.map(vehicle => ({
+      ...vehicle,
+      status: vehicle.status === 'na cestě' ? 'volný' : vehicle.status, // Resetujeme status vozidel
+      destination: null // Resetujeme destinaci pro vozidla na cestě
+    })),
+    fetchedVillages,
+    passengerGroups,
+    searchRadiusKm
+  };
+
+  store.put(gameState, "state");
+
+  console.log("Uložen herní stav");
+}
+
+async function loadGameState() {
+  const db = await openDB();
+  const tx = db.transaction(storeName, "readonly");
+  const store = tx.objectStore(storeName);
+
+  const request = store.get("state");
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => {
+      if (request.result) {
+        const state = request.result;
+        money = state.money || 0;
+        ownedVehicles = (state.ownedVehicles || []).map(bus => ({
+          ...bus,
+          status: bus.status === 'na cestě' || bus.status?.startsWith('jede do')
+            ? 'volný'
+            : bus.status,
+          destination: null
+        }));
+        fetchedVillages = state.fetchedVillages || [];
+        passengerGroups = state.passengerGroups || {};
+        searchRadiusKm = state.searchRadiusKm || 5;
+
+        console.log("Načten herní stav", state);
+        renderMoney();
+        renderVehicleList();
+        renderDispatchTab();
+        resolve(true);
+      } else {
+        console.log("Nebyl uložen žádný stav.");
+        resolve(false);
+      }
+    };
+    request.onerror = () => reject("Chyba při načítání stavu hry");
+  });
+}
+
+// Smazání stavu hry
+async function deleteGameState() {
+  const db = await openDB();
+  const tx = db.transaction(storeName, "readwrite");
+  const store = tx.objectStore(storeName);
+  store.delete("state");
+  console.log("Herní stav smazán");
+}
+  setInterval(() => {
+  saveGameState();
+}, 5 * 60 * 1000); // každých 5 minut
+  </script>
+</body>
+</html>
