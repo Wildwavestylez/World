@@ -230,24 +230,24 @@ let money = 500000;
 let passengerGenerationStarted = false;
 
 function startGeneratingPassengers() {
-  if (passengerGenerationStarted) return; // zabrání spuštění víc intervalů
-
+  if (passengerGenerationStarted) return;
   passengerGenerationStarted = true;
 
   setInterval(() => {
     if (fetchedVillages.length === 0) return;
 
-    const randomIndex = Math.floor(Math.random() * fetchedVillages.length);
-    const destination = fetchedVillages[randomIndex].name;
+    const SPAWN_BATCH = 250; // ← TADY ŘÍDÍŠ HUSTOTU
 
-    if (!passengerGroups[destination]) {
-      passengerGroups[destination] = 1;
-    } else {
-      passengerGroups[destination]++;
+    for (let i = 0; i < SPAWN_BATCH; i++) {
+      const randomIndex = Math.floor(Math.random() * fetchedVillages.length);
+      const destination = fetchedVillages[randomIndex].name;
+
+      passengerGroups[destination] =
+        (passengerGroups[destination] || 0) + 1;
     }
 
     renderDispatchTab();
-  }, 0.1);
+  }, 5000); // každých 5 sekund
 }
 
 
