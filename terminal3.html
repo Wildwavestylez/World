@@ -490,22 +490,7 @@ function createInitialVehicle() {
 
 
 
-function openDispatchModal(destination, passengerCount) {
-  const modal = document.getElementById('dispatch-modal');
-  const content = document.getElementById('dispatch-modal-content');
 
-  content.innerHTML = `
-    <h3>Vypravit autobus do: ${destination}</h3>
-    <p>Čekajících cestujících: ${passengerCount}</p>
-    <button onclick="assignBusToDestination('${destination}', ${passengerCount})">
-      Vypravit volný autobus
-    </button>
-    <button onclick="closeDispatchModal()">Zavřít</button>
-  `;
-
-  modal.style.display = 'block';
-
-}
 
   function dispatchVehicle(vehicleId, destination, requestedPassengerCount) {
   const vehicle = ownedVehicles.find(v => v.id === vehicleId);
