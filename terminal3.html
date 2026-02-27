@@ -188,7 +188,7 @@
 
 
 
-   let searchRadiusKm = 20; // začínáme na 5 km 
+   let searchRadiusKm = 5; // začínáme na 5 km 
     let fetchedVillages = [];
 let passengerGroups = {}; // { název obce: počet cestujících }
 
@@ -225,7 +225,7 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   console.log("Aktualizované obce:", fetchedVillages);
   startGeneratingPassengers();
 }
-let money = 20000;
+let money = 500000;
 
 // Spuštění generování cestujících
 let passengerGenerationStarted = false;
