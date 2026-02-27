@@ -190,7 +190,7 @@
 
    let searchRadiusKm = 10; // začínáme na 5 km 
     let fetchedVillages = [];
-let passengerGroups = {}; // { název obce: počet cestujících }
+const passengerGroups = {}; // { název obce: počet cestujících }
 
 // Fetch nearby villages – už jsme měli
 async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
