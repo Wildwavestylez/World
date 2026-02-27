@@ -194,53 +194,35 @@ const passengerGroups = {}; // { název obce: počet cestujících }
 
 // Fetch nearby villages – už jsme měli
 async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
-  try {
-    const overpassUrl = "https://overpass-api.de/api/interpreter";
+  const overpassUrl = "https://overpass-api.de/api/interpreter";
+  const query = `
+    [out:json][timeout:25];
+    (
+      node["place"~"village|town"](around:${radiusKm * 1000},${terminalLat},${terminalLon});
+    );
+    out body;
+  `;
+  const response = await fetch(overpassUrl, {
+    method: "POST",
+    body: query
+  });
+  const data = await response.json();
 
-    const query = `
-      [out:json][timeout:25];
-      (
-        node["shop"~"supermarket|convenience|discount|grocery"]
-          (around:${radiusKm * 1000},${terminalLat},${terminalLon});
-      );
-      out body;
-    `;
+  const newVillages = data.elements.map(el => ({
+    name: el.tags.name || "Neznámá obec",
+    lat: el.lat,
+    lon: el.lon
+  }));
 
-    const response = await fetch(overpassUrl, {
-      method: "POST",
-      body: query
-    });
-
-    if (!response.ok) {
-      throw new Error("Overpass API error");
+  // Přidáme jen nové obce, co ještě nejsou ve fetchedVillages
+  newVillages.forEach(village => {
+    if (!fetchedVillages.some(v => v.name === village.name)) {
+      fetchedVillages.push(village);
     }
+  });
 
-    const data = await response.json();
-
-    const newVillages = data.elements.map(el => {
-      const shopName = (el.tags && el.tags.name) ? el.tags.name : "Obchod";
-      return {
-        id: el.id,      // unikátní ID
-        name: shopName, // jen jméno obchodu
-        lat: el.lat,
-        lon: el.lon
-      };
-    });
-
-    // Přidáme jen nové podle ID
-    newVillages.forEach(village => {
-      if (!fetchedVillages.some(v => v.id === village.id)) {
-        fetchedVillages.push(village);
-      }
-    });
-
-    console.log("Aktualizované obce:", fetchedVillages.length);
-
-    startGeneratingPassengers();
-
-  } catch (error) {
-    console.error("Chyba při načítání obcí:", error);
-  }
+  console.log("Aktualizované obce:", fetchedVillages);
+  startGeneratingPassengers();
 }
 let money = 500000;
 
