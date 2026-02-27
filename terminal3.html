@@ -350,6 +350,7 @@ function renderTab(tabName) {
       <button onclick="saveGameState()">Uložit hru</button>
       <button onclick="loadGameState()">Načíst hru</button>
       <button onclick="deleteGameState()">Smazat uloženou hru</button>
+<button onclick="resetVillages()">Resetovat obce</button>
     </div>
   `;
 }
@@ -793,6 +794,20 @@ async function loadGameState() {
     request.onerror = () => reject("Chyba při načítání stavu hry");
   });
 }
+
+async function resetVillages() {
+  fetchedVillages = [];
+  passengerGroups = {};
+  searchRadiusKm = 20;
+
+  await saveGameState();
+
+  await fetchNearbyVillages(searchRadiusKm);
+
+  renderDispatchTab();
+  console.log("Obce byly resetovány.");
+}
+
 
 // Smazání stavu hry
 async function deleteGameState() {
