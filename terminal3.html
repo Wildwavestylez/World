@@ -218,26 +218,10 @@ async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
     const data = await response.json();
 
     const newVillages = data.elements.map(el => {
-      const tags = el.tags || {};
-
-      const shopName = tags.name || "Obchod";
-
-      const location =
-        tags["addr:city"] ||
-        tags["addr:town"] ||
-        tags["addr:village"] ||
-        tags["addr:hamlet"] ||
-        tags["addr:suburb"] ||
-        tags["is_in"] ||
-        "";
-
-      const displayName = location
-        ? `${shopName} ${location}`
-        : shopName;
-
+      const shopName = (el.tags && el.tags.name) ? el.tags.name : "Obchod";
       return {
-        id: el.id,               // 🔥 unikátní identifikátor
-        name: displayName,
+        id: el.id,      // unikátní ID
+        name: shopName, // jen jméno obchodu
         lat: el.lat,
         lon: el.lon
       };
