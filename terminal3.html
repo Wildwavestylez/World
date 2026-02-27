@@ -195,13 +195,13 @@ const passengerGroups = {}; // { název obce: počet cestujících }
 // Fetch nearby villages – už jsme měli
 async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   const overpassUrl = "https://overpass-api.de/api/interpreter";
-  const query = `
-    [out:json][timeout:25];
-    (
-      node["place"~"village|town"](around:${radiusKm * 1000},${terminalLat},${terminalLon});
-    );
-    out body;
-  `;
+  const query = `  
+  [out:json][timeout:25];  
+  (  
+    node["amenity"="fuel"](around:${radiusKm * 1000},${terminalLat},${terminalLon});  
+  );  
+  out body;  
+`;
   const response = await fetch(overpassUrl, {
     method: "POST",
     body: query
