@@ -194,36 +194,69 @@ const passengerGroups = {}; // { název obce: počet cestujících }
 
 // Fetch nearby villages – už jsme měli
 async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
-  const overpassUrl = "https://overpass-api.de/api/interpreter";
-  const query = `
-  [out:json][timeout:25];
-  (
-    node["shop"~"supermarket|convenience|discount|grocery"]
-      (around:${radiusKm * 1000},${terminalLat},${terminalLon});
-  );
-  out body;
-`;
-  const response = await fetch(overpassUrl, {
-    method: "POST",
-    body: query
-  });
-  const data = await response.json();
+  try {
+    const overpassUrl = "https://overpass-api.de/api/interpreter";
 
-  const newVillages = data.elements.map(el => ({
-    name: el.tags.name || "Neznámá obec",
-    lat: el.lat,
-    lon: el.lon
-  }));
+    const query = `
+      [out:json][timeout:25];
+      (
+        node["shop"~"supermarket|convenience|discount|grocery"]
+          (around:${radiusKm * 1000},${terminalLat},${terminalLon});
+      );
+      out body;
+    `;
 
-  // Přidáme jen nové obce, co ještě nejsou ve fetchedVillages
-  newVillages.forEach(village => {
-    if (!fetchedVillages.some(v => v.name === village.name)) {
-      fetchedVillages.push(village);
+    const response = await fetch(overpassUrl, {
+      method: "POST",
+      body: query
+    });
+
+    if (!response.ok) {
+      throw new Error("Overpass API error");
     }
-  });
 
-  console.log("Aktualizované obce:", fetchedVillages);
-  startGeneratingPassengers();
+    const data = await response.json();
+
+    const newVillages = data.elements.map(el => {
+      const tags = el.tags || {};
+
+      const shopName = tags.name || "Obchod";
+
+      const location =
+        tags["addr:city"] ||
+        tags["addr:town"] ||
+        tags["addr:village"] ||
+        tags["addr:hamlet"] ||
+        tags["addr:suburb"] ||
+        tags["is_in"] ||
+        "";
+
+      const displayName = location
+        ? `${shopName} ${location}`
+        : shopName;
+
+      return {
+        id: el.id,               // 🔥 unikátní identifikátor
+        name: displayName,
+        lat: el.lat,
+        lon: el.lon
+      };
+    });
+
+    // Přidáme jen nové podle ID
+    newVillages.forEach(village => {
+      if (!fetchedVillages.some(v => v.id === village.id)) {
+        fetchedVillages.push(village);
+      }
+    });
+
+    console.log("Aktualizované obce:", fetchedVillages.length);
+
+    startGeneratingPassengers();
+
+  } catch (error) {
+    console.error("Chyba při načítání obcí:", error);
+  }
 }
 let money = 500000;
 
