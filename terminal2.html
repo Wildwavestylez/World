@@ -578,101 +578,125 @@ function closeDispatchModal() {
 // Globální pole pro všechny aktivní animace autobusů
 const activeBusAnimations = [];
 
-// Nová lehká verze
-function assignBusToDestination(destination, passengerCount) {
-  const bus = ownedVehicles.find(b => b.status === 'volný');
-  if (!bus) {
+// function assignBusToDestination(destinationName, passengerCount) {
+  const availableBus = ownedVehicles.find(bus => bus.status === 'volný');
+  if (!availableBus) {
     alert('Nemáte žádný volný autobus!');
     return;
   }
 
-  const village = fetchedVillages.find(v => v.name === destination);
+  const village = fetchedVillages.find(v => v.name === destinationName);
   if (!village) {
     alert('Cíl nebyl nalezen.');
     return;
   }
 
-  bus.status = `jede do ${destination}`;
-  bus.destination = destination;
+  // Spočítáme přímou vzdálenost (Haversine)
+  const distanceKm = getDistanceKm(terminalLat, terminalLon, village.lat, village.lon);
 
-  // === jednoduchá přímá trasa mezi terminálem a cílem ===
-  const routeCoords = [
-    [terminalLat, terminalLon],
-    [village.lat, village.lon]
-  ];
+  const actualPassengerCount = Math.min(passengerCount, availableBus.capacity);
 
-  const distanceKm = getDistanceBetweenPoints(
-    { lat: terminalLat, lon: terminalLon },
-    { lat: village.lat, lon: village.lon }
-  );
+  // Nastavíme autobus na cestu
+  availableBus.status = `na cestě do ${destinationName}`;
+  availableBus.destination = destinationName;
 
-  const travelTime = (distanceKm / bus.speed) * 3600 * 1000; // ms
-
-  // Ikona autobusu
+  // Marker a polyline
   const busIcon = L.icon({
-    iconUrl: busTypes[bus.type].iconUrl,
+    iconUrl: busTypes[availableBus.type].iconUrl,
     iconSize: [32, 32],
     iconAnchor: [16, 16]
   });
 
-  const marker = L.marker(routeCoords[0], { icon: busIcon }).addTo(map);
-  const line = L.polyline(routeCoords, { color: 'blue' }).addTo(map);
+  const coords = [
+    [terminalLat, terminalLon],
+    [village.lat, village.lon]
+  ];
 
-  // === Animace tam ===
-  let index = 0;
-  const interval = travelTime / routeCoords.length;
+  const marker = L.marker(coords[0], { icon: busIcon }).addTo(map);
+  const line = L.polyline(coords, { color: 'blue' }).addTo(map);
 
-  const forwardInterval = setInterval(() => {
-    marker.setLatLng(routeCoords[index]);
-    index++;
-    if (index >= routeCoords.length) {
-      clearInterval(forwardInterval);
+  let progress = 0; // 0..1
+  const speedKmPerSec = availableBus.speed / 3600; // rychlost v km/s
+  const travelTimeSec = distanceKm / speedKmPerSec;
 
-      // výdělek tam
-      const actualPassengers = Math.min(passengerCount, bus.capacity);
-      money += actualPassengers * distanceKm * 10;
+  const startTime = Date.now();
+
+  function animate() {
+    const elapsed = (Date.now() - startTime) / 1000; // v sekundách
+    progress = Math.min(elapsed / travelTimeSec, 1);
+
+    // interpolace souřadnic
+    const lat = terminalLat + (village.lat - terminalLat) * progress;
+    const lon = terminalLon + (village.lon - terminalLon) * progress;
+    marker.setLatLng([lat, lon]);
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      // Cíl dosažen, vyděláme peníze
+      const incomeTo = actualPassengerCount * distanceKm * 10;
+      money += incomeTo;
       renderMoney();
 
       setTimeout(() => {
-        // === Animace zpět ===
-        let backIndex = routeCoords.length - 1;
-        const backInterval = setInterval(() => {
-          if (backIndex < 0) {
-            clearInterval(backInterval);
+        // cesta zpět
+        const returnStartTime = Date.now();
+        function animateBack() {
+          const elapsedBack = (Date.now() - returnStartTime) / 1000;
+          progress = Math.min(elapsedBack / travelTimeSec, 1);
 
-            // výdělek zpět (autobus plný)
-            money += bus.capacity * distanceKm * 10;
+          const latBack = village.lat + (terminalLat - village.lat) * progress;
+          const lonBack = village.lon + (terminalLon - village.lon) * progress;
+          marker.setLatLng([latBack, lonBack]);
+
+          if (progress < 1) {
+            requestAnimationFrame(animateBack);
+          } else {
+            // Dokončeno
+            const incomeBack = availableBus.capacity * distanceKm * 10;
+            money += incomeBack;
+
+            availableBus.status = 'volný';
+            availableBus.destination = null;
+            availableBus.kmDriven += distanceKm * 2;
+            availableBus.kmToService -= distanceKm * 2;
+            if (availableBus.kmToService <= 0) availableBus.status = 'potřebuje servis';
+
             renderMoney();
-
-            bus.status = 'volný';
-            bus.destination = null;
-            bus.kmDriven += distanceKm * 2;
-            bus.kmToService -= distanceKm * 2;
-            if (bus.kmToService <= 0) bus.status = 'potřebuje servis';
+            renderVehicleList();
+            renderDispatchTab();
 
             map.removeLayer(marker);
             map.removeLayer(line);
-
-            renderVehicleList();
-            renderDispatchTab();
-          } else {
-            marker.setLatLng(routeCoords[backIndex]);
-            backIndex--;
           }
-        }, interval);
-      }, 5000); // pauza 5 s na cíli
+        }
+        animateBack();
+      }, 5000); // 5s pauza na zastávce
     }
-  }, interval);
+  }
 
-  // odečtení cestujících z fronty
-  const actualPassengers = Math.min(passengerCount, bus.capacity);
-  passengerGroups[destination] = Math.max(
-    0,
-    (passengerGroups[destination] || 0) - actualPassengers
-  );
-  if (passengerGroups[destination] <= 0) delete passengerGroups[destination];
+  // Odečteme cestující
+  passengerGroups[destinationName] -= actualPassengerCount;
+  if (passengerGroups[destinationName] <= 0) delete passengerGroups[destinationName];
+
   renderDispatchTab();
+  animate();
 }
+
+// Haversine vzdálenost
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function deg2rad(deg) { return deg * (Math.PI/180); }
 
 // Hlavní animace všech autobusů
 function animateBuses() {
