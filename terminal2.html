@@ -579,9 +579,9 @@ function closeDispatchModal() {
 const activeBusAnimations = [];
 
 // Nová lehká verze
-async function assignBusToDestination(destination, passengerCount) {
-  const availableBus = ownedVehicles.find(bus => bus.status === 'volný');
-  if (!availableBus) {
+function assignBusToDestination(destination, passengerCount) {
+  const bus = ownedVehicles.find(b => b.status === 'volný');
+  if (!bus) {
     alert('Nemáte žádný volný autobus!');
     return;
   }
@@ -592,52 +592,86 @@ async function assignBusToDestination(destination, passengerCount) {
     return;
   }
 
-  // Označíme autobus jako "na cestě"
-  availableBus.status = `jede do ${destination}`;
-  availableBus.destination = destination;
+  bus.status = `jede do ${destination}`;
+  bus.destination = destination;
 
-  // Získáme jednoduchou trasu přes OSRM API
-  const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${terminalLon},${terminalLat};${village.lon},${village.lat}?overview=full&geometries=geojson`;
-  const res = await fetch(osrmUrl);
-  const data = await res.json();
-  if (!data.routes || !data.routes.length) {
-    alert('Nepodařilo se získat trasu!');
-    return;
-  }
+  // === jednoduchá přímá trasa mezi terminálem a cílem ===
+  const routeCoords = [
+    [terminalLat, terminalLon],
+    [village.lat, village.lon]
+  ];
 
-  // Pole souřadnic
-  let coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]); // lat, lon
+  const distanceKm = getDistanceBetweenPoints(
+    { lat: terminalLat, lon: terminalLon },
+    { lat: village.lat, lon: village.lon }
+  );
 
-  // Zjednodušení trasy – jen každý 5. bod
-  coords = coords.filter((_, i) => i % 5 === 0);
+  const travelTime = (distanceKm / bus.speed) * 3600 * 1000; // ms
 
-  const distanceKm = data.routes[0].distance / 1000;
-  const actualPassengerCount = Math.min(passengerCount, availableBus.capacity);
-
-  // Vytvoříme polyline a marker
+  // Ikona autobusu
   const busIcon = L.icon({
-    iconUrl: busTypes[availableBus.type].iconUrl,
+    iconUrl: busTypes[bus.type].iconUrl,
     iconSize: [32, 32],
     iconAnchor: [16, 16]
   });
-  const line = L.polyline(coords, { color: 'blue' }).addTo(map);
-  const marker = L.marker(coords[0], { icon: busIcon }).addTo(map);
 
-  // Přidáme do aktivních animací
-  const animation = { bus: availableBus, marker, line, coords, index: 0, forward: true };
-  activeBusAnimations.push(animation);
+  const marker = L.marker(routeCoords[0], { icon: busIcon }).addTo(map);
+  const line = L.polyline(routeCoords, { color: 'blue' }).addTo(map);
 
-  // Odečteme cestující
-  passengerGroups[destination] -= actualPassengerCount;
+  // === Animace tam ===
+  let index = 0;
+  const interval = travelTime / routeCoords.length;
+
+  const forwardInterval = setInterval(() => {
+    marker.setLatLng(routeCoords[index]);
+    index++;
+    if (index >= routeCoords.length) {
+      clearInterval(forwardInterval);
+
+      // výdělek tam
+      const actualPassengers = Math.min(passengerCount, bus.capacity);
+      money += actualPassengers * distanceKm * 10;
+      renderMoney();
+
+      setTimeout(() => {
+        // === Animace zpět ===
+        let backIndex = routeCoords.length - 1;
+        const backInterval = setInterval(() => {
+          if (backIndex < 0) {
+            clearInterval(backInterval);
+
+            // výdělek zpět (autobus plný)
+            money += bus.capacity * distanceKm * 10;
+            renderMoney();
+
+            bus.status = 'volný';
+            bus.destination = null;
+            bus.kmDriven += distanceKm * 2;
+            bus.kmToService -= distanceKm * 2;
+            if (bus.kmToService <= 0) bus.status = 'potřebuje servis';
+
+            map.removeLayer(marker);
+            map.removeLayer(line);
+
+            renderVehicleList();
+            renderDispatchTab();
+          } else {
+            marker.setLatLng(routeCoords[backIndex]);
+            backIndex--;
+          }
+        }, interval);
+      }, 5000); // pauza 5 s na cíli
+    }
+  }, interval);
+
+  // odečtení cestujících z fronty
+  const actualPassengers = Math.min(passengerCount, bus.capacity);
+  passengerGroups[destination] = Math.max(
+    0,
+    (passengerGroups[destination] || 0) - actualPassengers
+  );
   if (passengerGroups[destination] <= 0) delete passengerGroups[destination];
-
   renderDispatchTab();
-
-  // Spustíme hlavní animaci, pokud ještě neběží
-  if (!window.busAnimationLoopRunning) {
-    window.busAnimationLoopRunning = true;
-    requestAnimationFrame(animateBuses);
-  }
 }
 
 // Hlavní animace všech autobusů
