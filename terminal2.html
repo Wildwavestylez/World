@@ -578,7 +578,7 @@ function closeDispatchModal() {
 // Globální pole pro všechny aktivní animace autobusů
 const activeBusAnimations = [];
 
-// function assignBusToDestination(destinationName, passengerCount) {
+function assignBusToDestination(destinationName, passengerCount) {
   const availableBus = ownedVehicles.find(bus => bus.status === 'volný');
   if (!availableBus) {
     alert('Nemáte žádný volný autobus!');
