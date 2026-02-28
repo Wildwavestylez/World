@@ -178,6 +178,13 @@
     price: 100000,
     iconUrl: "https://i.imgur.com/41OPNQH.png"
   },
+vlak: {
+    name: "vlak",
+    capacity: 250,
+    speed: 670,
+    price: 300000,
+    iconUrl: "https://imgur.com/ZLIih6E.png"
+  },
 
 
 
@@ -188,7 +195,7 @@
 
 
 
-   let searchRadiusKm = 10; // začínáme na 5 km 
+   let searchRadiusKm = 25; // začínáme na 5 km 
     let fetchedVillages = [];
 const passengerGroups = {}; // { název obce: počet cestujících }
 
@@ -196,7 +203,7 @@ const passengerGroups = {}; // { název obce: počet cestujících }
 async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
   const overpassUrl = "https://overpass-api.de/api/interpreter";
   const query = `  
-  [out:json][timeout:25];  
+  [out:json][timeout:65];  
   (  
     node["amenity"="fuel"](around:${radiusKm * 1000},${terminalLat},${terminalLon});  
   );  
@@ -236,7 +243,7 @@ function startGeneratingPassengers() {
   setInterval(() => {
     if (fetchedVillages.length === 0) return;
 
-    const SPAWN_BATCH = 250; // ← TADY ŘÍDÍŠ HUSTOTU
+    const SPAWN_BATCH = 500; // ← TADY ŘÍDÍŠ HUSTOTU
 
     for (let i = 0; i < SPAWN_BATCH; i++) {
       const randomIndex = Math.floor(Math.random() * fetchedVillages.length);
@@ -393,6 +400,7 @@ function renderVehicleList() {
     <button onclick="buyBus('mikrobus')">Koupit Mikrobus (5 000 Kč)</button>
     <button onclick="buyBus('minibus')">Koupit Minibus (50 000 Kč)</button>
     <button onclick="buyBus('autobus')">Koupit Autobus (100 000 Kč)</button>
+   <button onclick="buyBus('vlak')">Koupit vlak (300 000 Kč)</button>
     
   
   `;
