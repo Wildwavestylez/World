@@ -404,8 +404,7 @@ function renderVehicleList() {
     <button onclick="buyBus('mikrobus')">Koupit Mikrobus (5 000 Kč)</button>
     <button onclick="buyBus('minibus')">Koupit Minibus (50 000 Kč)</button>
     <button onclick="buyBus('autobus')">Koupit Autobus (100 000 Kč)</button>
-   <button onclick="buyBus('vlak')">Koupit vlak (300 000 Kč)</button>
-    
+   
   
   `;
   listContainer.appendChild(purchaseButtons);
@@ -465,7 +464,7 @@ function createInitialVehicle() {
     id: Date.now(),
     type: 'mikrobus',
     name: 'cápek 1',
-    capacity: 50,
+    capacity: 40,
     speed: 650, // 
     status: 'volný',
     kmDriven: 0,
