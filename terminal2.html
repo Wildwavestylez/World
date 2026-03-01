@@ -194,7 +194,7 @@ vlak: {
 };
 
 
-let dynamicRadiusKm = 5;   // počáteční okruh
+let dynamicRadiusKm = 10;   // počáteční okruh
    let searchRadiusKm = 25; // začínáme na 5 km 
     let fetchedVillages = [];
 const passengerGroups = {}; // { název obce: počet cestujících }
@@ -260,7 +260,7 @@ function startGeneratingPassengers() {
 }
 
 setInterval(() => {
-  dynamicRadiusKm += 2;   // každých 5 minut přidáme +2 km
+  dynamicRadiusKm += 5;   // každých 5 minut přidáme +2 km
   console.log("Nový okruh:", dynamicRadiusKm, "km");
 }, 180000);
 
