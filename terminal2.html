@@ -182,7 +182,7 @@ vlak: {
     name: "vlak",
     capacity: 380,
     speed: 670,
-    price: 300000,
+    price: 500000,
     iconUrl: "https://imgur.com/ZLIih6E.png"
   },
 
@@ -243,7 +243,7 @@ function startGeneratingPassengers() {
   setInterval(() => {
     if (fetchedVillages.length === 0) return;
 
-    const SPAWN_BATCH = 500; // ← TADY ŘÍDÍŠ HUSTOTU
+    const SPAWN_BATCH = 2500; // ← TADY ŘÍDÍŠ HUSTOTU
 
     for (let i = 0; i < SPAWN_BATCH; i++) {
       const randomIndex = Math.floor(Math.random() * fetchedVillages.length);
