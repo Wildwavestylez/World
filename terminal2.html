@@ -153,6 +153,7 @@
   const loaded = await loadGameState();
   if (!loaded) {
     await fetchNearbyVillages(); // První fetch pokud není uložen stav
+startAutoDispatch();
   }
 };
 
