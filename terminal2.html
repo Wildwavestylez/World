@@ -194,13 +194,13 @@ vlak: {
 };
 
 
-
+let dynamicRadiusKm = 5;   // počáteční okruh
    let searchRadiusKm = 25; // začínáme na 5 km 
     let fetchedVillages = [];
 const passengerGroups = {}; // { název obce: počet cestujících }
 
 // Fetch nearby villages – už jsme měli
-async function fetchNearbyVillages(radiusKm = searchRadiusKm) {
+fetchNearbyVillages(radiusKm = dynamicRadiusKm) {
   const overpassUrl = "https://overpass-api.de/api/interpreter";
   const query = `  
   [out:json][timeout:65];  
@@ -256,6 +256,11 @@ function startGeneratingPassengers() {
     renderDispatchTab();
   }, 5000); // každých 5 sekund
 }
+
+setInterval(() => {
+  dynamicRadiusKm += 2;   // každých 5 minut přidáme +2 km
+  console.log("Nový okruh:", dynamicRadiusKm, "km");
+}, 180000);
 
 
 // Přepis vykreslování obsahu Dispečinku
@@ -772,9 +777,7 @@ function buyBus(type) {
   ownedVehicles.push(newBus);
 
   renderVehicleList(); // Aktualizujeme seznam vozidel
-// Zvýšíme rádius a přifetchneme nové obce
-  searchRadiusKm += 16;
-  fetchNearbyVillages(searchRadiusKm);
+
 }
 
 // Funkce pro vytvoření nového autobusu
