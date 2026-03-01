@@ -179,13 +179,6 @@ startAutoDispatch();
     price: 100000,
     iconUrl: "https://i.imgur.com/41OPNQH.png"
   },
-vlak: {
-    name: "vlak",
-    capacity: 380,
-    speed: 670,
-    price: 500000,
-    iconUrl: "https://imgur.com/ZLIih6E.png"
-  },
 
 
 
@@ -195,7 +188,7 @@ vlak: {
 };
 
 
-let dynamicRadiusKm = 10;   // počáteční okruh
+let dynamicRadiusKm = 20;   // počáteční okruh
    let searchRadiusKm = 25; // začínáme na 5 km 
     let fetchedVillages = [];
 const passengerGroups = {}; // { název obce: počet cestujících }
@@ -248,7 +241,7 @@ function startGeneratingPassengers() {
   setInterval(() => {
     if (fetchedVillages.length === 0) return;
 
-    const SPAWN_BATCH = 2500; // ← TADY ŘÍDÍŠ HUSTOTU
+    const SPAWN_BATCH = 100; // ← TADY ŘÍDÍŠ HUSTOTU
 
     for (let i = 0; i < SPAWN_BATCH; i++) {
       const randomIndex = Math.floor(Math.random() * fetchedVillages.length);
@@ -263,10 +256,10 @@ function startGeneratingPassengers() {
 }
 
 setInterval(() => {
-  dynamicRadiusKm += 5;   // každých 5 minut přidáme +2 km
+  dynamicRadiusKm += 18;   // každých 5 minut přidáme +2 km
   console.log("Nový okruh:", dynamicRadiusKm, "km");
 fetchNearbyVillages(dynamicRadiusKm);
-}, 180000);
+}, 150000);
 
 
 // Přepis vykreslování obsahu Dispečinku
