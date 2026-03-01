@@ -505,6 +505,33 @@ function createInitialVehicle() {
 }
 
 
+let autoDispatchInterval = null;
+
+function startAutoDispatch() {
+  if (autoDispatchInterval) return; // už běží
+
+  autoDispatchInterval = setInterval(() => {
+
+    // 1️⃣ Najdi destinaci s nejvíc lidmi
+    const entries = Object.entries(passengerGroups);
+    if (entries.length === 0) return;
+
+    const [destination, passengerCount] = entries.reduce((max, current) =>
+      current[1] > max[1] ? current : max
+    );
+
+    if (passengerCount <= 0) return;
+
+    // 2️⃣ Najdi volný autobus
+    const availableBus = ownedVehicles.find(bus => bus.status === 'volný');
+    if (!availableBus) return;
+
+    // 3️⃣ Pošli autobus
+    assignBusToDestination(destination, passengerCount);
+
+  }, 2500); // každé 2.5 sekundy
+}
+
 
 function openDispatchModal(destination, passengerCount) {
   const modal = document.getElementById('dispatch-modal');
