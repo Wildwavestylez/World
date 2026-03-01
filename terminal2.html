@@ -180,7 +180,7 @@
   },
 vlak: {
     name: "vlak",
-    capacity: 250,
+    capacity: 380,
     speed: 670,
     price: 300000,
     iconUrl: "https://imgur.com/ZLIih6E.png"
@@ -461,8 +461,8 @@ function createInitialVehicle() {
     id: Date.now(),
     type: 'mikrobus',
     name: 'cápek 1',
-    capacity: 6,
-    speed: 650, // měla by být 70, ne 650
+    capacity: 50,
+    speed: 650, // 
     status: 'volný',
     kmDriven: 0,
     kmToService: 200000,
@@ -773,7 +773,7 @@ function buyBus(type) {
 
   renderVehicleList(); // Aktualizujeme seznam vozidel
 // Zvýšíme rádius a přifetchneme nové obce
-  searchRadiusKm += 5;
+  searchRadiusKm += 16;
   fetchNearbyVillages(searchRadiusKm);
 }
 
