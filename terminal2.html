@@ -262,6 +262,7 @@ function startGeneratingPassengers() {
 setInterval(() => {
   dynamicRadiusKm += 5;   // každých 5 minut přidáme +2 km
   console.log("Nový okruh:", dynamicRadiusKm, "km");
+fetchNearbyVillages(dynamicRadiusKm);
 }, 180000);
 
 
