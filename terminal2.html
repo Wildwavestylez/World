@@ -509,28 +509,21 @@ function createInitialVehicle() {
 let autoDispatchInterval = null;
 
 function startAutoDispatch() {
-  if (autoDispatchInterval) return; // už běží
+  if (autoDispatchInterval) return;
 
   autoDispatchInterval = setInterval(() => {
+    const bestDestination = getMostDemandedDestination();
+    if (!bestDestination) return;
 
-    // 1️⃣ Najdi destinaci s nejvíc lidmi
-    const entries = Object.entries(passengerGroups);
-    if (entries.length === 0) return;
+    const bus = getAvailableBus();
+    if (!bus) return;
 
-    const [destination, passengerCount] = entries.reduce((max, current) =>
-      current[1] > max[1] ? current : max
-    );
+    const passengerCount = passengerGroups[bestDestination];
+    if (!passengerCount || passengerCount <= 0) return;
 
-    if (passengerCount <= 0) return;
+    assignBusToDestination(bestDestination, passengerCount);
 
-    // 2️⃣ Najdi volný autobus
-    const availableBus = ownedVehicles.find(bus => bus.status === 'volný');
-    if (!availableBus) return;
-
-    // 3️⃣ Pošli autobus
-    assignBusToDestination(destination, passengerCount);
-
-  }, 2500); // každé 2.5 sekundy
+  }, 2500); // každých 2.5 sekundy
 }
 
 
@@ -619,6 +612,23 @@ function closeDispatchModal() {
 }
 
 
+function getMostDemandedDestination() {
+  let maxPassengers = 0;
+  let bestDestination = null;
+
+  for (const [destination, count] of Object.entries(passengerGroups)) {
+    if (count > maxPassengers) {
+      maxPassengers = count;
+      bestDestination = destination;
+    }
+  }
+
+  return bestDestination;
+}
+
+function getAvailableBus() {
+  return ownedVehicles.find(bus => bus.status === 'volný');
+}
 // Globální pole pro všechny aktivní animace autobusů
 const activeBusAnimations = [];
 
