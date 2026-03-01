@@ -205,12 +205,14 @@ const passengerGroups = {}; // { název obce: počet cestujících }
 async function
 fetchNearbyVillages(radiusKm = dynamicRadiusKm) {
   const overpassUrl = "https://overpass-api.de/api/interpreter";
-  const query = `  
-  [out:json][timeout:65];  
-  (  
-    node["amenity"="fuel"](around:${radiusKm * 1000},${terminalLat},${terminalLon});  
-  );  
-  out body;  
+
+const query = `
+[out:json][timeout:25];
+(
+  node["railway"="station"](around:${radiusKm * 1000},${terminalLat},${terminalLon});
+  node["railway"="halt"](around:${radiusKm * 1000},${terminalLat},${terminalLon});
+);
+out body;
 `;
   const response = await fetch(overpassUrl, {
     method: "POST",
