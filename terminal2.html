@@ -200,6 +200,8 @@ let dynamicRadiusKm = 5;   // počáteční okruh
 const passengerGroups = {}; // { název obce: počet cestujících }
 
 // Fetch nearby villages – už jsme měli
+
+async function
 fetchNearbyVillages(radiusKm = dynamicRadiusKm) {
   const overpassUrl = "https://overpass-api.de/api/interpreter";
   const query = `  
