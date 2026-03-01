@@ -937,6 +937,15 @@ async function deleteGameState() {
   setInterval(() => {
   saveGameState();
 }, 5 * 60 * 1000); // každých 5 minut
+
+  window.onload = async () => {
+  const loaded = await loadGameState();
+  if (!loaded) {
+    await fetchNearbyVillages(); // První fetch pokud není uložen stav
+startAutoDispatch();
+  }
+};
+
   </script>
 </body>
 </html>
