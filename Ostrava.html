@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ostrava Tram-Train Simulator</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #fff; overflow: hidden; }
+        
+        #map { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+
+        #top-bar {
+            position: absolute; top: 15px; left: 15px; right: 15px; z-index: 1000;
+            display: flex; justify-content: space-between; align-items: center; pointer-events: none;
+        }
+
+        .hud-card {
+            background: rgba(17, 17, 22, 0.9); backdrop-filter: blur(8px);
+            padding: 10px 18px; border-radius: 8px; border: 1px solid #333;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); pointer-events: auto; font-weight: bold;
+        }
+
+        #balance-box { color: #2ecc71; font-size: 16px; }
+
+        #hamburger-btn {
+            background: #2a2a35; color: #fff; border: 1px solid #444;
+            padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 20px;
+            pointer-events: auto; transition: background 0.2s;
+        }
+        #hamburger-btn:hover { background: #3a3a48; }
+
+        #sidebar {
+            position: absolute; top: 0; left: -360px; width: 350px; height: 100vh;
+            background: rgba(24, 24, 29, 0.95); backdrop-filter: blur(10px); z-index: 1001;
+            padding: 20px; box-shadow: 5px 0 25px rgba(0,0,0,0.7);
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; flex-direction: column; gap: 15px; overflow-y: auto;
+        }
+
+        #sidebar.open { left: 0; }
+
+        .close-btn { align-self: flex-end; background: none; border: none; color: #aaa; font-size: 24px; cursor: pointer; }
+        .close-btn:hover { color: #fff; }
+
+        .tab-nav { display: flex; gap: 5px; background: #111116; padding: 5px; border-radius: 6px; }
+        .tab-btn { flex: 1; padding: 8px; background: none; border: none; color: #888; cursor: pointer; font-weight: 600; font-size: 12px; border-radius: 4px; }
+        .tab-btn.active { background: #2a2a35; color: #fff; }
+
+        .tab-content { display: none; flex-direction: column; gap: 10px; }
+        .tab-content.active { display: flex; }
+
+        .tool-btn {
+            display: flex; align-items: center; justify-content: space-between;
+            width: 100%; padding: 12px; background: #2a2a35; color: #fff;
+            border: 2px solid transparent; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 600;
+        }
+        .tool-btn:hover { background: #3a3a48; }
+        .tool-btn.active { border-color: #3498db; background: #1f3a52; }
+
+        .price-tag { font-size: 11px; color: #f1c40f; }
+
+        .item-card { background: #22222a; padding: 12px; border-radius: 6px; border: 1px solid #333; display: flex; flex-direction: column; gap: 6px; }
+        .action-btn { background: #27ae60; color: #fff; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .action-btn:hover { background: #2ecc71; }
+
+        .stop-marker { background: #e74c3c; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px rgba(0,0,0,0.8); }
+        .train-marker { background: #f1c40f; width: 22px; height: 22px; border-radius: 4px; border: 2px solid #000; display: flex; align-items: center; justify-content: center; font-size: 13px; box-shadow: 0 0 10px #f1c40f; }
+        .track-node { background: #ffffff; width: 6px; height: 6px; border-radius: 50%; border: 1px solid #000; }
+    </style>
+</head>
+<body>
+
+    <div id="top-bar">
+        <button id="hamburger-btn" onclick="toggleSidebar()">☰ Menu</button>
+        <div class="hud-card">🚆 Tram-Train Ostrava</div>
+        <div class="hud-card" id="balance-box">350 000 000 Kč</div>
+    </div>
+
+    <div id="sidebar">
+        <button class="close-btn" onclick="toggleSidebar()">✕</button>
+
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('build')">🔨 Stavba</button>
+            <button class="tab-btn" onclick="switchTab('fleet')">DEP DEPO</button>
+            <button class="tab-btn" onclick="switchTab('lines')">🗺️ Linky</button>
+        </div>
+
+        <div id="tab-build" class="tab-content active">
+            <button class="tool-btn active" id="btn-select" onclick="setMode('select')">🖐️ Prohlížení</button>
+            <button class="tool-btn" id="btn-track" onclick="setMode('track')">🛤️ Koleje <span class="price-tag">15M / km</span></button>
+            <button class="tool-btn" id="btn-tunnel" onclick="setMode('tunnel')">🚇 Tunel <span class="price-tag">80M / km</span></button>
+            <button class="tool-btn" id="btn-stop" onclick="setMode('stop')">🚏 Zastávka <span class="price-tag">5M Kč</span></button>
+        </div>
+
+        <div id="tab-fleet" class="tab-content">
+            <div class="item-card">
+                <b>Stadler Citylink</b>
+                <span style="font-size: 12px; color: #aaa;">Dvousystémová vlakotramvaj</span>
+                <span class="price-tag">120 000 000 Kč</span>
+                <button class="action-btn" onclick="buyTrain('Stadler Citylink', 120000000)">Koupit vozidlo</button>
+            </div>
+            <h4>Vlastněná vozidla (<span id="train-count">0</span>):</h4>
+            <div id="owned-trains-list"></div>
+        </div>
+
+        <div id="tab-lines" class="tab-content">
+            <button class="action-btn" style="background:#3498db;" onclick="startLineCreation()">➕ Vytvořit novou linku</button>
+            <div id="line-creation-info" style="display:none; font-size:12px; color:#f1c40f; background:#222; padding:8px; border-radius:4px;">
+                Klikáním na zastávky vytvoř trasu.
+                <button class="action-btn" style="margin-top:5px;" onclick="finishLineCreation()">Dokončit linku</button>
+            </div>
+            <h4>Aktivní linky:</h4>
+            <div id="lines-list"></div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+   <script>
+    const map = L.map('map', { zoomControl: false }).setView([49.8355, 18.2923], 13);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    let balance = 350000000;
+    let currentMode = 'select';
+    let trackStartPoint = null;
+
+    const COST_TRACK_KM = 15000000;
+    const COST_TUNNEL_KM = 80000000;
+    const COST_STOP = 5000000;
+    const SNAP_RADIUS_METERS = 30;
+
+    let stops = [];
+    let trains = [];
+    let lines = [];
+    let nodes = []; 
+    let trackSegments = [];
+    let tempLineStops = [];
+    let isCreatingLine = false;
+
+    let extendingLine = null;
+    let extendPosition = null; 
+
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById(`tab-${tabId}`).classList.add('active');
+    }
+
+    function setMode(mode) {
+        currentMode = mode;
+        trackStartPoint = null;
+        document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`btn-${mode}`).classList.add('active');
+    }
+
+    function getSnappedLatLng(latlng) {
+        let closestPoint = latlng;
+        let minDistance = SNAP_RADIUS_METERS;
+
+        nodes.forEach(node => {
+            let dist = map.distance(latlng, node);
+            if (dist < minDistance) {
+                minDistance = dist;
+                closestPoint = node;
+            }
+        });
+
+        stops.forEach(stop => {
+            let dist = map.distance(latlng, stop.latlng);
+            if (dist < minDistance) {
+                minDistance = dist;
+                closestPoint = stop.latlng;
+            }
+        });
+
+        return closestPoint;
+    }
+
+    map.on('click', function(e) {
+        let snappedLatLng = getSnappedLatLng(e.latlng);
+
+        if (currentMode === 'track' || currentMode === 'tunnel') {
+            handleLineBuilding(snappedLatLng, currentMode === 'tunnel');
+        } else if (currentMode === 'stop') {
+            buildStop(snappedLatLng);
+        }
+    });
+
+    function addNodeMarker(latlng) {
+        let exists = nodes.some(n => map.distance(n, latlng) < 1);
+        if (!exists) {
+            nodes.push(latlng);
+            L.marker(latlng, {
+                icon: L.divIcon({ className: 'track-node' }),
+                interactive: false
+            }).addTo(map);
+        }
+    }
+
+    function handleLineBuilding(latlng, isTunnel) {
+        if (!trackStartPoint) {
+            trackStartPoint = latlng;
+            L.circleMarker(latlng, { color: isTunnel ? '#9b59b6' : '#3498db', radius: 4 }).addTo(map);
+        } else {
+            let distKm = (map.distance(trackStartPoint, latlng)) / 1000;
+            let cost = Math.round(distKm * (isTunnel ? COST_TUNNEL_KM : COST_TRACK_KM));
+
+            if (balance < cost) {
+                alert("Nedostatek financí!");
+                trackStartPoint = null;
+                return;
+            }
+
+            balance -= cost;
+            
+            L.polyline([trackStartPoint, latlng], {
+                color: isTunnel ? '#9b59b6' : '#3498db',
+                weight: isTunnel ? 4 : 5,
+                dashArray: isTunnel ? '6, 6' : null
+            }).addTo(map);
+
+            trackSegments.push({ start: trackStartPoint, end: latlng });
+
+            addNodeMarker(trackStartPoint);
+            addNodeMarker(latlng);
+
+            trackStartPoint = null;
+            updateUI();
+        }
+    }
+
+    function buildStop(latlng) {
+        if (balance < COST_STOP) return alert("Nedostatek financí!");
+
+        balance -= COST_STOP;
+        let stopId = stops.length + 1;
+        let stopName = prompt("Název zastávky:", `Stanice ${stopId}`) || `Stanice ${stopId}`;
+
+        let marker = L.marker(latlng, {
+            icon: L.divIcon({ className: 'stop-marker' })
+        }).addTo(map);
+
+        let stopObj = { id: stopId, name: stopName, latlng: latlng, marker: marker };
+        stops.push(stopObj);
+
+        marker.on('click', () => onStopClick(stopObj));
+        marker.bindPopup(`<b>🚏 ${stopName}</b>`);
+
+        updateUI();
+    }
+
+    function buyTrain(model, price) {
+        if (balance < price) return alert("Nemáš dostatek peněz!");
+        balance -= price;
+        trains.push({ id: trains.length + 1, model: model, assignedLine: null });
+        updateUI();
+    }
+
+    function startLineCreation() {
+        isCreatingLine = true;
+        extendingLine = null;
+        tempLineStops = [];
+        document.getElementById('line-creation-info').style.display = 'block';
+        toggleSidebar();
+    }
+
+    function appendStopToLine(lineId, position) {
+        extendingLine = lines.find(l => l.id === lineId);
+        extendPosition = position;
+        isCreatingLine = false;
+        
+        alert(`Klikni na zastávku na mapě, kterou chceš přidat na ${position === 'start' ? 'ZAČÁTEK' : 'KONEC'} linky ${extendingLine.name}.`);
+        toggleSidebar();
+    }
+
+    function onStopClick(stopObj) {
+        if (isCreatingLine) {
+            tempLineStops.push(stopObj);
+            alert(`Zastávka ${stopObj.name} přidána do nové linky.`);
+            return;
+        }
+
+        if (extendingLine) {
+            if (extendingLine.stops.some(s => s.id === stopObj.id)) {
+                alert("Tato zastávka už v lince je!");
+                return;
+            }
+
+            if (extendPosition === 'start') {
+                extendingLine.stops.unshift(stopObj);
+            } else {
+                extendingLine.stops.push(stopObj);
+            }
+
+            extendingLine.path = buildPathFromStops(extendingLine.stops);
+
+            alert(`Zastávka ${stopObj.name} byla úspěšně přidána! Vlaky automaticky upraví trasu.`);
+            
+            extendingLine = null;
+            extendPosition = null;
+            updateUI();
+        }
+    }
+
+    function buildPathFromStops(selectedStops) {
+        let fullPath = [];
+        
+        for (let i = 0; i < selectedStops.length - 1; i++) {
+            let startPt = selectedStops[i].latlng;
+            let endPt = selectedStops[i+1].latlng;
+            
+            let segmentPath = findTrackPath(startPt, endPt);
+            
+            if (fullPath.length > 0 && segmentPath.length > 0) {
+                segmentPath.shift();
+            }
+            fullPath = fullPath.concat(segmentPath);
+        }
+
+        return fullPath;
+    }
+
+    function findTrackPath(startLatLng, endLatLng) {
+        let queue = [[startLatLng]];
+        let visited = [];
+
+        while (queue.length > 0) {
+            let path = queue.shift();
+            let current = path[path.length - 1];
+
+            if (map.distance(current, endLatLng) < 20) {
+                return path;
+            }
+
+            visited.push(current);
+
+            let neighbors = [];
+            trackSegments.forEach(seg => {
+                if (map.distance(seg.start, current) < 20) neighbors.push(seg.end);
+                if (map.distance(seg.end, current) < 20) neighbors.push(seg.start);
+            });
+
+            neighbors.forEach(neighbor => {
+                if (!visited.some(v => map.distance(v, neighbor) < 20)) {
+                    queue.push([...path, neighbor]);
+                }
+            });
+        }
+
+        return [startLatLng, endLatLng];
+    }
+
+    function finishLineCreation() {
+        if (tempLineStops.length < 2) return alert("Linka musí mít alespoň 2 zastávky!");
+
+        let lineName = prompt("Název linky:", `Linka L${lines.length + 1}`) || `Linka L${lines.length + 1}`;
+        let calculatedPath = buildPathFromStops(tempLineStops);
+
+        lines.push({ 
+            id: lines.length + 1, 
+            name: lineName, 
+            stops: [...tempLineStops], 
+            path: calculatedPath,
+            assignedTrains: [] // Pole pro více nasazených vlaků!
+        });
+        
+        isCreatingLine = false;
+        document.getElementById('line-creation-info').style.display = 'none';
+        updateUI();
+    }
+
+    function assignTrainToLine(trainId, lineId) {
+        let train = trains.find(t => t.id === trainId);
+        let line = lines.find(l => l.id === lineId);
+        if (!train || !line) return;
+
+        train.assignedLine = line.id;
+        line.assignedTrains.push(train.id);
+
+        let trainMarker = L.marker(line.path[0], {
+            icon: L.divIcon({ className: 'train-marker', html: '🚆' })
+        }).addTo(map);
+
+        // Počet již nasazených vlaků na lince
+        let trainIndex = line.assignedTrains.length - 1;
+
+        // Kód spustí pohyb s vypočítaným časovým odstupem (taktováním)
+        startTrainMovement(trainMarker, line, trainIndex);
+        updateUI();
+    }
+
+    function startTrainMovement(marker, line, trainIndex) {
+        let currentSegmentIndex = 0;
+        let direction = 1;
+        const SPEED_KMH = 50; 
+
+        // Funkce pro rozjezd s odstupem
+        function initMovement() {
+            let totalTrains = line.assignedTrains.length;
+            
+            // Určíme takt: pokud je na lince 2. vlak z 2, odstartuje s pauzou
+            // vypočítanou z počtu vozidel (např. půlka periody linky)
+            let delayMs = (trainIndex * 12000) / totalTrains; 
+
+            setTimeout(() => {
+                moveSegment();
+            }, delayMs);
+        }
+
+        function moveSegment() {
+            let currentPath = line.path;
+
+            if (currentSegmentIndex >= currentPath.length) {
+                currentSegmentIndex = currentPath.length - 1;
+            }
+
+            let nextSegmentIndex = currentSegmentIndex + direction;
+
+            if (nextSegmentIndex >= currentPath.length || nextSegmentIndex < 0) {
+                direction *= -1;
+                nextSegmentIndex = currentSegmentIndex + direction;
+            }
+
+            let startPt = currentPath[currentSegmentIndex];
+            let targetPt = currentPath[nextSegmentIndex];
+
+            let distanceMeters = map.distance(startPt, targetPt);
+            let distanceKm = distanceMeters / 1000;
+
+            let durationMs = ((distanceKm / SPEED_KMH) * 3600 * 1000) / 5;
+            if (durationMs < 50) durationMs = 50;
+
+            let startTime = Date.now();
+
+            function animate() {
+                let elapsed = Date.now() - startTime;
+                let progress = Math.min(elapsed / durationMs, 1);
+
+                let currentLat = startPt.lat + (targetPt.lat - startPt.lat) * progress;
+                let currentLng = startPt.lng + (targetPt.lng - startPt.lng) * progress;
+                marker.setLatLng([currentLat, currentLng]);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    currentSegmentIndex = nextSegmentIndex;
+
+                    let isAtStop = line.stops.some(stop => 
+                        map.distance(stop.latlng, targetPt) < 20
+                    );
+
+                    if (isAtStop) {
+                        balance += Math.round(distanceKm * 150000);
+                        updateUI();
+                        setTimeout(moveSegment, 2000);
+                    } else {
+                        moveSegment();
+                    }
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        initMovement();
+    }
+
+    function updateUI() {
+        document.getElementById('balance-box').innerText = `${balance.toLocaleString()} Kč`;
+        document.getElementById('train-count').innerText = trains.length;
+
+        let fleetHtml = '';
+        trains.forEach(t => {
+            fleetHtml += `<div class="item-card">
+                <b>🚆 ${t.model} #${t.id}</b>
+                <span style="font-size:11px; color:#aaa;">Stav: ${t.assignedLine ? `Linka L${t.assignedLine}` : 'V depu'}</span>
+            </div>`;
+        });
+        document.getElementById('owned-trains-list').innerHTML = fleetHtml;
+
+        let linesHtml = '';
+        lines.forEach(l => {
+            let availableTrains = trains.filter(t => !t.assignedLine);
+            let selectOptions = availableTrains.map(t => `<option value="${t.id}">${t.model} #${t.id}</option>`).join('');
+
+            linesHtml += `<div class="item-card">
+                <b>🗺️ ${l.name}</b>
+                <span style="font-size:11px; color:#aaa;">Zastávek: ${l.stops.length} | Vlaků: ${l.assignedTrains.length}</span>
+                <span style="font-size:11px; color:#aaa;">Trasa: ${l.stops[0].name} ➔ ${l.stops[l.stops.length - 1].name}</span>
+                
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <button class="action-btn" style="font-size:10px; background:#e67e22;" onclick="appendStopToLine(${l.id}, 'start')">➕ Na začátek</button>
+                    <button class="action-btn" style="font-size:10px; background:#e67e22;" onclick="appendStopToLine(${l.id}, 'end')">➕ Na konec</button>
+                </div>
+
+                <div style="margin-top:6px; border-top: 1px solid #333; padding-top: 4px;">
+                    ${availableTrains.length > 0 ? `
+                        <select id="select-train-${l.id}" style="padding:4px; margin-top:4px;">${selectOptions}</select>
+                        <button class="action-btn" style="margin-top:4px;" onclick="assignTrainToLine(parseInt(document.getElementById('select-train-${l.id}').value), ${l.id})">➕ Nasadit další vlak</button>
+                    ` : '<span style="color:#aaa; font-size:10px;">Žádný volný vlak v depu</span>'}
+                </div>
+            </div>`;
+        });
+        document.getElementById('lines-list').innerHTML = linesHtml;
+    }
+</script>
+
+</body>
+</html>
