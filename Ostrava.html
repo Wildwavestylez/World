@@ -596,19 +596,41 @@
         }
 
         function updateTrainPopup(train) {
-            if (!train.marker) return;
+    if (!train.marker) return;
 
-            let passCount = train.passengersOnBoard.length;
-            let content = `
-                <b>🚆 Vozidlo ${train.id}</b><br>
-                <span>Typ: <b>${train.model}</b></span><br>
-                <span>Linka: <b>L${train.assignedLine}</b></span><br>
-                <span>Najeto: <b>${train.distanceKm.toFixed(1)} km</b></span><br>
-                <span>Cestující: <b>${passCount} / ${train.capacity}</b></span>
-            `;
+    let passCount = train.passengersOnBoard.length;
 
-            train.marker.setPopupContent(content);
-        }
+    // Spočítáme, kam přesně lidi ve vlaku jedou
+    let targetCounts = {};
+    train.passengersOnBoard.forEach(p => {
+        targetCounts[p.targetId] = (targetCounts[p.targetId] || 0) + 1;
+    });
+
+    // Vytvoříme přehledný HTML seznam cílových stanic
+    let passDetailsHtml = '';
+    for (let targetId in targetCounts) {
+        let targetStop = stops.find(s => s.id == targetId);
+        let name = targetStop ? targetStop.name : `Stanice ${targetId}`;
+        passDetailsHtml += `<br>➔ ${name}: <b>${targetCounts[targetId]} lidí</b>`;
+    }
+
+    if (passCount === 0) {
+        passDetailsHtml = '<br><i style="color:#888;">Vlak je prázdný</i>';
+    }
+
+    let content = `
+        <b>🚆 Vozidlo ${train.id}</b><br>
+        <span>Typ: <b>${train.model}</b></span><br>
+        <span>Linka: <b>L${train.assignedLine}</b></span><br>
+        <span>Najeto: <b>${train.distanceKm.toFixed(1)} km</b></span><br>
+        <hr style="border:0; border-top:1px solid #444; margin:5px 0;">
+        <span>Obsazenost: <b>${passCount} / ${train.capacity} os.</b></span>
+        <span style="font-size:11px; color:#aaa;">${passDetailsHtml}</span>
+    `;
+
+    train.marker.setPopupContent(content);
+}
+
 
         function unassignTrain(trainId) {
             let train = trains.find(t => t.id === trainId);
