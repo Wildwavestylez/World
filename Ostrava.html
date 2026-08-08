@@ -744,7 +744,7 @@
         effectiveDirection = -1;
     }
 
-    // Stanice, které má vlak ještě PŘED SEBOU ve svém směru
+    // Stanice, které má vlak ještě PŘED SEBOU ve svém směru jízdy
     let upcomingStops = [];
     if (effectiveDirection === 1) {
         upcomingStops = line.stops.slice(currentStopIndex + 1);
@@ -753,7 +753,7 @@
     }
     let upcomingStopIds = upcomingStops.map(s => s.id);
 
-    // 1. OPTIMALIZOVANÝ VÝSTUP A PŘESTUP
+    // 1. VÝSTUP A PŘESTUP
     train.passengersOnBoard.forEach(p => {
         if (p.targetId === stop.id) {
             // A) Dorazil do konečného cíle -> Inkasujeme 150 Kč
@@ -763,7 +763,7 @@
             // Zjistíme linky, které vedou do cíle cestujícího
             let targetLines = lines.filter(l => l.stops.some(s => s.id === p.targetId));
 
-            // Zjistíme, zda na TÉTO stanici zastavuje nějaká z cílových linek (je to přestupní uzel!)
+            // Zjistíme, zda na TÉTO stanici zastavuje nějaká z cílových linek (je to přestupní uzel)
             let isTransferStation = targetLines.some(tl => tl.stops.some(ts => ts.id === stop.id));
 
             // Zjistíme, zda náš vlak v budoucím směru jízdy ještě nabízí lepší/přímý cíl nebo přestup
@@ -776,7 +776,6 @@
                 stop.passengers[p.targetId] = (stop.passengers[p.targetId] || 0) + 1;
                 alightedCount++;
             } else {
-                // Jinak zůstává ve vlaku a jede dál!
                 remainingPassengers.push(p);
             }
         }
@@ -785,19 +784,24 @@
     train.passengersOnBoard = remainingPassengers;
     balance += earnings;
 
-    // 2. CHYTRÝ NÁSTUP
+    // 2. KONTROLOVANÝ NÁSTUP (STŘEDOBOD OPRAVY SMĚRU)
     let boardedCount = 0;
 
     for (let targetId in stop.passengers) {
         let tId = parseInt(targetId);
         let targetLines = lines.filter(l => l.stops.some(s => s.id === tId));
 
-        // Naložíme člověka jen v případě, že ho náš vlak vezme směrem k jeho cíli nebo k přestupnímu uzlu
-        let relevantStopsInDirection = upcomingStopIds.filter(upcomingId => {
-            return upcomingId === tId || targetLines.some(tl => tl.stops.some(ts => ts.id === upcomingId));
-        });
+        // Najdeme VŠECHNY stanice na naší lince, kde by tento člověk mohsmysluplně vystoupit (cíl nebo přestup)
+        let validDropoffStopIds = line.stops.filter(myStop => {
+            let isDirectTarget = (myStop.id === tId);
+            let isTransferPoint = targetLines.some(tl => tl.stops.some(ts => ts.id === myStop.id));
+            return isDirectTarget || isTransferPoint;
+        }).map(s => s.id);
 
-        if (relevantStopsInDirection.length > 0) {
+        // Naložíme ho JEN TEHDY, pokud alespoň jedna z těchto platných stanic leží VE SMĚRU JÍZDY!
+        let hasValidStopInDirection = upcomingStopIds.some(upId => validDropoffStopIds.includes(upId));
+
+        if (hasValidStopInDirection) {
             let waiting = stop.passengers[targetId];
             let space = train.capacity - train.passengersOnBoard.length;
 
