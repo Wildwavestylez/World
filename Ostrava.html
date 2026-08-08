@@ -709,6 +709,7 @@
 
         // CHYTRÁ LOGIKA NÁSTUPU A PŘESTUPŮ (TRANSFERS)
  // CHYTRÁ LOGIKA NÁSTUPU A PŘESTUPŮ (S KONTROLOU SMĚRU JÍZDY)
+// CHYTRÁ LOGIKA NÁSTUPU A PŘESTUPŮ (S KONTROLOU SMĚRU A PŘESTUPNÍCH UZLŮ)
 function handlePassengerBoarding(train, stop, line, direction) {
     let remainingPassengers = [];
     let earnings = 0;
@@ -718,12 +719,15 @@ function handlePassengerBoarding(train, stop, line, direction) {
     // 1. VÝSTUP A PŘESTUP
     train.passengersOnBoard.forEach(p => {
         if (p.targetId === stop.id) {
-            earnings += 550;
+            // Cíl dosažen -> Inkasujeme odměnu 150 Kč
+            earnings += 150;
             alightedCount++;
         } else if (!lineStopIds.includes(p.targetId)) {
+            // Cílová stanice NELEŽÍ na této lince -> Cestující vystoupí a počká na přestupním uzlu
             stop.passengers[p.targetId] = (stop.passengers[p.targetId] || 0) + 1;
             alightedCount++;
         } else {
+            // Cíl leží dále na lince -> Jedeme dál
             remainingPassengers.push(p);
         }
     });
@@ -731,47 +735,69 @@ function handlePassengerBoarding(train, stop, line, direction) {
     train.passengersOnBoard = remainingPassengers;
     balance += earnings;
 
-    // 2. NÁSTUP (S CHYTRÝM OŠETŘENÍM KONEČNÝCH STANIC)
+    // 2. NÁSTUP (S KONTROLOU SMĚRU A CHYTRÝM PŘESTUPOVÁNÍM)
     let boardedCount = 0;
     let currentStopIndex = line.stops.findIndex(s => s.id === stop.id);
 
-    // Pokud je vlak na konečné stanici, po pauze se OTOČÍ.
-    // Musíme tedy nastavit směr podle toho, kam bude odjíždĚT, ne jak přijel!
+    // Ošetření konečných stanic – určení směru jízdy po odjezdu ze stanice
     let effectiveDirection = direction;
     if (currentStopIndex === 0) {
-        effectiveDirection = 1; // Z první stanice se vždy odjíždí směrem dopředu
+        effectiveDirection = 1;
     } else if (currentStopIndex === line.stops.length - 1) {
-        effectiveDirection = -1; // Z poslední stanice se vždy odjíždí směrem zpět
+        effectiveDirection = -1;
     }
 
+    // Stanice, které leží VE SMĚRU JÍZDY vlaku
     let upcomingStopIds = [];
     if (effectiveDirection === 1) {
-        // Vlak odjíždí směrem k vyšším indexům
         upcomingStopIds = line.stops.slice(currentStopIndex + 1).map(s => s.id);
     } else {
-        // Vlak odjíždí směrem k nižším indexům
         upcomingStopIds = line.stops.slice(0, currentStopIndex).map(s => s.id);
     }
 
+    // Procházíme cestující čekající na stanici
     for (let targetId in stop.passengers) {
         let tId = parseInt(targetId);
 
-        if (upcomingStopIds.includes(tId)) {
-            let waiting = stop.passengers[targetId];
-            let space = train.capacity - train.passengersOnBoard.length;
+        // Zjistíme, které linky vedou do cílové stanice cestujícího
+        let targetLines = lines.filter(l => l.stops.some(s => s.id === tId));
 
-            if (space > 0 && waiting > 0) {
-                let boarding = Math.min(waiting, space);
-                stop.passengers[targetId] -= boarding;
-                boardedCount += boarding;
+        let canTransport = false;
 
-                for (let i = 0; i < boarding; i++) {
-                    train.passengersOnBoard.push({ targetId: tId });
+        if (lineStopIds.includes(tId)) {
+            // Cíl leží přímo na naší lince
+            canTransport = true;
+        } else {
+            // Přestup! Zkontrolujeme, zda máme na lince stanici, kde lze přestoupit na linku vedoucí do cíle
+            canTransport = line.stops.some(myStop => 
+                targetLines.some(targetLine => targetLine.stops.some(ts => ts.id === myStop.id))
+            );
+        }
+
+        // Pokud je dokážeme popovézt A cílová/přestupní stanice leží ve směru jízdy:
+        if (canTransport) {
+            let relevantStopsInDirection = upcomingStopIds.filter(upcomingId => {
+                return upcomingId === tId || targetLines.some(tl => tl.stops.some(ts => ts.id === upcomingId));
+            });
+
+            if (relevantStopsInDirection.length > 0) {
+                let waiting = stop.passengers[targetId];
+                let space = train.capacity - train.passengersOnBoard.length;
+
+                if (space > 0 && waiting > 0) {
+                    let boarding = Math.min(waiting, space);
+                    stop.passengers[targetId] -= boarding;
+                    boardedCount += boarding;
+
+                    for (let i = 0; i < boarding; i++) {
+                        train.passengersOnBoard.push({ targetId: tId });
+                    }
                 }
             }
         }
     }
 
+    // Vizuální plovoucí pop-up s počtem nastupujících/vystupujících
     if (boardedCount > 0 || alightedCount > 0) {
         showFloatingPassengerInfo(train.marker.getLatLng(), `+${boardedCount} 👥 / -${alightedCount} 👥`);
     }
