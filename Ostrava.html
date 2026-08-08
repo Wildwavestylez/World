@@ -720,7 +720,7 @@ function handlePassengerBoarding(train, stop, line, direction) {
     train.passengersOnBoard.forEach(p => {
         if (p.targetId === stop.id) {
             // Cíl dosažen -> Inkasujeme odměnu 150 Kč
-            earnings += 150;
+            earnings += 650;
             alightedCount++;
         } else if (!lineStopIds.includes(p.targetId)) {
             // Cílová stanice NELEŽÍ na této lince -> Cestující vystoupí a počká na přestupním uzlu
