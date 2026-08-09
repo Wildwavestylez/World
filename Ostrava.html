@@ -87,6 +87,24 @@
         .track-node { background: #ffffff; width: 6px; height: 6px; border-radius: 50%; border: 1px solid #000; }
         .hidden-node { display: none !important; }
 
+/* Posuvník pro popup okna vlaků a stanic */
+.passenger-scroll-list {
+    max-height: 180px; /* cca 8-10 řádků */
+    overflow-y: auto;
+    margin-top: 5px;
+    padding-right: 5px;
+}
+
+/* Jemné přizpůsobení posuvníku pro moderní vzhled */
+.passenger-scroll-list::-webkit-scrollbar {
+    width: 5px;
+}
+.passenger-scroll-list::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 3px;
+}
+
+
         .passenger-float-info {
             background: rgba(0, 0, 0, 0.85);
             color: #2ecc71;
@@ -383,38 +401,63 @@
             updateUI();
         }
 
-        function updateStopPopup(stopObj) {
-            let passHtml = '';
-            let total = 0;
-            for (let targetId in stopObj.passengers) {
-                let targetStop = stops.find(s => s.id == targetId);
-                let count = stopObj.passengers[targetId];
-                if (targetStop && count > 0) {
-                    passHtml += `<br>➔ ${targetStop.name}: <b>${count} lidí</b>`;
-                    total += count;
-                }
-            }
+        // 1. INOVOVANÁ FUNKCE SE SCROLLBAREM A SEŘAZENÍM
+function updateStopPopup(stopObj) {
+    if (!stopObj.marker) return;
 
-            let content = `
-                <b>🚏 ${stopObj.name}</b><br>
-                <span>Čeká celkem: <b>${total} cestujících</b></span>
-                <span style="font-size:11px; color:#555;">${passHtml}</span>
-            `;
+    let total = 0;
+    let targetCounts = [];
 
-            stopObj.marker.setPopupContent(content);
-        }
-
-        // GENERÁTOR CESTUJÍCÍCH (Běží každých 8 sekund)
-        setInterval(() => {
-            if (stops.length < 2) return;
-            stops.forEach(stop => {
-                let target = stops[Math.floor(Math.random() * stops.length)];
-                if (target.id !== stop.id) {
-                    stop.passengers[target.id] = (stop.passengers[target.id] || 0) + Math.floor(Math.random() * 4) + 1;
-                    updateStopPopup(stop);
-                }
+    // Spočítáme a připravíme data
+    for (let targetId in stopObj.passengers) {
+        let count = stopObj.passengers[targetId];
+        let targetStop = stops.find(s => s.id == targetId);
+        
+        if (targetStop && count > 0) {
+            total += count;
+            targetCounts.push({
+                name: targetStop.name,
+                count: count
             });
-        }, 8000);
+        }
+    }
+
+    // SEŘAZENÍ SESTUPNĚ (nejvíc lidí nahoře)
+    targetCounts.sort((a, b) => b.count - a.count);
+
+    // Sestavení HTML se scrollbarem
+    let passHtml = '';
+    if (targetCounts.length > 0) {
+        passHtml = '<div class="passenger-scroll-list">';
+        targetCounts.forEach(item => {
+            passHtml += `➔ ${item.name}: <b>${item.count} lidí</b><br>`;
+        });
+        passHtml += '</div>';
+    } else {
+        passHtml = '<br><i style="color:#888;">Nástupiště je prázdné</i>';
+    }
+
+    let content = `
+        <b>🚏 ${stopObj.name}</b><br>
+        <hr style="border:0; border-top:1px solid #444; margin:5px 0;">
+        <span>Čeká celkem: <b>${total} cestujících</b></span>
+        <span style="font-size:11px; color:#aaa;">${passHtml}</span>
+    `;
+
+    stopObj.marker.setPopupContent(content);
+}
+
+// 2. TVŮJ GENERÁTOR CESTUJÍCÍCH (Běží každých 8 sekund)
+setInterval(() => {
+    if (stops.length < 2) return;
+    stops.forEach(stop => {
+        let target = stops[Math.floor(Math.random() * stops.length)];
+        if (target.id !== stop.id) {
+            stop.passengers[target.id] = (stop.passengers[target.id] || 0) + Math.floor(Math.random() * 4) + 1;
+            updateStopPopup(stop);
+        }
+    });
+}, 8000);
 
         function buyTrain(typeId) {
             let vType = VEHICLE_TYPES.find(v => v.id === typeId);
@@ -600,21 +643,30 @@
 
     let passCount = train.passengersOnBoard.length;
 
-    // Spočítáme, kam přesně lidi ve vlaku jedou
+    // 1. Spočítáme lidi podle cílových stanic
     let targetCounts = {};
     train.passengersOnBoard.forEach(p => {
         targetCounts[p.targetId] = (targetCounts[p.targetId] || 0) + 1;
     });
 
-    // Vytvoříme přehledný HTML seznam cílových stanic
-    let passDetailsHtml = '';
-    for (let targetId in targetCounts) {
+    // 2. Převod na pole a SEŘAZENÍ SESTUPNĚ (nejvíc lidí nahoře)
+    let sortedTargets = Object.keys(targetCounts).map(targetId => {
         let targetStop = stops.find(s => s.id == targetId);
-        let name = targetStop ? targetStop.name : `Stanice ${targetId}`;
-        passDetailsHtml += `<br>➔ ${name}: <b>${targetCounts[targetId]} lidí</b>`;
-    }
+        return {
+            name: targetStop ? targetStop.name : `Stanice ${targetId}`,
+            count: targetCounts[targetId]
+        };
+    }).sort((a, b) => b.count - a.count);
 
-    if (passCount === 0) {
+    // 3. Generování HTML obsahu
+    let passDetailsHtml = '';
+    if (sortedTargets.length > 0) {
+        passDetailsHtml = '<div class="passenger-scroll-list">';
+        sortedTargets.forEach(item => {
+            passDetailsHtml += `➔ ${item.name}: <b>${item.count} lidí</b><br>`;
+        });
+        passDetailsHtml += '</div>';
+    } else {
         passDetailsHtml = '<br><i style="color:#888;">Vlak je prázdný</i>';
     }
 
@@ -630,6 +682,7 @@
 
     train.marker.setPopupContent(content);
 }
+
 
 
         function unassignTrain(trainId) {
@@ -833,6 +886,35 @@ function handlePassengerBoarding(train, stop, line, direction) {
     updateTrainPopup(train);
     updateUI();
 }
+
+function distributeTrainsEvenlyOnLine(lineId) {
+    let lineTrains = trains.filter(t => t.assignedLine === lineId);
+    let line = lines.find(l => l.id === lineId);
+    
+    if (!line || lineTrains.length === 0) return;
+
+    let totalStops = line.stops.length;
+    
+    lineTrains.forEach((train, index) => {
+        // Vypočítáme ideální rozestup na trati
+        // Např. pro 4 vlaky na 10 stanicích: Vlak 0 na stop 0, Vlak 1 na stop 2.5, atd.
+        let targetStopIndex = Math.floor((index / lineTrains.length) * totalStops);
+        
+        // Polovina vlaků pojede tam (1), polovina zpět (-1)
+        let assignedDirection = (index % 2 === 0) ? 1 : -1;
+
+        // Nastavíme vlak na jeho startovní pozici
+        train.currentStopIndex = targetStopIndex;
+        train.direction = assignedDirection;
+        
+        // Aktualizace pozice ikonky na mapě
+        let startStop = line.stops[targetStopIndex];
+        if (startStop && train.marker) {
+            train.marker.setLatLng([startStop.lat, startStop.lng]);
+        }
+    });
+}
+
 
 
 
