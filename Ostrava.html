@@ -734,11 +734,9 @@ function handlePassengerBoarding(train, stop, line, direction) {
     let earnings = 0;
     let alightedCount = 0;
 
-    // Bezpečné vyhledání indexu aktuální zastávky (používáme == pro shodu čísel i textu)
     let currentStopIndex = line.stops.findIndex(s => s.id == stop.id);
-    if (currentStopIndex === -1) return; // Pojistka: pokud stanice na lince není, nic neděláme
+    if (currentStopIndex === -1) return;
 
-    // Určení efektivního směru po odjezdu (řeší i otočení na konečných)
     let effectiveDirection = direction;
     if (currentStopIndex === 0) {
         effectiveDirection = 1;
@@ -746,33 +744,29 @@ function handlePassengerBoarding(train, stop, line, direction) {
         effectiveDirection = -1;
     }
 
-    // 1. ZÍSKÁME STRICTNĚ POUZE STANICE PŘED VLAKEM
+    // Stanice, které leží POUZE A JENOM PŘED VLAKEM
     let upcomingStops = [];
     if (effectiveDirection === 1) {
-        // Vlak jede dopředu (např. z B směrem k C, D, E)
         upcomingStops = line.stops.slice(currentStopIndex + 1);
     } else {
-        // Vlak jede zpět (např. z B směrem k A)
         upcomingStops = line.stops.slice(0, currentStopIndex);
     }
     let upcomingStopIds = upcomingStops.map(s => s.id);
 
-    // 2. VÝSTUP A PŘESTUP
+    // 1. VÝSTUP A PŘESTUP
     train.passengersOnBoard.forEach(p => {
         if (p.targetId == stop.id) {
-            // A) Dorazil do cíle -> 150 Kč
-            earnings += 650;
+            earnings += 750;
             alightedCount++;
         } else {
-            let targetLines = lines.filter(l => l.stops.some(s => s.id == p.targetId));
-            let isTransferStation = targetLines.some(tl => tl.stops.some(ts => ts.id == stop.id));
+            // Hledáme JINÉ linky vedoucí do cíle (ne naši vlastní)
+            let otherTargetLines = lines.filter(l => l.id !== line.id && l.stops.some(s => s.id == p.targetId));
+            let isTransferStation = otherTargetLines.some(tl => tl.stops.some(ts => ts.id == stop.id));
 
-            // Kontrola, zda náš vlak v PŘEDNÍM směru ještě nabízí možnost pokračovat k cíli/přestupu
             let hasFutureOption = upcomingStopIds.some(upId => upId == p.targetId) || upcomingStops.some(myStop => 
-                targetLines.some(targetLine => targetLine.stops.some(ts => ts.id == myStop.id))
+                otherTargetLines.some(targetLine => targetLine.stops.some(ts => ts.id == myStop.id))
             );
 
-            // Vystoupí JEN TEHDY, pokud jsme na přestupní stanici A NÁŠ VLAK už dál v tomto směru nepomůže
             if (isTransferStation && !hasFutureOption) {
                 stop.passengers[p.targetId] = (stop.passengers[p.targetId] || 0) + 1;
                 alightedCount++;
@@ -785,21 +779,32 @@ function handlePassengerBoarding(train, stop, line, direction) {
     train.passengersOnBoard = remainingPassengers;
     balance += earnings;
 
-    // 3. ABSOLUTNĚ PŘÍSNÝ NÁSTUP
+    // 2. NÁSTUP (OPRAVENÁ LOGIKA BEZ SAMOPŘESTUPU)
     let boardedCount = 0;
 
     for (let targetId in stop.passengers) {
         let tId = parseInt(targetId);
-        let targetLines = lines.filter(l => l.stops.some(s => s.id == tId));
 
-        // Platné výstupní/přestupní stanice pro tohoto cestujícího na Naší lince
-        let validDropoffStopIds = line.stops.filter(myStop => {
-            let isDirectTarget = (myStop.id == tId);
-            let isTransferPoint = targetLines.some(tl => tl.stops.some(ts => ts.id == myStop.id));
-            return isDirectTarget || isTransferPoint;
-        }).map(s => s.id);
+        // A) Leží cíl přímo na naší lince?
+        let isDirectTargetOnOurLine = line.stops.some(s => s.id == tId);
+        
+        // B) Pokud ne, existují JINÉ linky pro přestup?
+        let otherTargetLines = lines.filter(l => l.id !== line.id && l.stops.some(s => s.id == tId));
 
-        // KONTROLA: Leží alespoň JEDNA platná stanice STRICTNĚ v seznamu stanic PŘED vlakem?
+        let validDropoffStopIds = [];
+
+        if (isDirectTargetOnOurLine) {
+            // Pokud cíl leží na naší lince, jediná platná stanice pro výstup je PŘÍMO TEN CÍL!
+            validDropoffStopIds.push(tId);
+        } else {
+            // Pokud leží na jiné lince, platné stanice jsou křižovatky s těmito JINÝMI linkami
+            line.stops.forEach(myStop => {
+                let isTransferPoint = otherTargetLines.some(tl => tl.stops.some(ts => ts.id == myStop.id));
+                if (isTransferPoint) validDropoffStopIds.push(myStop.id);
+            });
+        }
+
+        // Nastoupí POUZE pokud je jeho cíl/přestup STRICTNĚ PŘED VLAKEM!
         let isAnyValidStopAhead = upcomingStopIds.some(aheadId => 
             validDropoffStopIds.some(validId => validId == aheadId)
         );
@@ -828,7 +833,6 @@ function handlePassengerBoarding(train, stop, line, direction) {
     updateTrainPopup(train);
     updateUI();
 }
-
 
 
 
