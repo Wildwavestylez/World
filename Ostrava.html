@@ -708,9 +708,15 @@ setInterval(() => {
     let direction = 1;
 
     function initMovement() {
-        let totalTrains = line.assignedTrains.length;
-        let delayMs = (trainIndex * 10000) / (totalTrains || 1); 
+        let totalTrains = line.assignedTrains ? line.assignedTrains.length : 1;
+        
+        // FIX TAKTU: Pevný rozestup 15 sekund mezi výjezdy jednotlivých vlaků
+        // 1. vlak (index 0) = 0s delay
+        // 2. vlak (index 1) = 15s delay
+        // 3. vlak (index 2) = 30s delay... atd.
+        let delayMs = trainIndex * 15000; 
 
+        // Pokud vlak už měl nějaký pohyb nebo načítáme pozici, ale chceme takt:
         setTimeout(() => {
             moveSegment();
         }, delayMs);
@@ -767,9 +773,9 @@ setInterval(() => {
                 let currentStop = line.stops.find(stop => map.distance(stop.latlng, targetPt) < 20);
 
                 if (currentStop) {
-                    // TADY předáváme i 'direction' do obsluhy cestujících!
+                    // Předáváme i 'direction' do obsluhy cestujících
                     handlePassengerBoarding(train, currentStop, line, direction);
-                    setTimeout(moveSegment, 2000);
+                    setTimeout(moveSegment, 2000); // Stanicovací pauza 2 sekundy
                 } else {
                     moveSegment();
                 }
@@ -781,6 +787,7 @@ setInterval(() => {
 
     initMovement();
 }
+
 
 function handlePassengerBoarding(train, stop, line, direction) {
     let remainingPassengers = [];
@@ -891,32 +898,27 @@ function distributeTrainsEvenlyOnLine(lineId) {
     let line = lines.find(l => l.id == lineId);
     let lineTrains = trains.filter(t => t.assignedLine == lineId);
 
-    if (!line || lineTrains.length === 0 || line.stops.length < 2) return;
+    if (!line || lineTrains.length === 0) return;
 
-    let totalStops = line.stops.length;
+    // Nastavíme interval mezi vlaky (např. 15 sekund mezi každým výjezdem)
+    let intervalDelayMs = 15000; // 15 sekund (uprav si podle rychlosti tvých vlaků)
 
     lineTrains.forEach((train, index) => {
-        // Vypočítáme rovnocenný rozestup na lince
-        let step = totalStops / lineTrains.length;
-        let targetStopIndex = Math.floor(index * step) % totalStops;
+        // První vlak (index 0) má delay 0 a jede hned.
+        // Další vlaky dostanou postupně větší zpoždění (15s, 30s, 45s...)
+        train.startDelay = index * intervalDelayMs;
+        
+        // Všechny postavíme na startovní stanici
+        train.currentStopIndex = 0;
+        train.direction = 1;
 
-        // Lichý vlak pojede tam (1), sudý zpět (-1) -> tím pádem pokryjí oba směry
-        let assignedDirection = (index % 2 === 0) ? 1 : -1;
-
-        // Nastavíme vlak
-        train.currentStopIndex = targetStopIndex;
-        train.direction = assignedDirection;
-
-        // Hned posuneme i jeho ikonu na mapě na správnou stanici
-        let startStop = line.stops[targetStopIndex];
+        let startStop = line.stops[0];
         if (startStop && train.marker) {
             train.marker.setLatLng([startStop.lat, startStop.lng]);
         }
-        
-        // Aktualizujeme popup okno vlaku
-        updateTrainPopup(train);
     });
 }
+
 
 
         function showFloatingPassengerInfo(latlng, text) {
