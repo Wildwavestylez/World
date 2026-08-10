@@ -448,16 +448,37 @@ function updateStopPopup(stopObj) {
 }
 
 // 2. TVŮJ GENERÁTOR CESTUJÍCÍCH (Běží každých 8 sekund)
+// GENERÁTOR CESTUJÍCÍCH (Běží každých 8 sekund - Karlsruhe S-Bahn styl)
 setInterval(() => {
     if (stops.length < 2) return;
+
+    // Maximální rádius v kilometrech pro lokální/příměstskou doprovodnou síť
+    const MAX_TRAVEL_DISTANCE_KM = 10; 
+
     stops.forEach(stop => {
-        let target = stops[Math.floor(Math.random() * stops.length)];
-        if (target.id !== stop.id) {
+        // Vyfiltrujeme jen stanice, které leží v okruhu do 20 km od aktuální stanice
+        let reachableStops = stops.filter(target => {
+            if (target.id === stop.id) return false; // Vynecháme samotnou stanici
+
+            let distMeters = map.distance(stop.latlng, target.latlng);
+            let distKm = distMeters / 1000;
+
+            return distKm <= MAX_TRAVEL_DISTANCE_KM;
+        });
+
+        // Pokud v tomto okruhu existují nějaké stanice, přisypeme na nástupiště lidi
+        if (reachableStops.length > 0) {
+            let target = reachableStops[Math.floor(Math.random() * reachableStops.length)];
+            
+            // Přidáme 1 až 4 nové cestující
             stop.passengers[target.id] = (stop.passengers[target.id] || 0) + Math.floor(Math.random() * 4) + 1;
+            
+            // Obnovíme vizuál popupu stanice
             updateStopPopup(stop);
         }
     });
-}, 18000);
+}, 15000);
+
 
         function buyTrain(typeId) {
             let vType = VEHICLE_TYPES.find(v => v.id === typeId);
