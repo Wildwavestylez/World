@@ -789,6 +789,49 @@ setInterval(() => {
 }
 
 
+// 1. POMOCNÁ FUNKCE: Najde všechny stanice na NAŠÍ lince, které vedou k cíli (přímo, přes 1 přestup, nebo přes 2 přestupy)
+function getValidTransferStopsForTarget(ourLine, targetId) {
+    let validStops = [];
+
+    // A) Přímý cíl leží přímo na naší lince
+    if (ourLine.stops.some(s => s.id == targetId)) {
+        return [targetId];
+    }
+
+    // Všechny ostatní linky v síti (mimo naši)
+    let otherLines = lines.filter(l => l.id !== ourLine.id);
+
+    // Linky, které končí/prochází přímo cílovou stanicí
+    let targetLines = lines.filter(l => l.stops.some(s => s.id == targetId));
+
+    ourLine.stops.forEach(myStop => {
+        // B) 1. Přestup: Naše stanice přímo kříží cílovou linku
+        let isDirectTransfer = targetLines.some(tl => tl.stops.some(ts => ts.id == myStop.id));
+
+        if (isDirectTransfer) {
+            validStops.push(myStop.id);
+        } else {
+            // C) 2. Přestup: Naše stanice kříží "Mezilehlou linku", která se dál kříží s cílovou linkou!
+            // Zjistíme, jaké linky prochází naší stanicí
+            let connectingLines = otherLines.filter(l => l.stops.some(s => s.id == myStop.id));
+
+            let canReachTargetInTwoHops = connectingLines.some(connLine =>
+                targetLines.some(targetLine =>
+                    connLine.stops.some(cs => targetLine.stops.some(ts => ts.id == cs.id))
+                )
+            );
+
+            if (canReachTargetInTwoHops) {
+                validStops.push(myStop.id);
+            }
+        }
+    });
+
+    return validStops;
+}
+
+
+// 2. HLAVNÍ FUNKCE OBSLUHY NÁSTUPU A VÝSTUPU
 function handlePassengerBoarding(train, stop, line, direction) {
     let remainingPassengers = [];
     let earnings = 0;
@@ -804,7 +847,7 @@ function handlePassengerBoarding(train, stop, line, direction) {
         effectiveDirection = -1;
     }
 
-    // Stanice, které leží POUZE A JENOM PŘED VLAKEM
+    // Stanice, které leží STRICTNĚ PŘED VLAKEM
     let upcomingStops = [];
     if (effectiveDirection === 1) {
         upcomingStops = line.stops.slice(currentStopIndex + 1);
@@ -813,21 +856,27 @@ function handlePassengerBoarding(train, stop, line, direction) {
     }
     let upcomingStopIds = upcomingStops.map(s => s.id);
 
-    // 1. VÝSTUP A PŘESTUP
+    // -------------------------------------------------------------
+    // A) VÝSTUP A PŘESTUP
+    // -------------------------------------------------------------
     train.passengersOnBoard.forEach(p => {
         if (p.targetId == stop.id) {
-            earnings += 750;
+            // Dorazil do cíle -> odměna
+            earnings += 150;
             alightedCount++;
         } else {
-            // Hledáme JINÉ linky vedoucí do cíle (ne naši vlastní)
-            let otherTargetLines = lines.filter(l => l.id !== line.id && l.stops.some(s => s.id == p.targetId));
-            let isTransferStation = otherTargetLines.some(tl => tl.stops.some(ts => ts.id == stop.id));
+            // Platné přestupní/cílové stanice pro tohoto cestujícího z této stanice dál
+            let validStopsAhead = getValidTransferStopsForTarget(line, p.targetId);
 
-            let hasFutureOption = upcomingStopIds.some(upId => upId == p.targetId) || upcomingStops.some(myStop => 
-                otherTargetLines.some(targetLine => targetLine.stops.some(ts => ts.id == myStop.id))
+            // Nabízí náš vlak ještě v dopředném směru nějakou užitečnou stanici/přestup?
+            let hasFutureOption = upcomingStopIds.some(upId =>
+                validStopsAhead.some(vId => vId == upId)
             );
 
-            if (isTransferStation && !hasFutureOption) {
+            // Pokud jsme na křižovatce a NÁŠ vlak už dál v jeho směru nepomůže, vysadíme ho!
+            let isTransferPoint = validStopsAhead.includes(stop.id);
+
+            if (isTransferPoint && !hasFutureOption) {
                 stop.passengers[p.targetId] = (stop.passengers[p.targetId] || 0) + 1;
                 alightedCount++;
             } else {
@@ -839,33 +888,19 @@ function handlePassengerBoarding(train, stop, line, direction) {
     train.passengersOnBoard = remainingPassengers;
     balance += earnings;
 
-    // 2. NÁSTUP (OPRAVENÁ LOGIKA BEZ SAMOPŘESTUPU)
+    // -------------------------------------------------------------
+    // B) NÁSTUP CESTUJÍCÍCH (s podporou 2 přestupů)
+    // -------------------------------------------------------------
     let boardedCount = 0;
 
     for (let targetId in stop.passengers) {
         let tId = parseInt(targetId);
 
-        // A) Leží cíl přímo na naší lince?
-        let isDirectTargetOnOurLine = line.stops.some(s => s.id == tId);
-        
-        // B) Pokud ne, existují JINÉ linky pro přestup?
-        let otherTargetLines = lines.filter(l => l.id !== line.id && l.stops.some(s => s.id == tId));
+        // Najdeme všechny stanice na NAŠÍ lince, ze kterých se dá do cíle dostat (přímo, 1. i 2. přestup)
+        let validDropoffStopIds = getValidTransferStopsForTarget(line, tId);
 
-        let validDropoffStopIds = [];
-
-        if (isDirectTargetOnOurLine) {
-            // Pokud cíl leží na naší lince, jediná platná stanice pro výstup je PŘÍMO TEN CÍL!
-            validDropoffStopIds.push(tId);
-        } else {
-            // Pokud leží na jiné lince, platné stanice jsou křižovatky s těmito JINÝMI linkami
-            line.stops.forEach(myStop => {
-                let isTransferPoint = otherTargetLines.some(tl => tl.stops.some(ts => ts.id == myStop.id));
-                if (isTransferPoint) validDropoffStopIds.push(myStop.id);
-            });
-        }
-
-        // Nastoupí POUZE pokud je jeho cíl/přestup STRICTNĚ PŘED VLAKEM!
-        let isAnyValidStopAhead = upcomingStopIds.some(aheadId => 
+        // KONTROLA: Leží alespoň jedna z těchto výstupních/přestupních stanic STRICTNĚ PŘED VLAKEM?
+        let isAnyValidStopAhead = upcomingStopIds.some(aheadId =>
             validDropoffStopIds.some(validId => validId == aheadId)
         );
 
@@ -893,6 +928,7 @@ function handlePassengerBoarding(train, stop, line, direction) {
     updateTrainPopup(train);
     updateUI();
 }
+
 
 function distributeTrainsEvenlyOnLine(lineId) {
     let line = lines.find(l => l.id == lineId);
