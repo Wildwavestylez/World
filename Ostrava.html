@@ -457,7 +457,7 @@ setInterval(() => {
             updateStopPopup(stop);
         }
     });
-}, 15000);
+}, 18000);
 
         function buyTrain(typeId) {
             let vType = VEHICLE_TYPES.find(v => v.id === typeId);
@@ -714,7 +714,7 @@ setInterval(() => {
         // 1. vlak (index 0) = 0s delay
         // 2. vlak (index 1) = 15s delay
         // 3. vlak (index 2) = 30s delay... atd.
-        let delayMs = trainIndex * 40000; 
+        let delayMs = trainIndex * 28000; 
 
         // Pokud vlak už měl nějaký pohyb nebo načítáme pozici, ale chceme takt:
         setTimeout(() => {
