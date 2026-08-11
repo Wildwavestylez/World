@@ -135,7 +135,7 @@
         <div class="hud-card" id="balance-box">350 000 000 Kč</div>
     </div>
 
-    <div id="sidebar">
+        <div id="sidebar">
         <button class="close-btn" onclick="toggleSidebar()">✕</button>
 
         <div class="tab-nav">
@@ -150,11 +150,10 @@
             <button class="tool-btn" id="btn-tunnel" onclick="setMode('tunnel')">🚇 Tunel <span class="price-tag">80M / km</span></button>
             <button class="tool-btn" id="btn-stop" onclick="setMode('stop')">🚏 Zastávka <span class="price-tag">5M Kč</span></button>
             <button class="tool-btn" id="btn-demolish" onclick="setMode('demolish')">🗑️ Zbourat kolej <span class="price-tag">Vrátí 50%</span></button>
-            
+
             <button id="btn-undo-track" class="undo-btn" onclick="undoLastTrack()">↩️ Zpět (poslední kolej)</button>
             <button id="btn-undo-stop" class="undo-btn" onclick="undoLastStop()">↩️ Zpět (poslední zastávka)</button>
         </div>
-
 
         <div id="tab-fleet" class="tab-content">
             <h4>Koupit nové vozidlo:</h4>
@@ -165,16 +164,15 @@
 
         <div id="tab-lines" class="tab-content">
             <button class="action-btn" style="background:#3498db;" onclick="startLineCreation()">➕ Vytvořit novou linku</button>
+            
             <div id="line-creation-info" style="display:none; font-size:12px; color:#f1c40f; background:#222; padding:8px; border-radius:4px;">
-    Klikáním na zastávky vytvoř trasu.
-    <div style="display:flex; gap:5px; margin-top:5px;">
-        <button class="action-btn" style="background:#e67e22; flex:1;" onclick="undoLastLineStop()">↩️ Zpět (stanice)</button>
-        <button class="action-btn" style="background:#2ecc71; flex:1;" onclick="finishLineCreation()">Dokončit linku</button>
-    </div>
-</div>
-
-                <button class="action-btn" style="margin-top:5px;" onclick="finishLineCreation()">Dokončit linku</button>
+                Klikáním na zastávky vytvoř trasu.
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <button class="action-btn" style="background:#e67e22; flex:1;" onclick="undoLastLineStop()">↩️ Zpět (stanice)</button>
+                    <button class="action-btn" style="background:#2ecc71; flex:1;" onclick="finishLineCreation()">Dokončit linku</button>
+                </div>
             </div>
+
             <h4>Aktivní linky:</h4>
             <div id="lines-list"></div>
         </div>
@@ -187,6 +185,7 @@
     </div>
 
     <div id="map"></div>
+
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
