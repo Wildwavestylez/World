@@ -904,6 +904,79 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+function getShortestPathDijkstra(startStopId, targetStopId) {
+    let startId = String(startStopId);
+    let targetId = String(targetStopId);
+
+    if (startId === targetId) return [startId];
+
+    let distances = {};
+    let previous = {};
+    let unvisited = new Set();
+
+    // 1. Inicializace všech stanic
+    stops.forEach(s => {
+        let idStr = String(s.id);
+        distances[idStr] = Infinity;
+        previous[idStr] = null;
+        unvisited.add(idStr);
+    });
+
+    distances[startId] = 0;
+
+    while (unvisited.size > 0) {
+        // Najdeme nenavštívenou stanici s nejmenší vzdáleností
+        let currentId = null;
+        let minDist = Infinity;
+
+        unvisited.forEach(id => {
+            if (distances[id] < minDist) {
+                minDist = distances[id];
+                currentId = id;
+            }
+        });
+
+        if (currentId === null || minDist === Infinity || currentId === targetId) break;
+
+        unvisited.delete(currentId);
+        let currentStop = stops.find(s => String(s.id) === currentId);
+
+        // Najdeme sousední stanice propojené LINKAMI
+        let neighbors = [];
+        lines.forEach(line => {
+            let idx = line.stops.findIndex(s => String(s.id) === currentId);
+            if (idx !== -1) {
+                if (idx > 0) neighbors.push(line.stops[idx - 1]);
+                if (idx < line.stops.length - 1) neighbors.push(line.stops[idx + 1]);
+            }
+        });
+
+        // Procházíme sousedy a počítáme fyzickou vzdálenost (v metrech/km)
+        neighbors.forEach(neighborStop => {
+            let neighborId = String(neighborStop.id);
+            if (unvisited.has(neighborId)) {
+                // Výpočet vzdálenosti z Leaflet latlng
+                let dist = map.distance(currentStop.latlng, neighborStop.latlng); 
+                let alt = distances[currentId] + dist;
+
+                if (alt < distances[neighborId]) {
+                    distances[neighborId] = alt;
+                    previous[neighborId] = currentId;
+                }
+            }
+        });
+    }
+
+    // Rekonstrukce cesty
+    let path = [];
+    let curr = targetId;
+    while (curr !== null) {
+        path.unshift(curr);
+        curr = previous[curr];
+    }
+
+    return path[0] === startId ? path : null;
+}
 
 
 // 1. NEJKRATŠÍ CESTA (BFS) - Propojuje stanice podle všech existujících linek
@@ -943,17 +1016,16 @@ function handlePassengerBoarding(train, stop, line, direction) {
     let currentStopIndex = line.stops.findIndex(s => String(s.id) === String(stop.id));
     if (currentStopIndex === -1) return;
 
-    // 1. ZJISTÍME STRIKTNĚ STANIČNÍ SMĚR VLAKU
+    // Je stanice konečná?
+    let isTerminus = (currentStopIndex === 0 || currentStopIndex === line.stops.length - 1);
+
+    // Stanice STRICTNĚ PŘED VLAKEM podle aktuálního směru
     let upcomingStops = [];
     if (direction === 1) {
-        // Jdeme dopředu (od indexu + 1 až do konce)
         upcomingStops = line.stops.slice(currentStopIndex + 1);
     } else {
-        // Jdeme pozpátku (od indexu - 1 dolů k 0)
         upcomingStops = line.stops.slice(0, currentStopIndex).reverse();
     }
-    
-    // Převedeme ID na Stringy pro 100% jistotu při porovnávání
     let upcomingStopIds = upcomingStops.map(s => String(s.id));
 
     let remainingPassengers = [];
@@ -961,7 +1033,7 @@ function handlePassengerBoarding(train, stop, line, direction) {
     let alightedCount = 0;
 
     // -------------------------------------------------------------
-    // A) VÝSTUP CESTUJÍCÍCH (Vysadíme ty, co dorazili nebo musí přestoupit)
+    // A) VÝSTUP Z VLAKU
     // -------------------------------------------------------------
     train.passengersOnBoard.forEach(p => {
         if (!p || typeof p !== 'object') return;
@@ -969,14 +1041,23 @@ function handlePassengerBoarding(train, stop, line, direction) {
         let pTargetId = String(p.targetId);
         let currentStopId = String(stop.id);
 
-        // 1. Je v cíli?
+        // 1. Dorazil do cíle -> Peníze a vystoupit!
         if (currentStopId === pTargetId) {
             earnings += 750;
             alightedCount++;
             return;
         }
 
-        // 2. Má spočítanou trasu?
+        // 2. Je na konečné? Pokud vlak dál nejede v jeho směru, NATVRDO VYSTOUPIT!
+        if (isTerminus) {
+            // Na konečné vystoupí všichni, kdo tu nemají cílovou stanici
+            stop.passengers[p.targetId] = stop.passengers[p.targetId] || [];
+            stop.passengers[p.targetId].push(p);
+            alightedCount++;
+            return;
+        }
+
+        // 3. Běžná stanice: Kontrola, zda náš vlak pokračuje do jeho DALŠÍ stanice
         if (p.path && Array.isArray(p.path)) {
             let pathStr = p.path.map(id => String(id));
             let myIndexInPath = pathStr.indexOf(currentStopId);
@@ -984,7 +1065,7 @@ function handlePassengerBoarding(train, stop, line, direction) {
             if (myIndexInPath !== -1 && myIndexInPath < pathStr.length - 1) {
                 let nextRequiredStopId = pathStr[myIndexInPath + 1];
 
-                // Pokud náš vlak V TOTO CHVÍLI NEJEDE do jeho další stanice -> VYSTOUPÍ NA PŘESTUP!
+                // Pokud náš vlak V TOTO CHVÍLI NEJEDE do jeho další stanice -> VYSTOUPÍ NA PŘESTUP
                 if (!upcomingStopIds.includes(nextRequiredStopId)) {
                     stop.passengers[p.targetId] = stop.passengers[p.targetId] || [];
                     stop.passengers[p.targetId].push(p);
@@ -994,7 +1075,6 @@ function handlePassengerBoarding(train, stop, line, direction) {
             }
         }
 
-        // Pokud vlak pokračuje v jeho směru, zůstává sedět
         remainingPassengers.push(p);
     });
 
@@ -1002,7 +1082,7 @@ function handlePassengerBoarding(train, stop, line, direction) {
     balance += earnings;
 
     // -------------------------------------------------------------
-    // B) NÁSTUP CESTUJÍCÍCH (Nastoupí Jen ti, kterým vlak jede do JEJICH DALŠÍ stanice)
+    // B) NÁSTUP DO VLAKU
     // -------------------------------------------------------------
     let boardedCount = 0;
 
@@ -1015,9 +1095,9 @@ function handlePassengerBoarding(train, stop, line, direction) {
         waitingList.forEach(p => {
             if (!p || typeof p !== 'object') return;
 
-            // Pokud nemá trasu, spočítáme ji
+            // Spočítáme Dijkstrou nejkratší cestu podle km
             if (!p.path) {
-                p.path = getShortestPathStops(stop.id, p.targetId);
+                p.path = getShortestPathDijkstra(stop.id, p.targetId);
             }
 
             if (p.path && p.path.length > 1) {
@@ -1027,16 +1107,15 @@ function handlePassengerBoarding(train, stop, line, direction) {
                 if (myIdx !== -1 && myIdx < pathStr.length - 1) {
                     let nextStopId = pathStr[myIdx + 1];
 
-                    // KLÍČOVÁ PODMÍNKA: Jede vlak do jeho DALŠÍ stanice?
+                    // Nastoupí JEN pokud vlak pokračuje do jeho další stanice
                     if (upcomingStopIds.includes(nextStopId) && train.passengersOnBoard.length < train.capacity) {
                         train.passengersOnBoard.push(p);
                         boardedCount++;
-                        return; // Nastoupil
+                        return;
                     }
                 }
             }
 
-            // Nenastoupil -> zůstává na zastávce
             nextWaitingList.push(p);
         });
 
