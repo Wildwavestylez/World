@@ -906,8 +906,10 @@ document.addEventListener('keydown', function(e) {
 
 
 
-// 1. Pomocná funkce: Najde nejkratší posloupnost stanic ze Startu do Cíle přes dostupné linky
+// 1. NEJKRATŠÍ CESTA (BFS) - Propojuje stanice podle všech existujících linek
 function getShortestPathStops(startStopId, targetStopId) {
+    if (startStopId === targetStopId) return [startStopId];
+
     let queue = [[startStopId]];
     let visited = new Set([startStopId]);
 
@@ -917,7 +919,6 @@ function getShortestPathStops(startStopId, targetStopId) {
 
         if (currentId === targetStopId) return path;
 
-        // Najdeme všechny sousední stanice, které jsou spojeny jakoukoliv linkou
         let neighborIds = new Set();
         lines.forEach(line => {
             let idx = line.stops.findIndex(s => s.id === currentId);
@@ -935,18 +936,21 @@ function getShortestPathStops(startStopId, targetStopId) {
         });
     }
 
-    return null; // Cesta neexistuje
+    return null; // Propojení neexistuje
 }
 
-// 2. Nová, čistá obsluha nástupu a výstupu
+// 2. BEZPEČNÁ OBSLUHA NÁSTUPU A VÝSTUPU
 function handlePassengerBoarding(train, stop, line, direction) {
     let currentStopIndex = line.stops.findIndex(s => s.id == stop.id);
     if (currentStopIndex === -1) return;
 
-    // Stanice, které leží přímo před vlakem na jeho lince
-    let upcomingStops = (direction === 1) 
-        ? line.stops.slice(currentStopIndex + 1) 
-        : line.stops.slice(0, currentStopIndex);
+    // POJISTKA SMĚRU: Určíme přesně stanice PŘED vlakem
+    let upcomingStops = [];
+    if (direction === 1) {
+        upcomingStops = line.stops.slice(currentStopIndex + 1);
+    } else {
+        upcomingStops = line.stops.slice(0, currentStopIndex);
+    }
     let upcomingStopIds = upcomingStops.map(s => s.id);
 
     let remainingPassengers = [];
@@ -954,70 +958,82 @@ function handlePassengerBoarding(train, stop, line, direction) {
     let alightedCount = 0;
 
     // -------------------------------------------------------------
-    // A) VÝSTUP A PŘESTUP
+    // A) VÝSTUP CESTUJÍCÍCH Z VLAKU
     // -------------------------------------------------------------
     train.passengersOnBoard.forEach(p => {
-        // Zjistíme, kam má člověk jet dál ze své trasy
-        let myIndexInPath = p.path.indexOf(stop.id);
-        
-        // 1. Je v cíli?
+        // Pokud je objekt neplatný nebo starý, raději ho vysadíme
+        if (!p || typeof p !== 'object') return;
+
+        // 1. Je v cílové stanici?
         if (stop.id === p.targetId) {
             earnings += 750;
             alightedCount++;
-        } 
-        // 2. Je na přestupní stanici? (Náš vlak už nejede do jeho DALŠÍ stanice na trase)
-        else if (myIndexInPath !== -1 && myIndexInPath < p.path.length - 1) {
-            let nextRequiredStopId = p.path[myIndexInPath + 1];
-            
-            // Pokud náš vlak dopředu nenabízí jeho další stanici, vystoupí a počká na jinou linku
-            if (!upcomingStopIds.includes(nextRequiredStopId)) {
-                stop.passengers[p.targetId] = stop.passengers[p.targetId] || [];
-                stop.passengers[p.targetId].push(p); // Vystoupí na stanici s celou svou trasou
-                alightedCount++;
-            } else {
-                remainingPassengers.push(p); // Jede dál naším vlakem
-            }
-        } else {
-            remainingPassengers.push(p);
+            return;
         }
+
+        // 2. Kontrola trasy – jede náš vlak dál do jeho DALŠÍ stanice?
+        if (p.path && Array.isArray(p.path)) {
+            let myIndexInPath = p.path.indexOf(stop.id);
+
+            if (myIndexInPath !== -1 && myIndexInPath < p.path.length - 1) {
+                let nextRequiredStopId = p.path[myIndexInPath + 1];
+
+                // Pokud náš vlak dopředu NEOBSAHUJE jeho další stanici, vystoupí na přestup!
+                if (!upcomingStopIds.includes(nextRequiredStopId)) {
+                    stop.passengers[p.targetId] = stop.passengers[p.targetId] || [];
+                    stop.passengers[p.targetId].push(p); // Počká na nástupišti
+                    alightedCount++;
+                    return;
+                }
+            }
+        }
+
+        // Jinak zůstává ve vlaku
+        remainingPassengers.push(p);
     });
 
     train.passengersOnBoard = remainingPassengers;
     balance += earnings;
 
     // -------------------------------------------------------------
-    // B) NÁSTUP (Cestující nastoupí jen pokud vlak jede do jeho DALŠÍ stanice)
+    // B) NÁSTUP CESTUJÍCÍCH NA STANICI
     // -------------------------------------------------------------
     let boardedCount = 0;
 
-    // Projdeme čekající na stanici
     for (let targetId in stop.passengers) {
         let waitingList = stop.passengers[targetId];
-        if (!Array.isArray(waitingList) || waitingList.length === 0) continue;
+
+        // Ošetření pro stará čísla i nové pole
+        if (!Array.isArray(waitingList)) continue;
 
         let nextWaitingList = [];
 
         waitingList.forEach(p => {
-            // Pokud člověk ještě nemá spočítanou trasu, spočítáme ji
+            if (!p || typeof p !== 'object') return;
+
+            // Spočítáme trasu, pokud ji ještě nemá
             if (!p.path) {
                 p.path = getShortestPathStops(stop.id, p.targetId);
             }
 
-            if (p.path) {
+            // Pokud trasa existuje a vlak má volno
+            if (p.path && p.path.length > 1) {
                 let myIdx = p.path.indexOf(stop.id);
+
                 if (myIdx !== -1 && myIdx < p.path.length - 1) {
                     let nextStopId = p.path[myIdx + 1];
 
-                    // ZKONTROLUJEME: Jede náš vlak do jeho další stanice na trase?
+                    // ZKONTROLUJEME: Leží jeho další stanice PŘED vlakem?
                     if (upcomingStopIds.includes(nextStopId) && train.passengersOnBoard.length < train.capacity) {
                         train.passengersOnBoard.push(p);
                         boardedCount++;
-                        return; // Nastoupil, nevrací se do nástupiště
+                        return; // Nastoupil, nezůstává na stanici
                     }
                 }
             }
 
-            nextWaitingList.push(p); // Nenastoupil, zůstává na stanici
+            // Pokud nenastoupil, zůstává na stanici
+            nextWaitingList.push(p);
         });
 
         stop.passengers[targetId] = nextWaitingList;
