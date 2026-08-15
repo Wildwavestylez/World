@@ -227,6 +227,15 @@
         let extendingLine = null;
         let extendPosition = null; 
 
+       // Globální cache pro uložení již spočítaných tras
+let pathCache = {};
+
+// Funkce pro reset paměti – zvolej ji vždy při změně sítě!
+function clearPathCache() {
+    pathCache = {};
+}
+
+
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
         function switchTab(tabId) {
