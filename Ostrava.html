@@ -453,7 +453,7 @@
 setInterval(() => {
     if (stops.length < 2) return;
 
-    const MAX_TRAVEL_DISTANCE_KM = 20; 
+    const MAX_TRAVEL_DISTANCE_KM = 8; 
 
     stops.forEach(stop => {
         let reachableStops = stops.filter(target => {
@@ -946,11 +946,20 @@ function getShortestPathDijkstra(startStopId, targetStopId) {
 
     if (startId === targetId) return [startId];
 
+    // -------------------------------------------------------------
+    // A) KONTROLA CACHE
+    // -------------------------------------------------------------
+    let cacheKey = `${startId}->${targetId}`;
+    if (pathCache[cacheKey] !== undefined) {
+        return pathCache[cacheKey]; // Vrátí uloženou trusu (nebo null, pokud neexistuje)
+    }
+
     let distances = {};
     let previous = {};
     let unvisited = new Set();
 
     stops.forEach(s => {
+        if (!s) return;
         let idStr = String(s.id);
         distances[idStr] = Infinity;
         previous[idStr] = null;
@@ -970,24 +979,24 @@ function getShortestPathDijkstra(startStopId, targetStopId) {
             }
         });
 
-        // Pokud už se nedá nikam jet nebo jsme dosáhli cíle
         if (currentId === null || minDist === Infinity || currentId === targetId) break;
 
         unvisited.delete(currentId);
-        let currentStop = stops.find(s => String(s.id) === currentId);
-        if (!currentStop) continue;
+        let currentStop = stops.find(s => s && String(s.id) === currentId);
+        if (!currentStop || !currentStop.latlng) continue;
 
-        // Najdeme sousední stanice propojené jakoukoliv existující LINKOU
         let neighbors = [];
         lines.forEach(line => {
-            let idx = line.stops.findIndex(s => String(s.id) === currentId);
+            if (!line || !line.stops) return;
+            let idx = line.stops.findIndex(s => s && String(s.id) === currentId);
             if (idx !== -1) {
-                if (idx > 0) neighbors.push(line.stops[idx - 1]);
-                if (idx < line.stops.length - 1) neighbors.push(line.stops[idx + 1]);
+                if (idx > 0 && line.stops[idx - 1]) neighbors.push(line.stops[idx - 1]);
+                if (idx < line.stops.length - 1 && line.stops[idx + 1]) neighbors.push(line.stops[idx + 1]);
             }
         });
 
         neighbors.forEach(neighborStop => {
+            if (!neighborStop || !neighborStop.latlng) return;
             let neighborId = String(neighborStop.id);
             if (unvisited.has(neighborId)) {
                 let dist = map.distance(currentStop.latlng, neighborStop.latlng); 
@@ -1001,7 +1010,6 @@ function getShortestPathDijkstra(startStopId, targetStopId) {
         });
     }
 
-    // Rekonstrukce cesty
     let path = [];
     let curr = targetId;
     while (curr !== null) {
@@ -1009,8 +1017,16 @@ function getShortestPathDijkstra(startStopId, targetStopId) {
         curr = previous[curr];
     }
 
-    return path[0] === startId ? path : null;
+    let result = (path[0] === startId) ? path : null;
+
+    // -------------------------------------------------------------
+    // B) ULOŽENÍ VÝSLEDKU DO CACHE
+    // -------------------------------------------------------------
+    pathCache[cacheKey] = result;
+
+    return result;
 }
+
 
 
 function handlePassengerBoarding(train, stop, line, direction) {
