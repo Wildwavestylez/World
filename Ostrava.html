@@ -785,19 +785,57 @@ function sellTrain(trainId) {
             updateUI();
         }
 
-        function startTrainMovement(train, line, trainIndex) {
+        function assignTrainToLine(trainId, lineId) {
+    let train = trains.find(t => t.id === trainId);
+    let line = lines.find(l => l.id === lineId);
+    if (!train || !line) return;
+
+    if (train.assignedLine) {
+        let oldLine = lines.find(l => l.id === train.assignedLine);
+        if (oldLine) {
+            oldLine.assignedTrains = oldLine.assignedTrains.filter(id => id !== train.id);
+        }
+    }
+
+    train.assignedLine = line.id;
+    line.assignedTrains.push(train.id);
+
+    // Zjistíme, zda jde o nové vozidlo nasazené za běhu (má index > 0 na lince, ale už běží hra)
+    let trainIndex = line.assignedTrains.length - 1;
+    
+    // Pokud je to nový vlak a na lince už je plno, nasadíme ho tak, aby vyjel hned (nebo s minimálním rozestupem)
+    let startPosition = line.path[0];
+    
+    let trainMarker = L.marker(startPosition, {
+        icon: L.divIcon({ 
+            className: 'train-img-icon', 
+            html: `<img src="${train.img}" class="train-img-marker" style="border-color:${line.color};">` 
+        })
+    }).addTo(map);
+
+    train.marker = trainMarker;
+    trainMarker.bindPopup('');
+    trainMarker.on('click', () => updateTrainPopup(train));
+
+    // Spustíme pohyb s ohledem na to, kolikátý vlak v pořadí to je
+    startTrainMovement(train, line, trainIndex);
+
+    autoSave();
+    updateUI();
+}
+
+function startTrainMovement(train, line, trainIndex) {
     let currentSegmentIndex = 0;
     let direction = 1;
 
     function initMovement() {
-        // Kontrola, zda se hra načetla/spustila s více vlaky najednou (např. po startu),
-        // nebo zda byl vlak zakoupen jako nový v běhu hry.
-        // Pokud má vlak pořadí (trainIndex > 0) a vyjíždí ze startu (distanceKm == 0),
-        // dostane rozestup (např. 12000 ms = 12s).
-        // Nově přidaný vlak v hluchém místě s indexem 0 nebo samostatný vlak vyjede IHNED.
-        let isBatchStart = (train.distanceKm === 0 || train.distanceKm === undefined);
-        let delayMs = isBatchStart ? (trainIndex * 12000) : 0; // Zde si upravuj 12000 ms (12s) podle potřeby
+        // Pokud jde o načtení hry (nebo hromadný start), uděláme krásné rozestupy za sebou (např. 15 vteřin)
+        // Pokud je to ale nově přidaný vlak za chodu hry (trainIndex > 0 a už nějaké vlaky jedou), 
+        // můžeme mu dát buď krátký rozestup, nebo ho pustit ihned.
+        let delayMs = trainIndex * 15000; // 15 vteřin rozestup mezi vlaky
 
+        // Pojistka: Pokud už má vlak nějakou historii ujetých kilometrů z uložené hry, 
+        // neresetujeme ho násilím na začátek, ale necháme ho běžet.
         setTimeout(() => {
             moveSegment();
         }, delayMs);
@@ -807,14 +845,13 @@ function sellTrain(trainId) {
         if (!train.assignedLine) return;
 
         let currentPath = line.path;
-
         if (currentSegmentIndex >= currentPath.length) {
             currentSegmentIndex = currentPath.length - 1;
         }
 
         let nextSegmentIndex = currentSegmentIndex + direction;
 
-        // Pokud jsme na konci trati, ihned otočíme směr
+        // Jakmile dojede na konečnou (konec pole tras), hned otočí směr a valí zpět
         if (nextSegmentIndex >= currentPath.length || nextSegmentIndex < 0) {
             direction *= -1;
             nextSegmentIndex = currentSegmentIndex + direction;
@@ -827,7 +864,7 @@ function sellTrain(trainId) {
 
         let distanceMeters = map.distance(startPt, targetPt);
         let distanceKm = distanceMeters / 1000;
-        
+
         train.distanceKm = (train.distanceKm || 0) + distanceKm;
         totalDistanceTraveledKm += distanceKm;
 
@@ -844,19 +881,18 @@ function sellTrain(trainId) {
 
             let currentLat = startPt.lat + (targetPt.lat - startPt.lat) * progress;
             let currentLng = startPt.lng + (targetPt.lng - startPt.lng) * progress;
-            
+
             if (train.marker) train.marker.setLatLng([currentLat, currentLng]);
 
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
                 currentSegmentIndex = nextSegmentIndex;
-
                 let currentStop = line.stops.find(stop => map.distance(stop.latlng, targetPt) < 20);
 
                 if (currentStop) {
                     handlePassengerBoarding(train, currentStop, line, direction);
-                    // Standardní stanicování 2 sekundy všude (i na konečné, hned se otočí a jede)
+                    // Krátká pauza ve stanici (2 sekundy) a jede se dál
                     setTimeout(moveSegment, 2000); 
                 } else {
                     moveSegment();
@@ -868,6 +904,23 @@ function sellTrain(trainId) {
     }
 
     initMovement();
+}
+
+function distributeTrainsEvenlyOnLine(lineId) {
+    let line = lines.find(l => l.id == lineId);
+    let lineTrains = trains.filter(t => t.assignedLine == lineId);
+    if (!line || lineTrains.length === 0) return;
+
+    // Po načtení hry srovná vlaky na linku tak, aby startovaly postupně za sebou
+    lineTrains.forEach((train, index) => {
+        train.currentStopIndex = 0;
+        train.direction = 1;
+
+        let startStop = line.stops[0];
+        if (startStop && train.marker) {
+            train.marker.setLatLng([startStop.latlng.lat, startStop.latlng.lng]);
+        }
+    });
 }
 
 
@@ -1193,40 +1246,7 @@ function handlePassengerBoarding(train, stop, line, direction) {
     updateUI();
 }
 
-
-
-
-
-function distributeTrainsEvenlyOnLine(lineId) {
-    let line = lines.find(l => l.id == lineId);
-    let lineTrains = trains.filter(t => t.assignedLine == lineId);
-
-    if (!line || lineTrains.length === 0) return;
-
-    // Nastavíme interval mezi vlaky (např. 15 sekund mezi každým výjezdem)
-    let intervalDelayMs = 15000; // 15 sekund (uprav si podle rychlosti tvých vlaků)
-
-    lineTrains.forEach((train, index) => {
-        // První vlak (index 0) má delay 0 a jede hned.
-        // Další vlaky dostanou postupně větší zpoždění (15s, 30s, 45s...)
-        train.startDelay = index * intervalDelayMs;
-        
-        // Všechny postavíme na startovní stanici
-        train.currentStopIndex = 0;
-        train.direction = 1;
-
-        let startStop = line.stops[0];
-        if (startStop && train.marker) {
-            train.marker.setLatLng([startStop.lat, startStop.lng]);
-        }
-    });
-}
-
-
-
-        
-
-        function updateUI() {
+    function updateUI() {
             document.getElementById('balance-box').innerText = `${balance.toLocaleString()} Kč`;
             document.getElementById('train-count').innerText = trains.length;
 
