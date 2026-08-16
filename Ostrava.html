@@ -23,6 +23,23 @@
             display: flex; gap: 10px; align-items: center;
         }
 
+#stats-box {
+    display: flex;
+    flex-direction: column; /* Hodnoty půjdou pod sebe */
+    justify-content: center;
+    gap: 3px; /* Malá mezera mezi řádky */
+    padding: 4px 10px;
+    white-space: nowrap; /* Zabrání nechtěnému zalamování textu */
+}
+
+#stats-box div {
+    display: flex;
+    align-items: center;
+    gap: 6px; /* Mezera mezi ikonou a číslem */
+    font-size: 13px; /* Můžeš upravit podle chuti, aby to sedělo k penězům */
+}
+
+
         #balance-box { color: #2ecc71; font-size: 16px; }
 
         #hamburger-btn {
@@ -129,12 +146,18 @@
 </head>
 <body>
 
-  <div id="top-bar">
+    <div id="top-bar">
     <button id="hamburger-btn" onclick="toggleSidebar()">☰ Menu</button>
-    <!-- Místo textu Ostrava dáme element pro statistiky -->
-    <div class="hud-card" id="stats-box">👥 0 | 🚆 0.0 km</div>
+    
+    <!-- Změna: Statistiky rozdělené do dvojsloupcového/vertikálního bloku -->
+    <div class="hud-card" id="stats-box" style="display: flex; flex-direction: column; gap: 4px; padding: 4px 10px;">
+        <div id="stats-passengers">👥 <span id="passengers-val">0</span></div>
+        <div id="stats-km">🚆 <span id="km-val">0.0</span> km</div>
+    </div>
+
     <div class="hud-card" id="balance-box">350 000 000 Kč</div>
 </div>
+
 
         <div id="sidebar">
         <button class="close-btn" onclick="toggleSidebar()">✕</button>
@@ -271,12 +294,15 @@ function clearPathCache() {
         }
 
 function updateStatsUI() {
-    let statsElem = document.getElementById('stats-box');
-    if (!statsElem) return;
-
-    let kmFormatted = totalDistanceTraveledKm.toFixed(1);
-    statsElem.innerHTML = `👥 <b>${totalPassengersTransported}</b> | 🚆 <b>${kmFormatted} km</b>`;
+    let passengersElem = document.getElementById('passengers-val');
+    let kmElem = document.getElementById('km-val');
+    
+    if (passengersElem && kmElem) {
+        passengersElem.innerText = totalPassengersTransported.toLocaleString();
+        kmElem.innerText = totalDistanceTraveledKm.toFixed(1);
+    }
 }
+
 
 
         function getSnappedLatLng(latlng) {
