@@ -786,21 +786,21 @@ function sellTrain(trainId) {
         }
 
         function startTrainMovement(train, line, trainIndex) {
-    let totalTrains = line.assignedTrains ? line.assignedTrains.length : 1;
     let currentSegmentIndex = 0;
-
-    // Pokud je vlak nový (ještě nejel) a na lince je více vlaků,
-    // posuneme jeho start na konkrétní úsek trasy podle jeho pořadí:
-    if ((!train.distanceKm || train.distanceKm === 0) && totalTrains > 1) {
-        let pathLength = line.path.length;
-        // Rozpočítáme start tak, aby každý vlak začal v jiné části trati
-        currentSegmentIndex = Math.floor((trainIndex / totalTrains) * pathLength);
-    }
-
     let direction = 1;
 
     function initMovement() {
-        moveSegment();
+        // Kontrola, zda se hra načetla/spustila s více vlaky najednou (např. po startu),
+        // nebo zda byl vlak zakoupen jako nový v běhu hry.
+        // Pokud má vlak pořadí (trainIndex > 0) a vyjíždí ze startu (distanceKm == 0),
+        // dostane rozestup (např. 12000 ms = 12s).
+        // Nově přidaný vlak v hluchém místě s indexem 0 nebo samostatný vlak vyjede IHNED.
+        let isBatchStart = (train.distanceKm === 0 || train.distanceKm === undefined);
+        let delayMs = isBatchStart ? (trainIndex * 12000) : 0; // Zde si upravuj 12000 ms (12s) podle potřeby
+
+        setTimeout(() => {
+            moveSegment();
+        }, delayMs);
     }
 
     function moveSegment() {
@@ -814,13 +814,12 @@ function sellTrain(trainId) {
 
         let nextSegmentIndex = currentSegmentIndex + direction;
 
-        // Pokud jsme na konci trati, otočíme směr
+        // Pokud jsme na konci trati, ihned otočíme směr
         if (nextSegmentIndex >= currentPath.length || nextSegmentIndex < 0) {
             direction *= -1;
             nextSegmentIndex = currentSegmentIndex + direction;
         }
 
-        // Uložíme aktuální směr do objektu vlaku
         train.direction = direction;
 
         let startPt = currentPath[currentSegmentIndex];
@@ -829,7 +828,6 @@ function sellTrain(trainId) {
         let distanceMeters = map.distance(startPt, targetPt);
         let distanceKm = distanceMeters / 1000;
         
-        // Přičteme ujeté km vlaku i do globálních statistik
         train.distanceKm = (train.distanceKm || 0) + distanceKm;
         totalDistanceTraveledKm += distanceKm;
 
@@ -858,7 +856,8 @@ function sellTrain(trainId) {
 
                 if (currentStop) {
                     handlePassengerBoarding(train, currentStop, line, direction);
-                    setTimeout(moveSegment, 2000); // Stanicovací pauza 2 sekundy
+                    // Standardní stanicování 2 sekundy všude (i na konečné, hned se otočí a jede)
+                    setTimeout(moveSegment, 2000); 
                 } else {
                     moveSegment();
                 }
@@ -870,6 +869,7 @@ function sellTrain(trainId) {
 
     initMovement();
 }
+
 
 
 
