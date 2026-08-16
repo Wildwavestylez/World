@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ostrava Tram-Train Simulator Pro</title>
+    <title> Tram-Train Simulator Pro</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -129,11 +129,12 @@
 </head>
 <body>
 
-    <div id="top-bar">
-        <button id="hamburger-btn" onclick="toggleSidebar()">☰ Menu</button>
-        <div class="hud-card">🚆 Tram-Train Ostrava</div>
-        <div class="hud-card" id="balance-box">350 000 000 Kč</div>
-    </div>
+  <div id="top-bar">
+    <button id="hamburger-btn" onclick="toggleSidebar()">☰ Menu</button>
+    <!-- Místo textu Ostrava dáme element pro statistiky -->
+    <div class="hud-card" id="stats-box">👥 0 | 🚆 0.0 km</div>
+    <div class="hud-card" id="balance-box">350 000 000 Kč</div>
+</div>
 
         <div id="sidebar">
         <button class="close-btn" onclick="toggleSidebar()">✕</button>
@@ -207,6 +208,9 @@
         }).addTo(map);
 
         let balance = 350000000;
+       let totalPassengersTransported = 0;
+         let totalDistanceTraveledKm = 0;
+
         let currentMode = 'select';
         let trackStartPoint = null;
         let tempStartMarker = null;
@@ -265,6 +269,15 @@ function clearPathCache() {
                 }
             });
         }
+
+function updateStatsUI() {
+    let statsElem = document.getElementById('stats-box');
+    if (!statsElem) return;
+
+    let kmFormatted = totalDistanceTraveledKm.toFixed(1);
+    statsElem.innerHTML = `👥 <b>${totalPassengersTransported}</b> | 🚆 <b>${kmFormatted} km</b>`;
+}
+
 
         function getSnappedLatLng(latlng) {
             let closestPoint = latlng;
@@ -779,13 +792,9 @@ function sellTrain(trainId) {
     function initMovement() {
         let totalTrains = line.assignedTrains ? line.assignedTrains.length : 1;
         
-        // FIX TAKTU: Pevný rozestup 15 sekund mezi výjezdy jednotlivých vlaků
-        // 1. vlak (index 0) = 0s delay
-        // 2. vlak (index 1) = 15s delay
-        // 3. vlak (index 2) = 30s delay... atd.
-        let delayMs = trainIndex * 28000; 
+        // Pokud vlak už dříve jel, vyjede hned. Pokud je nový, dostane jen krátký odstup (max 15s).
+        let delayMs = (train.distanceKm > 0) ? 0 : Math.min(trainIndex * 5000, 15000); 
 
-        // Pokud vlak už měl nějaký pohyb nebo načítáme pozici, ale chceme takt:
         setTimeout(() => {
             moveSegment();
         }, delayMs);
@@ -816,7 +825,10 @@ function sellTrain(trainId) {
 
         let distanceMeters = map.distance(startPt, targetPt);
         let distanceKm = distanceMeters / 1000;
+        
+        // Přičteme ujeté km vlaku i do globálních statistik
         train.distanceKm += distanceKm;
+        totalDistanceTraveledKm += distanceKm;
 
         let durationMs = ((distanceKm / train.speed) * 3600 * 1000) / 5;
         if (durationMs < 50) durationMs = 50;
@@ -1075,10 +1087,12 @@ function handlePassengerBoarding(train, stop, line, direction) {
 
         // Dorazil do cíle (i kdyby to byla konečná stanice)
         if (currentStopId === pTargetId) {
-            earnings += 750;
-            alightedCount++;
-            return;
-        }
+    earnings += 750;
+    alightedCount++;
+    totalPassengersTransported++; // <-- PŘIDAT TENTO ŘÁDEK
+    return;
+}
+
 
         // Pokud vlak dojel na konečnou a lidé v něm ještě nedorazili do svého cíle,
         // vystoupí a počkají na nástupišti na další spoj/přestup
@@ -1259,6 +1273,9 @@ function distributeTrainsEvenlyOnLine(lineId) {
                 </div>`;
             });
             document.getElementById('lines-list').innerHTML = linesHtml;
+
+updateStatsUI();
+
         }
 
         function autoSave() {
