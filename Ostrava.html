@@ -786,14 +786,15 @@ function sellTrain(trainId) {
         }
 
         function startTrainMovement(train, line, trainIndex) {
-    let totalPathLength = line.path.length;
     let totalTrains = line.assignedTrains ? line.assignedTrains.length : 1;
-
-    // Pokud je vlak nový (ještě nejel), vypočítáme mu startovní pozici na trati podle jeho indexu,
-    // aby se 16 vlaků rozprostřelo po celé lince a nejely v chumlu:
     let currentSegmentIndex = 0;
-    if (train.distanceKm === 0 && totalTrains > 1) {
-        currentSegmentIndex = Math.floor((trainIndex / totalTrains) * totalPathLength);
+
+    // Pokud je vlak nový (ještě nejel) a na lince je více vlaků,
+    // posuneme jeho start na konkrétní úsek trasy podle jeho pořadí:
+    if ((!train.distanceKm || train.distanceKm === 0) && totalTrains > 1) {
+        let pathLength = line.path.length;
+        // Rozpočítáme start tak, aby každý vlak začal v jiné části trati
+        currentSegmentIndex = Math.floor((trainIndex / totalTrains) * pathLength);
     }
 
     let direction = 1;
@@ -829,7 +830,7 @@ function sellTrain(trainId) {
         let distanceKm = distanceMeters / 1000;
         
         // Přičteme ujeté km vlaku i do globálních statistik
-        train.distanceKm += distanceKm;
+        train.distanceKm = (train.distanceKm || 0) + distanceKm;
         totalDistanceTraveledKm += distanceKm;
 
         let durationMs = ((distanceKm / train.speed) * 3600 * 1000) / 5;
