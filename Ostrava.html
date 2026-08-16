@@ -786,18 +786,20 @@ function sellTrain(trainId) {
         }
 
         function startTrainMovement(train, line, trainIndex) {
+    let totalPathLength = line.path.length;
+    let totalTrains = line.assignedTrains ? line.assignedTrains.length : 1;
+
+    // Pokud je vlak nový (ještě nejel), vypočítáme mu startovní pozici na trati podle jeho indexu,
+    // aby se 16 vlaků rozprostřelo po celé lince a nejely v chumlu:
     let currentSegmentIndex = 0;
+    if (train.distanceKm === 0 && totalTrains > 1) {
+        currentSegmentIndex = Math.floor((trainIndex / totalTrains) * totalPathLength);
+    }
+
     let direction = 1;
 
     function initMovement() {
-        let totalTrains = line.assignedTrains ? line.assignedTrains.length : 1;
-        
-        // Pokud vlak už dříve jel, vyjede hned. Pokud je nový, dostane jen krátký odstup (max 15s).
-        let delayMs = (train.distanceKm > 0) ? 0 : Math.min(trainIndex * 5000, 15000); 
-
-        setTimeout(() => {
-            moveSegment();
-        }, delayMs);
+        moveSegment();
     }
 
     function moveSegment() {
@@ -854,7 +856,6 @@ function sellTrain(trainId) {
                 let currentStop = line.stops.find(stop => map.distance(stop.latlng, targetPt) < 20);
 
                 if (currentStop) {
-                    // Předáváme i 'direction' do obsluhy cestujících
                     handlePassengerBoarding(train, currentStop, line, direction);
                     setTimeout(moveSegment, 2000); // Stanicovací pauza 2 sekundy
                 } else {
@@ -868,6 +869,7 @@ function sellTrain(trainId) {
 
     initMovement();
 }
+
 
 
 // 1. POMOCNÁ FUNKCE: Najde všechny stanice na NAŠÍ lince, které vedou k cíli (přímo, přes 1 přestup, nebo přes 2 přestupy)
