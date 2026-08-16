@@ -475,7 +475,7 @@ function updateStatsUI() {
 setInterval(() => {
     if (stops.length < 2) return;
 
-    const MAX_TRAVEL_DISTANCE_KM = 8; 
+    const MAX_TRAVEL_DISTANCE_KM = 10; 
 
     stops.forEach(stop => {
         let reachableStops = stops.filter(target => {
@@ -832,7 +832,7 @@ function startTrainMovement(train, line, trainIndex) {
         // Pokud jde o načtení hry (nebo hromadný start), uděláme krásné rozestupy za sebou (např. 15 vteřin)
         // Pokud je to ale nově přidaný vlak za chodu hry (trainIndex > 0 a už nějaké vlaky jedou), 
         // můžeme mu dát buď krátký rozestup, nebo ho pustit ihned.
-        let delayMs = trainIndex * 15000; // 15 vteřin rozestup mezi vlaky
+        let delayMs = trainIndex * 35000; // 15 vteřin rozestup mezi vlaky
 
         // Pojistka: Pokud už má vlak nějakou historii ujetých kilometrů z uložené hry, 
         // neresetujeme ho násilím na začátek, ale necháme ho běžet.
