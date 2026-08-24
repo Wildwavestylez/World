@@ -501,7 +501,7 @@ function updateStatsUI() {
 setInterval(() => {
     if (stops.length < 2) return;
 
-    const MAX_TRAVEL_DISTANCE_KM = 10; 
+    const MAX_TRAVEL_DISTANCE_KM = 150; 
 
     stops.forEach(stop => {
         let reachableStops = stops.filter(target => {
