@@ -707,38 +707,42 @@ function sellTrain(trainId) {
         }
 
         function assignTrainToLine(trainId, lineId) {
-            let train = trains.find(t => t.id === trainId);
-            let line = lines.find(l => l.id === lineId);
-            if (!train || !line) return;
+    let train = trains.find(t => t.id === trainId);
+    let line = lines.find(l => l.id === lineId);
+    if (!train || !line) return;
 
-            if (train.assignedLine) {
-                let oldLine = lines.find(l => l.id === train.assignedLine);
-                if (oldLine) {
-                    oldLine.assignedTrains = oldLine.assignedTrains.filter(id => id !== train.id);
-                }
-            }
-
-            train.assignedLine = line.id;
-            line.assignedTrains.push(train.id);
-
-            let trainMarker = L.marker(line.path[0], {
-                icon: L.divIcon({ 
-                    className: 'train-img-icon', 
-                    html: `<img src="${train.img}" class="train-img-marker" style="border-color:${line.color};">` 
-                })
-            }).addTo(map);
-
-            train.marker = trainMarker;
-            trainMarker.bindPopup('');
-            trainMarker.on('click', () => updateTrainPopup(train));
-
-            let trainIndex = line.assignedTrains.length - 1;
-            startTrainMovement(train, line, trainIndex);
-            
-            autoSave();
-            updateUI();
+    if (train.assignedLine) {
+        let oldLine = lines.find(l => l.id === train.assignedLine);
+        if (oldLine) {
+            oldLine.assignedTrains = oldLine.assignedTrains.filter(id => id !== train.id);
         }
+    }
 
+    train.assignedLine = line.id;
+    line.assignedTrains.push(train.id);
+
+    // Po přidání nového vlaku hned přepočítáme a rovnoměrně rozprostřeme VŠECHNY vlaky na této lince!
+    distributeTrainsEvenlyOnLine(line.id);
+
+    let startPosition = line.path[train.currentSegmentIndex] || line.path[0];
+
+    let trainMarker = L.marker(startPosition, {
+        icon: L.divIcon({ 
+            className: 'train-img-icon', 
+            html: `<img src="${train.img}" class="train-img-marker" style="border-color:${line.color};">` 
+        })
+    }).addTo(map);
+
+    train.marker = trainMarker;
+    trainMarker.bindPopup('');
+    trainMarker.on('click', () => updateTrainPopup(train));
+
+    // Spustíme pohyb okamžitě – startovní pozici i směr už vlak dostal z funkce distributeTrainsEvenlyOnLine
+    startTrainMovement(train, line);
+
+    autoSave();
+    updateUI();
+}
         function updateTrainPopup(train) {
     if (!train.marker) return;
 
@@ -937,18 +941,41 @@ function distributeTrainsEvenlyOnLine(lineId) {
     let lineTrains = trains.filter(t => t.assignedLine == lineId);
     if (!line || lineTrains.length === 0) return;
 
-    // Po načtení hry srovná vlaky na linku tak, aby startovaly postupně za sebou
-    lineTrains.forEach((train, index) => {
-        train.currentStopIndex = 0;
-        train.direction = 1;
+    let totalPathSegments = line.path.length - 1;
+    if (totalPathSegments <= 0) return;
 
-        let startStop = line.stops[0];
-        if (startStop && train.marker) {
-            train.marker.setLatLng([startStop.latlng.lat, startStop.latlng.lng]);
+    // Celková "délka" trati v segmentech tam i zpět
+    let totalLoopSegments = totalPathSegments * 2; 
+    let step = totalLoopSegments / lineTrains.length;
+
+    lineTrains.forEach((train, index) => {
+        // Vypočítáme pozici daného vlaku na okruhu (v jednotkách segmentů)
+        let loopPosition = Math.floor(index * step);
+
+        let segmentIndex;
+        let direction;
+
+        if (loopPosition < totalPathSegments) {
+            // Vlak jede směrem TAM
+            segmentIndex = loopPosition;
+            direction = 1;
+        } else {
+            // Vlak jede směrem ZPĚT
+            segmentIndex = totalLoopSegments - loopPosition;
+            direction = -1;
+        }
+
+        // Uložíme vypočítané hodnoty přímo do objektu vlaku
+        train.currentSegmentIndex = segmentIndex;
+        train.direction = direction;
+
+        // Pokud už má vlak vytvořený marker, posuneme ho na dané místo na mapě
+        let startPt = line.path[segmentIndex];
+        if (startPt && train.marker) {
+            train.marker.setLatLng([startPt.lat, startPt.lng]);
         }
     });
 }
-
 
 
 
