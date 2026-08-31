@@ -8,7 +8,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #fff; overflow: hidden; }
-        
+
         #map { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
 
         #top-bar {
@@ -94,7 +94,7 @@
         .danger-btn:hover { background: #e74c3c; }
 
         .stop-marker { background: #e74c3c; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px rgba(0,0,0,0.8); cursor: pointer; }
-        
+
         .train-img-marker {
             width: 40px; height: 24px; border-radius: 4px; object-fit: cover;
             border: 2px solid #fff; box-shadow: 0 0 10px rgba(0,0,0,0.8);
@@ -148,7 +148,7 @@
 
     <div id="top-bar">
     <button id="hamburger-btn" onclick="toggleSidebar()">☰ Menu</button>
-    
+
     <!-- Změna: Statistiky rozdělené do dvojsloupcového/vertikálního bloku -->
     <div class="hud-card" id="stats-box" style="display: flex; flex-direction: column; gap: 4px; padding: 4px 10px;">
         <div id="stats-passengers">👥 <span id="passengers-val">0</span></div>
@@ -188,7 +188,7 @@
 
         <div id="tab-lines" class="tab-content">
             <button class="action-btn" style="background:#3498db;" onclick="startLineCreation()">➕ Vytvořit novou linku</button>
-            
+
             <div id="line-creation-info" style="display:none; font-size:12px; color:#f1c40f; background:#222; padding:8px; border-radius:4px;">
                 Klikáním na zastávky vytvoř trasu.
                 <div style="display:flex; gap:5px; margin-top:5px;">
@@ -214,7 +214,7 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         const LINE_COLORS = ['#3498db', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#fd79a8'];
-        
+
         const VEHICLE_TYPES = [
     { id: 'citylink', series: '959', name: 'Stadler Citylink', speed: 80, capacity: 120, price: 5000000, img: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=100&auto=format&fit=crop&q=60' },
     { id: 't3', series: '150', name: 'Tatra T3R.EV / Trio', speed: 60, capacity: 75, price: 2000000, img: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=100&auto=format&fit=crop&q=60' },
@@ -296,7 +296,7 @@ function clearPathCache() {
 function updateStatsUI() {
     let passengersElem = document.getElementById('passengers-val');
     let kmElem = document.getElementById('km-val');
-    
+
     if (passengersElem && kmElem) {
         passengersElem.innerText = totalPassengersTransported.toLocaleString();
         kmElem.innerText = totalDistanceTraveledKm.toFixed(1);
@@ -366,7 +366,7 @@ function updateStatsUI() {
                 }
 
                 balance -= cost;
-                
+
                 let polyline = L.polyline([trackStartPoint, latlng], {
                     color: isTunnel ? '#9b59b6' : '#3498db',
                     weight: isTunnel ? 4 : 5,
@@ -594,7 +594,7 @@ function sellTrain(trainId) {
             extendingLine = lines.find(l => l.id === lineId);
             extendPosition = position;
             isCreatingLine = false;
-            
+
             alert(`Klikni na zastávku na mapě, kterou chceš přidat na ${position === 'start' ? 'ZAČÁTEK' : 'KONEC'} linky ${extendingLine.name}.`);
             toggleSidebar();
         }
@@ -622,7 +622,7 @@ function sellTrain(trainId) {
                 redrawLinePolyline(extendingLine);
 
                 alert(`Zastávka ${stopObj.name} byla úspěšně přidána!`);
-                
+
                 extendingLine = null;
                 extendPosition = null;
                 autoSave();
@@ -635,7 +635,7 @@ function sellTrain(trainId) {
             for (let i = 0; i < selectedStops.length - 1; i++) {
                 let startPt = selectedStops[i].latlng;
                 let endPt = selectedStops[i+1].latlng;
-                
+
                 let segmentPath = findTrackPath(startPt, endPt);
                 if (fullPath.length > 0 && segmentPath.length > 0) {
                     segmentPath.shift();
@@ -694,7 +694,7 @@ function sellTrain(trainId) {
                 polyline: linePolyline,
                 assignedTrains: [] 
             });
-            
+
             isCreatingLine = false;
             document.getElementById('line-creation-info').style.display = 'none';
             autoSave();
@@ -707,47 +707,43 @@ function sellTrain(trainId) {
         }
 
         function assignTrainToLine(trainId, lineId) {
-    let train = trains.find(t => t.id === trainId);
-    let line = lines.find(l => l.id === lineId);
-    if (!train || !line) return;
+            let train = trains.find(t => t.id === trainId);
+            let line = lines.find(l => l.id === lineId);
+            if (!train || !line) return;
 
-    if (train.assignedLine) {
-        let oldLine = lines.find(l => l.id === train.assignedLine);
-        if (oldLine) {
-            oldLine.assignedTrains = oldLine.assignedTrains.filter(id => id !== train.id);
+            if (train.assignedLine) {
+                let oldLine = lines.find(l => l.id === train.assignedLine);
+                if (oldLine) {
+                    oldLine.assignedTrains = oldLine.assignedTrains.filter(id => id !== train.id);
+                }
+            }
+
+            train.assignedLine = line.id;
+            line.assignedTrains.push(train.id);
+
+            let trainMarker = L.marker(line.path[0], {
+                icon: L.divIcon({ 
+                    className: 'train-img-icon', 
+                    html: `<img src="${train.img}" class="train-img-marker" style="border-color:${line.color};">` 
+                })
+            }).addTo(map);
+
+            train.marker = trainMarker;
+            trainMarker.bindPopup('');
+            trainMarker.on('click', () => updateTrainPopup(train));
+
+            let trainIndex = line.assignedTrains.length - 1;
+            startTrainMovement(train, line, trainIndex);
+
+            autoSave();
+            updateUI();
         }
-    }
 
-    train.assignedLine = line.id;
-    line.assignedTrains.push(train.id);
-
-    // Po přidání nového vlaku hned přepočítáme a rovnoměrně rozprostřeme VŠECHNY vlaky na této lince!
-    distributeTrainsEvenlyOnLine(line.id);
-
-    let startPosition = line.path[train.currentSegmentIndex] || line.path[0];
-
-    let trainMarker = L.marker(startPosition, {
-        icon: L.divIcon({ 
-            className: 'train-img-icon', 
-            html: `<img src="${train.img}" class="train-img-marker" style="border-color:${line.color};">` 
-        })
-    }).addTo(map);
-
-    train.marker = trainMarker;
-    trainMarker.bindPopup('');
-    trainMarker.on('click', () => updateTrainPopup(train));
-
-    // Spustíme pohyb okamžitě – startovní pozici i směr už vlak dostal z funkce distributeTrainsEvenlyOnLine
-    startTrainMovement(train, line);
-
-    autoSave();
-    updateUI();
-}
         function updateTrainPopup(train) {
     if (!train.marker) return;
 
     let passCount = train.passengersOnBoard.length;
-    
+
     // Najdeme konkrétní linku pro zobrazení jejího JMÉNA místo ID
     let currentLine = lines.find(l => l.id === train.assignedLine);
     let lineName = currentLine ? currentLine.name : 'Žádná';
@@ -832,10 +828,10 @@ function sellTrain(trainId) {
 
     // Zjistíme, zda jde o nové vozidlo nasazené za běhu (má index > 0 na lince, ale už běží hra)
     let trainIndex = line.assignedTrains.length - 1;
-    
+
     // Pokud je to nový vlak a na lince už je plno, nasadíme ho tak, aby vyjel hned (nebo s minimálním rozestupem)
     let startPosition = line.path[0];
-    
+
     let trainMarker = L.marker(startPosition, {
         icon: L.divIcon({ 
             className: 'train-img-icon', 
@@ -941,41 +937,18 @@ function distributeTrainsEvenlyOnLine(lineId) {
     let lineTrains = trains.filter(t => t.assignedLine == lineId);
     if (!line || lineTrains.length === 0) return;
 
-    let totalPathSegments = line.path.length - 1;
-    if (totalPathSegments <= 0) return;
-
-    // Celková "délka" trati v segmentech tam i zpět
-    let totalLoopSegments = totalPathSegments * 2; 
-    let step = totalLoopSegments / lineTrains.length;
-
+    // Po načtení hry srovná vlaky na linku tak, aby startovaly postupně za sebou
     lineTrains.forEach((train, index) => {
-        // Vypočítáme pozici daného vlaku na okruhu (v jednotkách segmentů)
-        let loopPosition = Math.floor(index * step);
+        train.currentStopIndex = 0;
+        train.direction = 1;
 
-        let segmentIndex;
-        let direction;
-
-        if (loopPosition < totalPathSegments) {
-            // Vlak jede směrem TAM
-            segmentIndex = loopPosition;
-            direction = 1;
-        } else {
-            // Vlak jede směrem ZPĚT
-            segmentIndex = totalLoopSegments - loopPosition;
-            direction = -1;
-        }
-
-        // Uložíme vypočítané hodnoty přímo do objektu vlaku
-        train.currentSegmentIndex = segmentIndex;
-        train.direction = direction;
-
-        // Pokud už má vlak vytvořený marker, posuneme ho na dané místo na mapě
-        let startPt = line.path[segmentIndex];
-        if (startPt && train.marker) {
-            train.marker.setLatLng([startPt.lat, startPt.lng]);
+        let startStop = line.stops[0];
+        if (startStop && train.marker) {
+            train.marker.setLatLng([startStop.latlng.lat, startStop.latlng.lng]);
         }
     });
 }
+
 
 
 
@@ -1241,7 +1214,7 @@ function handlePassengerBoarding(train, stop, line, direction) {
 
     for (let targetId in stop.passengers) {
         let waitingList = stop.passengers[targetId];
-        
+
         if (typeof waitingList === 'number') {
             let count = waitingList;
             waitingList = [];
@@ -1292,7 +1265,7 @@ function handlePassengerBoarding(train, stop, line, direction) {
         stop.passengers[targetId] = nextWaitingList;
     }
 
-    
+
 
     updateStopPopup(stop);
     updateTrainPopup(train);
@@ -1377,7 +1350,7 @@ updateStatsUI();
     if (!dataRaw) return alert("Žádná uložená pozice nebyla nalezena!");
 
     let data = JSON.parse(dataRaw);
-    
+
     // Vyčištění starých prvků z mapy
     stops.forEach(s => map.removeLayer(s.marker));
     trackSegments.forEach(s => map.removeLayer(s.polyline));
@@ -1397,7 +1370,7 @@ updateStatsUI();
 
         let stopObj = { id: s.id, name: s.name, latlng: s.latlng, marker: marker, passengers: s.passengers || {} };
         stops.push(stopObj);
-        
+
         marker.on('click', () => {
             if (isCreatingLine || extendingLine) {
                 marker.closePopup();
@@ -1420,7 +1393,7 @@ updateStatsUI();
 
         let segObj = { id: s.id, start: s.start, end: s.end, polyline: polyline, isTunnel: s.isTunnel, cost: s.cost };
         trackSegments.push(segObj);
-        
+
         polyline.on('click', () => {
             if (currentMode === 'demolish') demolishSegment(segObj);
         });
