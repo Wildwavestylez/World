@@ -826,13 +826,13 @@ function sellTrain(trainId) {
     train.assignedLine = line.id;
     line.assignedTrains.push(train.id);
 
-    // Zjistíme, zda jde o nové vozidlo nasazené za běhu (má index > 0 na lince, ale už běží hra)
-    let trainIndex = line.assignedTrains.length - 1;
+    // Po přidání nového vlaku hned přepočítáme a rovnoměrně rozprostřeme VŠECHNY vlaky na této lince
+    distributeTrainsEvenlyOnLine(line.id);
 
-    // Pokud je to nový vlak a na lince už je plno, nasadíme ho tak, aby vyjel hned (nebo s minimálním rozestupem)
-    let startPosition = line.path[0];
+    let startPt = line.path[train.currentSegmentIndex] || line.path[0];
 
-    let trainMarker = L.marker(startPosition, {
+    // Vytvoření markeru na mapě se správnými souřadnicemi
+    let trainMarker = L.marker([startPt.lat, startPt.lng], {
         icon: L.divIcon({ 
             className: 'train-img-icon', 
             html: `<img src="${train.img}" class="train-img-marker" style="border-color:${line.color};">` 
@@ -843,29 +843,85 @@ function sellTrain(trainId) {
     trainMarker.bindPopup('');
     trainMarker.on('click', () => updateTrainPopup(train));
 
-    // Spustíme pohyb s ohledem na to, kolikátý vlak v pořadí to je
-    startTrainMovement(train, line, trainIndex);
+    // Spustíme pohyb okamžitě z vypočítané pozice
+    startTrainMovement(train, line);
 
     autoSave();
     updateUI();
 }
 
-function startTrainMovement(train, line, trainIndex) {
-    let currentSegmentIndex = 0;
-    let direction = 1;
 
-    function initMovement() {
-        // Pokud jde o načtení hry (nebo hromadný start), uděláme krásné rozestupy za sebou (např. 15 vteřin)
-        // Pokud je to ale nově přidaný vlak za chodu hry (trainIndex > 0 a už nějaké vlaky jedou), 
-        // můžeme mu dát buď krátký rozestup, nebo ho pustit ihned.
-        let delayMs = trainIndex * 50000; // 15 vteřin rozestup mezi vlaky
+function startTrainMovement(train, line) {
+    // Pokud má vlak nastavený úsek z distributeTrainsEvenlyOnLine, použijeme ho. Jinak startujeme na 0.
+    let currentSegmentIndex = train.currentSegmentIndex !== undefined ? train.currentSegmentIndex : 0;
+    let direction = train.direction || 1;
 
-        // Pojistka: Pokud už má vlak nějakou historii ujetých kilometrů z uložené hry, 
-        // neresetujeme ho násilím na začátek, ale necháme ho běžet.
-        setTimeout(() => {
-            moveSegment();
-        }, delayMs);
+    function moveSegment() {
+        if (!train.assignedLine) return;
+
+        let currentPath = line.path;
+        if (currentSegmentIndex >= currentPath.length) {
+            currentSegmentIndex = currentPath.length - 1;
+        }
+
+        let nextSegmentIndex = currentSegmentIndex + direction;
+
+        // Otočení na konečné
+        if (nextSegmentIndex >= currentPath.length || nextSegmentIndex < 0) {
+            direction *= -1;
+            nextSegmentIndex = currentSegmentIndex + direction;
+        }
+
+        train.direction = direction;
+        train.currentSegmentIndex = currentSegmentIndex;
+
+        let startPt = currentPath[currentSegmentIndex];
+        let targetPt = currentPath[nextSegmentIndex];
+
+        let distanceMeters = map.distance(startPt, targetPt);
+        let distanceKm = distanceMeters / 1000;
+
+        train.distanceKm = (train.distanceKm || 0) + distanceKm;
+        totalDistanceTraveledKm += distanceKm;
+
+        let durationMs = ((distanceKm / train.speed) * 3600 * 1000) / 5;
+        if (durationMs < 50) durationMs = 50;
+
+        let startTime = Date.now();
+
+        function animate() {
+            if (!train.assignedLine) return;
+
+            let elapsed = Date.now() - startTime;
+            let progress = Math.min(elapsed / durationMs, 1);
+
+            let currentLat = startPt.lat + (targetPt.lat - startPt.lat) * progress;
+            let currentLng = startPt.lng + (targetPt.lng - startPt.lng) * progress;
+
+            if (train.marker) train.marker.setLatLng([currentLat, currentLng]);
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                currentSegmentIndex = nextSegmentIndex;
+                let currentStop = line.stops.find(stop => map.distance(stop.latlng, targetPt) < 20);
+
+                if (currentStop) {
+                    handlePassengerBoarding(train, currentStop, line, direction);
+                    setTimeout(moveSegment, 2000); 
+                } else {
+                    moveSegment();
+                }
+            }
+        }
+
+        requestAnimationFrame(animate);
     }
+
+    // Vlak vyrazí rovnou ze své rozestavené pozice
+    moveSegment();
+}
+
 
     function moveSegment() {
         if (!train.assignedLine) return;
@@ -937,14 +993,43 @@ function distributeTrainsEvenlyOnLine(lineId) {
     let lineTrains = trains.filter(t => t.assignedLine == lineId);
     if (!line || lineTrains.length === 0) return;
 
-    // Po načtení hry srovná vlaky na linku tak, aby startovaly postupně za sebou
-    lineTrains.forEach((train, index) => {
-        train.currentStopIndex = 0;
-        train.direction = 1;
+    let totalPathSegments = line.path.length - 1;
+    if (totalPathSegments <= 0) return;
 
-        let startStop = line.stops[0];
-        if (startStop && train.marker) {
-            train.marker.setLatLng([startStop.latlng.lat, startStop.latlng.lng]);
+    // Celková "délka" trati v segmentech tam i zpět
+    let totalLoopSegments = totalPathSegments * 2; 
+    let step = totalLoopSegments / lineTrains.length;
+
+    lineTrains.forEach((train, index) => {
+        // Vypočítáme pozici daného vlaku na okruhu (v jednotkách segmentů)
+        let loopPosition = Math.floor(index * step);
+
+        let segmentIndex;
+        let direction;
+
+        if (loopPosition < totalPathSegments) {
+            // Vlak jede směrem TAM
+            segmentIndex = loopPosition;
+            direction = 1;
+        } else {
+            // Vlak jede směrem ZPĚT
+            segmentIndex = totalLoopSegments - loopPosition;
+            
+            // Pojistka proti indexu mimo pole
+            if (segmentIndex >= line.path.length) {
+                segmentIndex = line.path.length - 1;
+            }
+            direction = -1;
+        }
+
+        // Uložíme vypočítané hodnoty přímo do objektu vlaku
+        train.currentSegmentIndex = segmentIndex;
+        train.direction = direction;
+
+        // Pokud už má vlak vytvořený marker, posuneme ho na dané místo na mapě
+        let startPt = line.path[segmentIndex];
+        if (startPt && train.marker) {
+            train.marker.setLatLng([startPt.lat, startPt.lng]);
         }
     });
 }
