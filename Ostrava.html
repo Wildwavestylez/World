@@ -969,55 +969,58 @@ function distributeTrainsEvenlyOnLine(lineId) {
     let lineTrains = trains.filter(t => t.assignedLine == lineId);
     if (!line || lineTrains.length === 0 || !line.path || line.path.length < 2) return;
 
-    // Spočítáme kumulativní vzdálenosti bodů na trase (tam)
-    let cumulativeDistances = [0];
+    // 1. Spočítáme vzdálenosti úseků trasy
+    let segDistances = [];
     let totalLineMeters = 0;
 
     for (let i = 0; i < line.path.length - 1; i++) {
         let d = map.distance(line.path[i], line.path[i + 1]);
+        segDistances.push(d);
         totalLineMeters += d;
-        cumulativeDistances.push(totalLineMeters);
     }
 
     if (totalLineMeters === 0) return;
 
-    let totalLoopMeters = totalLineMeters * 2; // Okruh Tam + Zpět
+    // Celková délka trasy TAM i ZPĚT
+    let totalLoopMeters = totalLineMeters * 2;
     let stepMeters = totalLoopMeters / lineTrains.length;
 
     lineTrains.forEach((train, index) => {
-        let targetLoopMeters = index * stepMeters;
-        let targetPathMeters;
-        let direction;
+        // Cílová pozice vlaku na celém okruhu
+        let targetMeters = index * stepMeters;
+        let direction = 1;
 
-        if (targetLoopMeters <= totalLineMeters) {
-            targetPathMeters = targetLoopMeters;
-            direction = 1; // Jde tam
-        } else {
-            targetPathMeters = totalLoopMeters - (targetLoopMeters - totalLineMeters);
-            direction = -1; // Jde zpět
+        // Pokud jsme v druhé polovině okruhu, vlak jede ZPĚT
+        if (targetMeters > totalLineMeters) {
+            targetMeters = totalLoopMeters - targetMeters; // Vzdálenost od startu směrem k cíli
+            direction = -1;
         }
 
-        // Najdeme přesný segment na trase
+        // 2. Najdeme přesný segment na trase
+        let accumulated = 0;
         let segmentIndex = 0;
-        for (let i = 0; i < cumulativeDistances.length - 1; i++) {
-            if (targetPathMeters >= cumulativeDistances[i] && targetPathMeters <= cumulativeDistances[i + 1]) {
+
+        for (let i = 0; i < segDistances.length; i++) {
+            if (accumulated + segDistances[i] >= targetMeters) {
                 segmentIndex = i;
                 break;
             }
+            accumulated += segDistances[i];
+            segmentIndex = i;
         }
 
-        if (segmentIndex >= line.path.length - 1) segmentIndex = line.path.length - 2;
-
+        // Uložíme přesný stav
         train.currentSegmentIndex = segmentIndex;
         train.direction = direction;
 
-        // Okamžitě posuneme marker na přesnou pozici
+        // Okamžitě posuneme marker na odpovídající bod
         let pt = line.path[segmentIndex];
         if (pt && train.marker) {
             train.marker.setLatLng([pt.lat, pt.lng]);
         }
     });
 }
+
 
 
 
