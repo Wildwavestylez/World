@@ -794,22 +794,33 @@ function sellTrain(trainId) {
 
 
         function unassignTrain(trainId) {
-            let train = trains.find(t => t.id === trainId);
-            if (!train) return;
+    let train = trains.find(t => t.id === trainId);
+    if (!train) return;
 
-            if (train.assignedLine) {
-                let oldLine = lines.find(l => l.id === train.assignedLine);
-                if (oldLine) {
-                    oldLine.assignedTrains = oldLine.assignedTrains.filter(id => id !== train.id);
-                }
-            }
+    let oldLineId = train.assignedLine;
 
-            train.assignedLine = null;
-            if (train.marker) map.removeLayer(train.marker);
-
-            autoSave();
-            updateUI();
+    if (oldLineId) {
+        let oldLine = lines.find(l => l.id === oldLineId);
+        if (oldLine) {
+            oldLine.assignedTrains = oldLine.assignedTrains.filter(id => id !== train.id);
         }
+    }
+
+    train.assignedLine = null;
+    train.isMoving = false;
+    if (train.marker) {
+        map.removeLayer(train.marker);
+        train.marker = null;
+    }
+
+    // Pokud na lince ještě nějaké vlaky zůstaly, znovu je rozprostřeme
+    if (oldLineId) {
+        distributeTrainsEvenlyOnLine(oldLineId);
+    }
+
+    autoSave();
+    updateUI();
+}
 
         function assignTrainToLine(trainId, lineId) {
     let train = trains.find(t => t.id === trainId);
@@ -866,35 +877,37 @@ function initializeAllTrainPositions() {
 
 
 function startTrainMovement(train, line) {
-    // Pokud má vlak nastavený úsek z distributeTrainsEvenlyOnLine, použijeme ho. Jinak startujeme na 0.
-    let currentSegmentIndex = train.currentSegmentIndex !== undefined ? train.currentSegmentIndex : 0;
-    let direction = train.direction || 1;
+    if (train.isMoving) return; // Zabrání zdvojení animace
+    train.isMoving = true;
 
     function moveSegment() {
-        if (!train.assignedLine) return;
+        if (!train.assignedLine) {
+            train.isMoving = false;
+            return;
+        }
 
         let currentPath = line.path;
-        if (currentSegmentIndex >= currentPath.length) {
-            currentSegmentIndex = currentPath.length - 1;
-        }
+        let currentSeg = train.currentSegmentIndex !== undefined ? train.currentSegmentIndex : 0;
+        let direction = train.direction || 1;
 
-        let nextSegmentIndex = currentSegmentIndex + direction;
+        let nextSeg = currentSeg + direction;
 
         // Otočení na konečné
-        if (nextSegmentIndex >= currentPath.length || nextSegmentIndex < 0) {
+        if (nextSeg >= currentPath.length || nextSeg < 0) {
             direction *= -1;
-            nextSegmentIndex = currentSegmentIndex + direction;
+            train.direction = direction;
+            nextSeg = currentSeg + direction;
         }
 
-        train.direction = direction;
-        train.currentSegmentIndex = currentSegmentIndex;
+        let startPt = currentPath[currentSeg];
+        let targetPt = currentPath[nextSeg];
 
-        let startPt = currentPath[currentSegmentIndex];
-        let targetPt = currentPath[nextSegmentIndex];
+        if (!startPt || !targetPt) {
+            train.isMoving = false;
+            return;
+        }
 
-        let distanceMeters = map.distance(startPt, targetPt);
-        let distanceKm = distanceMeters / 1000;
-
+        let distanceKm = map.distance(startPt, targetPt) / 1000;
         train.distanceKm = (train.distanceKm || 0) + distanceKm;
         totalDistanceTraveledKm += distanceKm;
 
@@ -904,7 +917,10 @@ function startTrainMovement(train, line) {
         let startTime = Date.now();
 
         function animate() {
-            if (!train.assignedLine) return;
+            if (!train.assignedLine) {
+                train.isMoving = false;
+                return;
+            }
 
             let elapsed = Date.now() - startTime;
             let progress = Math.min(elapsed / durationMs, 1);
@@ -917,7 +933,7 @@ function startTrainMovement(train, line) {
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
-                currentSegmentIndex = nextSegmentIndex;
+                train.currentSegmentIndex = nextSeg;
                 let currentStop = line.stops.find(stop => map.distance(stop.latlng, targetPt) < 20);
 
                 if (currentStop) {
@@ -932,74 +948,9 @@ function startTrainMovement(train, line) {
         requestAnimationFrame(animate);
     }
 
-    // Vlak vyrazí rovnou ze své rozestavené pozice
     moveSegment();
 }
 
-
-    function moveSegment() {
-        if (!train.assignedLine) return;
-
-        let currentPath = line.path;
-        if (currentSegmentIndex >= currentPath.length) {
-            currentSegmentIndex = currentPath.length - 1;
-        }
-
-        let nextSegmentIndex = currentSegmentIndex + direction;
-
-        // Jakmile dojede na konečnou (konec pole tras), hned otočí směr a valí zpět
-        if (nextSegmentIndex >= currentPath.length || nextSegmentIndex < 0) {
-            direction *= -1;
-            nextSegmentIndex = currentSegmentIndex + direction;
-        }
-
-        train.direction = direction;
-
-        let startPt = currentPath[currentSegmentIndex];
-        let targetPt = currentPath[nextSegmentIndex];
-
-        let distanceMeters = map.distance(startPt, targetPt);
-        let distanceKm = distanceMeters / 1000;
-
-        train.distanceKm = (train.distanceKm || 0) + distanceKm;
-        totalDistanceTraveledKm += distanceKm;
-
-        let durationMs = ((distanceKm / train.speed) * 3600 * 1000) / 5;
-        if (durationMs < 50) durationMs = 50;
-
-        let startTime = Date.now();
-
-        function animate() {
-            if (!train.assignedLine) return;
-
-            let elapsed = Date.now() - startTime;
-            let progress = Math.min(elapsed / durationMs, 1);
-
-            let currentLat = startPt.lat + (targetPt.lat - startPt.lat) * progress;
-            let currentLng = startPt.lng + (targetPt.lng - startPt.lng) * progress;
-
-            if (train.marker) train.marker.setLatLng([currentLat, currentLng]);
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                currentSegmentIndex = nextSegmentIndex;
-                let currentStop = line.stops.find(stop => map.distance(stop.latlng, targetPt) < 20);
-
-                if (currentStop) {
-                    handlePassengerBoarding(train, currentStop, line, direction);
-                    // Krátká pauza ve stanici (2 sekundy) a jede se dál
-                    setTimeout(moveSegment, 2000); 
-                } else {
-                    moveSegment();
-                }
-            }
-        }
-
-        requestAnimationFrame(animate);
-    }
-
-    initMovement();
 
 
 function distributeTrainsEvenlyOnLine(lineId) {
@@ -1007,7 +958,7 @@ function distributeTrainsEvenlyOnLine(lineId) {
     let lineTrains = trains.filter(t => t.assignedLine == lineId);
     if (!line || lineTrains.length === 0 || !line.path || line.path.length < 2) return;
 
-    // 1. Spočítáme přesné vzdálenosti mezi jednotlivými body trati v metrech
+    // Spočítáme kumulativní vzdálenosti bodů na trase (tam)
     let cumulativeDistances = [0];
     let totalLineMeters = 0;
 
@@ -1019,25 +970,23 @@ function distributeTrainsEvenlyOnLine(lineId) {
 
     if (totalLineMeters === 0) return;
 
-    // 2. Celkový okruh (Tam i Zpět)
-    let totalLoopMeters = totalLineMeters * 2;
+    let totalLoopMeters = totalLineMeters * 2; // Okruh Tam + Zpět
     let stepMeters = totalLoopMeters / lineTrains.length;
 
     lineTrains.forEach((train, index) => {
-        // Kde má vlak na okruhu stát (v metrech od začátku)
         let targetLoopMeters = index * stepMeters;
         let targetPathMeters;
         let direction;
 
         if (targetLoopMeters <= totalLineMeters) {
             targetPathMeters = targetLoopMeters;
-            direction = 1; // Směr tam
+            direction = 1; // Jde tam
         } else {
-            targetPathMeters = totalLoopMeters - targetLoopMeters;
-            direction = -1; // Směr zpět
+            targetPathMeters = totalLoopMeters - (targetLoopMeters - totalLineMeters);
+            direction = -1; // Jde zpět
         }
 
-        // 3. Najdeme přesný segment podle metrů
+        // Najdeme přesný segment na trase
         let segmentIndex = 0;
         for (let i = 0; i < cumulativeDistances.length - 1; i++) {
             if (targetPathMeters >= cumulativeDistances[i] && targetPathMeters <= cumulativeDistances[i + 1]) {
@@ -1046,22 +995,18 @@ function distributeTrainsEvenlyOnLine(lineId) {
             }
         }
 
-        if (segmentIndex >= line.path.length - 1) {
-            segmentIndex = line.path.length - 2;
-        }
+        if (segmentIndex >= line.path.length - 1) segmentIndex = line.path.length - 2;
 
-        // Nastavíme nové parametry přímo do objektu vlaku
         train.currentSegmentIndex = segmentIndex;
         train.direction = direction;
 
-        // Pokud už vlak na mapě existuje, okamžitě ho posuneme na nové souřadnice
-        let startPt = line.path[segmentIndex];
-        if (startPt && train.marker) {
-            train.marker.setLatLng([startPt.lat, startPt.lng]);
+        // Okamžitě posuneme marker na přesnou pozici
+        let pt = line.path[segmentIndex];
+        if (pt && train.marker) {
+            train.marker.setLatLng([pt.lat, pt.lng]);
         }
     });
 }
-
 
 
 
@@ -1465,116 +1410,147 @@ updateStatsUI();
 
     let data = JSON.parse(dataRaw);
 
-    // Vyčištění starých prvků z mapy
-    stops.forEach(s => map.removeLayer(s.marker));
-    trackSegments.forEach(s => map.removeLayer(s.polyline));
+    // 1. Vyčištění starých prvků z mapy
+    stops.forEach(s => { if (s.marker) map.removeLayer(s.marker); });
+    trackSegments.forEach(s => { if (s.polyline) map.removeLayer(s.polyline); });
     lines.forEach(l => { if (l.polyline) map.removeLayer(l.polyline); });
-    trains.forEach(t => { if (t.marker) map.removeLayer(t.marker); });
+    trains.forEach(t => { 
+        t.isMoving = false;
+        if (t.marker) map.removeLayer(t.marker); 
+    });
 
-    balance = data.balance;
+    balance = data.balance || 350000000;
+    totalPassengersTransported = data.totalPassengersTransported || 0;
+    totalDistanceTraveledKm = data.totalDistanceTraveledKm || 0;
+
     stops = [];
     trackSegments = [];
     lines = [];
     trains = [];
+    nodes = [];
 
-    // 1. NAČTENÍ ZASTÁVEK
-    data.stops.forEach(s => {
-        let marker = L.marker(s.latlng, { icon: L.divIcon({ className: 'stop-marker' }) }).addTo(map);
-        marker.bindPopup('');
+    // 2. NAČTENÍ ZASTÁVEK
+    if (data.stops) {
+        data.stops.forEach(s => {
+            let marker = L.marker(s.latlng, { icon: L.divIcon({ className: 'stop-marker' }) }).addTo(map);
+            marker.bindPopup('');
 
-        let stopObj = { id: s.id, name: s.name, latlng: s.latlng, marker: marker, passengers: s.passengers || {} };
-        stops.push(stopObj);
+            let stopObj = { 
+                id: s.id, 
+                name: s.name, 
+                latlng: s.latlng, 
+                marker: marker, 
+                passengers: s.passengers || {} 
+            };
+            stops.push(stopObj);
 
-        marker.on('click', () => {
-            if (isCreatingLine || extendingLine) {
-                marker.closePopup();
-                onStopClick(stopObj);
-            } else {
-                updateStopPopup(stopObj);
+            marker.on('click', () => {
+                if (isCreatingLine || extendingLine) {
+                    marker.closePopup();
+                    onStopClick(stopObj);
+                } else {
+                    updateStopPopup(stopObj);
+                }
+            });
+
+            updateStopPopup(stopObj);
+        });
+    }
+
+    // 3. NAČTENÍ KOLEJÍ
+    if (data.trackSegments) {
+        data.trackSegments.forEach(s => {
+            let polyline = L.polyline([s.start, s.end], {
+                color: s.isTunnel ? '#9b59b6' : '#3498db',
+                weight: s.isTunnel ? 4 : 5,
+                dashArray: s.isTunnel ? '6, 6' : null
+            }).addTo(map);
+
+            let segObj = { id: s.id, start: s.start, end: s.end, polyline: polyline, isTunnel: s.isTunnel, cost: s.cost };
+            trackSegments.push(segObj);
+
+            polyline.on('click', () => {
+                if (currentMode === 'demolish') demolishSegment(segObj);
+            });
+
+            addNodeMarker(s.start);
+            addNodeMarker(s.end);
+        });
+    }
+
+    // 4. NAČTENÍ LINEK
+    if (data.lines) {
+        data.lines.forEach(l => {
+            let lineStops = l.stopsIds.map(id => stops.find(s => s.id === id)).filter(Boolean);
+            let calculatedPath = buildPathFromStops(lineStops);
+            let linePolyline = L.polyline(calculatedPath, { color: l.color, weight: 6, opacity: 0.8 }).addTo(map);
+
+            lines.push({
+                id: l.id,
+                name: l.name,
+                color: l.color,
+                stops: lineStops,
+                path: calculatedPath,
+                polyline: linePolyline,
+                assignedTrains: []
+            });
+        });
+    }
+
+    // 5. NAČTENÍ VLAKŮ
+    if (data.trains) {
+        data.trains.forEach(t => {
+            let trainObj = {
+                id: t.id,
+                model: t.model,
+                speed: t.speed,
+                capacity: t.capacity,
+                price: t.price || 5000000,
+                img: t.img,
+                assignedLine: null,
+                distanceKm: t.distanceKm || 0,
+                passengersOnBoard: t.passengersOnBoard || [],
+                isMoving: false
+            };
+            trains.push(trainObj);
+
+            if (t.assignedLine) {
+                let targetLine = lines.find(l => l.id === t.assignedLine);
+                if (targetLine) {
+                    trainObj.assignedLine = targetLine.id;
+                    if (!targetLine.assignedTrains.includes(trainObj.id)) {
+                        targetLine.assignedTrains.push(trainObj.id);
+                    }
+
+                    // Vytvoříme marker vlaku
+                    let firstPt = targetLine.path[0];
+                    trainObj.marker = L.marker([firstPt.lat, firstPt.lng], {
+                        icon: L.divIcon({ 
+                            className: 'train-img-icon', 
+                            html: `<img src="${trainObj.img}" class="train-img-marker" style="border-color:${targetLine.color};">` 
+                        })
+                    }).addTo(map);
+
+                    trainObj.marker.bindPopup('');
+                    trainObj.marker.on('click', () => updateTrainPopup(trainObj));
+                }
             }
         });
+    }
 
-        updateStopPopup(stopObj);
-    });
-
-    // 2. NAČTENÍ KOLEJÍ
-    data.trackSegments.forEach(s => {
-        let polyline = L.polyline([s.start, s.end], {
-            color: s.isTunnel ? '#9b59b6' : '#3498db',
-            weight: s.isTunnel ? 4 : 5,
-            dashArray: s.isTunnel ? '6, 6' : null
-        }).addTo(map);
-
-        let segObj = { id: s.id, start: s.start, end: s.end, polyline: polyline, isTunnel: s.isTunnel, cost: s.cost };
-        trackSegments.push(segObj);
-
-        polyline.on('click', () => {
-            if (currentMode === 'demolish') demolishSegment(segObj);
-        });
-
-        addNodeMarker(s.start);
-        addNodeMarker(s.end);
-    });
-
-    // 3. NAČTENÍ LINEK
-    data.lines.forEach(l => {
-        let lineStops = l.stopsIds.map(id => stops.find(s => s.id === id)).filter(Boolean);
-        let calculatedPath = buildPathFromStops(lineStops);
-        let linePolyline = L.polyline(calculatedPath, { color: l.color, weight: 6, opacity: 0.8 }).addTo(map);
-
-        lines.push({
-            id: l.id,
-            name: l.name,
-            color: l.color,
-            stops: lineStops,
-            path: calculatedPath,
-            polyline: linePolyline,
-            assignedTrains: []
-        });
-    });
-
-    // 4. NAČTENÍ VLAKŮ
-    data.trains.forEach(t => {
-        let trainObj = {
-            id: t.id,
-            model: t.model,
-            speed: t.speed,
-            capacity: t.capacity,
-            img: t.img,
-            assignedLine: null,
-            distanceKm: t.distanceKm || 0,
-            passengersOnBoard: t.passengersOnBoard || [] // Obnovíme lidi uvnitř vlaku
-        };
-        trains.push(trainObj);
-
-        if (t.assignedLine) {
-            assignTrainToLine(trainObj.id, t.assignedLine);
-        }
-    });
-
-    // 5. ROZPROSTŘENÍ VLAKŮ DO TAKTU PODLE LINEK
+    // 6. ROZPROSTŘENÍ VLAKŮ NA SÍTÍ A SPUŠTĚNÍ POHYBU
     lines.forEach(line => {
         distributeTrainsEvenlyOnLine(line.id);
+    });
+
+    trains.forEach(t => {
+        if (t.assignedLine) {
+            let l = lines.find(line => line.id === t.assignedLine);
+            if (l) startTrainMovement(t, l);
+        }
     });
 
     setMode('select');
     updateUI();
     alert("Hra byla úspěšně načtena!");
 }
-
-        function resetGame() {
-            if (confirm("Opravdu chceš smazat uloženou hru a začít od znova?")) {
-                localStorage.removeItem('ostrava_tram_train_save');
-                location.reload();
-            }
-        }
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) autoSave();
-        });
-
-        setMode('select');
-        updateUI();
-    </script>
-</body>
-</html>
