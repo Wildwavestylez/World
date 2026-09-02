@@ -600,35 +600,44 @@ function sellTrain(trainId) {
         }
 
         function onStopClick(stopObj) {
-            if (isCreatingLine) {
-                tempLineStops.push(stopObj);
-                alert(`Zastávka ${stopObj.name} přidána do nové linky.`);
-                return;
-            }
+    if (isCreatingLine) {
+        tempLineStops.push(stopObj);
+        alert(`Zastávka ${stopObj.name} přidána do nové linky.`);
+        return;
+    }
 
-            if (extendingLine) {
-                if (extendingLine.stops.some(s => s.id === stopObj.id)) {
-                    alert("Tato zastávka už v lince je!");
-                    return;
-                }
-
-                if (extendPosition === 'start') {
-                    extendingLine.stops.unshift(stopObj);
-                } else {
-                    extendingLine.stops.push(stopObj);
-                }
-
-                extendingLine.path = buildPathFromStops(extendingLine.stops);
-                redrawLinePolyline(extendingLine);
-
-                alert(`Zastávka ${stopObj.name} byla úspěšně přidána!`);
-
-                extendingLine = null;
-                extendPosition = null;
-                autoSave();
-                updateUI();
-            }
+    if (extendingLine) {
+        if (extendingLine.stops.some(s => s.id === stopObj.id)) {
+            alert("Tato zastávka už v lince je!");
+            return;
         }
+
+        if (extendPosition === 'start') {
+            extendingLine.stops.unshift(stopObj);
+        } else {
+            extendingLine.stops.push(stopObj);
+        }
+
+        // Přepočítáme kompletní trasu (geometry path) linky
+        extendingLine.path = buildPathFromStops(extendingLine.stops);
+        redrawLinePolyline(extendingLine);
+
+        // Rozprostřeme vlaky na nové délce trati a restartujeme jejich pohyb v novém taktu
+        distributeTrainsEvenlyOnLine(extendingLine.id);
+        let lineTrains = trains.filter(t => t.assignedLine === extendingLine.id);
+        lineTrains.forEach(t => {
+            t.isMoving = false;
+            startTrainMovement(t, extendingLine);
+        });
+
+        alert(`Zastávka ${stopObj.name} byla úspěšně přidána!`);
+
+        extendingLine = null;
+        extendPosition = null;
+        autoSave();
+        updateUI();
+    }
+}
 
         function buildPathFromStops(selectedStops) {
             let fullPath = [];
@@ -827,21 +836,19 @@ function sellTrain(trainId) {
     let line = lines.find(l => l.id === lineId);
     if (!train || !line) return;
 
-    // 1. Odstranění ze staré linky
     if (train.assignedLine) {
         let oldLine = lines.find(l => l.id === train.assignedLine);
         if (oldLine) {
             oldLine.assignedTrains = oldLine.assignedTrains.filter(id => id !== train.id);
+            distributeTrainsEvenlyOnLine(oldLine.id); // Přepočet staré linky
         }
     }
 
-    // 2. Připsání na novou linku
     train.assignedLine = line.id;
     if (!line.assignedTrains.includes(train.id)) {
         line.assignedTrains.push(train.id);
     }
 
-    // 3. Vytvoření ikonky POUZE pro nový vlak
     if (!train.marker) {
         let firstPt = line.path[0];
         train.marker = L.marker([firstPt.lat, firstPt.lng], {
@@ -855,11 +862,15 @@ function sellTrain(trainId) {
         train.marker.on('click', () => updateTrainPopup(train));
     }
 
-    // 4. Přepočítáme a okamžitě rozprostřeme VŠECHNY vlaky na lince podle metrů
+    // 1. Rozprostřeme všechny vlaky na lince na nové pozice
     distributeTrainsEvenlyOnLine(line.id);
 
-    // 5. Spustíme smyčku pohybu POUZE pro tento nový vlak
-    startTrainMovement(train, line);
+    // 2. Restartujeme pohyb pro VŠECHNY vlaky na téhle lince z jejich nových pozic
+    let lineTrains = trains.filter(t => t.assignedLine === line.id);
+    lineTrains.forEach(t => {
+        t.isMoving = false; // Zrušíme starou smyčku
+        startTrainMovement(t, line); // Spustíme od nové pozice
+    });
 
     autoSave();
     updateUI();
