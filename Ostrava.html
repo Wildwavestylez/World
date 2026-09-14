@@ -512,7 +512,7 @@ setInterval(() => {
 
         if (reachableStops.length > 0) {
             let target = reachableStops[Math.floor(Math.random() * reachableStops.length)];
-            let newPassengersCount = Math.floor(Math.random() * 6) + 1;
+            let newPassengersCount = Math.floor(Math.random() * 10) + 3;
 
             stop.passengers[target.id] = stop.passengers[target.id] || [];
 
@@ -527,7 +527,7 @@ setInterval(() => {
             updateStopPopup(stop);
         }
     });
-}, 8000);
+}, 25000);
 
 
 
