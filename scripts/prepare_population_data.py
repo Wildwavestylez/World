@@ -119,6 +119,8 @@ def main() -> None:
                             "pixelHeight": transform.e,
                             "width": int(window.width),
                             "height": int(window.height),
+                            "sourceRowOffset": int(window.row_off),
+                            "sourceColOffset": int(window.col_off),
                         })
                     tile_x += args.tile_degrees
                 tile_y += args.tile_degrees
