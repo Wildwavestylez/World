@@ -34,8 +34,9 @@ jobs:
         run: |
           mkdir -p population-release
           for country in cz de at; do
-            mkdir -p "population-release/$country"
-            cp -r "data/population/$country" "population-release/$country/"
+            mkdir -p "population-release/$country/$country"
+            # Keep the archive paths identical to manifest tile.file (e.g. cz/+049.00_+013.75.f32.gz).
+            cp -r "data/population/$country/." "population-release/$country/$country/"
             cp data/population/manifest.json "population-release/$country/"
             (cd "population-release/$country" && zip -qr "../$country.zip" "$country" manifest.json)
           done
