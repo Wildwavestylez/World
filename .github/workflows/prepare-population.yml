@@ -1,0 +1,40 @@
+name: Prepare population tiles
+
+on:
+  push:
+    paths:
+      - ".github/workflows/prepare-population.yml"
+      - "scripts/download_population_data.py"
+      - "scripts/prepare_population_data.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: python -m pip install requests rasterio numpy
+      - name: Download source rasters outside repository
+        run: python scripts/download_population_data.py --output-dir ../worldpop-source
+      - name: Convert rasters to compact tiles
+        run: python scripts/prepare_population_data.py --input-dir ../worldpop-source --output-dir data/population
+      - name: Report generated size
+        run: |
+          du -sh data/population
+          find data/population -type f -printf '%s %p\n' | sort -nr | head -20
+      - name: Upload prepared tiles for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: population-tiles-cz-de-at
+          path: data/population/
+          if-no-files-found: error
+          retention-days: 14
