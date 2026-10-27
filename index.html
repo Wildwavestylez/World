@@ -33,7 +33,7 @@
 <button id="sendMaintenance" onclick="sendMaintenanceVehicle()">Vyslat údržbu</button>
 <button onclick="clearLocalStorage()">Vymazat LocalStorage</button>
     </div>  
-    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-debug-2</div></div>
+    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-debug-3</div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -69,6 +69,8 @@ if (savedPolygon) {
         // Populace z připravených WorldPop rastrů (2020, přibližně 100 m).
         // Načítají se pouze archivy zemí, které zasahují do aktuálního polygonu.
         const POPULATION_RELEASE = "https://github.com/Wildwavestylez/World/releases/download/population-data-2020/";
+        // Use jsDelivr for the tiny manifest: it serves raw GitHub files with browser-friendly CORS.
+        const POPULATION_MANIFEST_URL = "https://cdn.jsdelivr.net/gh/Wildwavestylez/World@main/data/population/manifest.json";
         const POPULATION_REFRESH_MS = 60000;
         let populationRequestInFlight = false;
         let lastPopulationRequestAt = 0;
@@ -473,7 +475,7 @@ function expandPolygon() {
      const output = document.getElementById("population");
      const statusOutput = document.getElementById("populationStatus");
      output.textContent = "…";
-     statusOutput.textContent = "Populace: stahuji manifest…";
+     statusOutput.textContent = "Populace: stahuji manifest z CDN…";
      output.title = "Načítám populační data WorldPop (2020)…";
 
      try {
@@ -482,7 +484,7 @@ function expandPolygon() {
          }
          if (!window.JSZip) throw new Error("Knihovna pro ZIP není načtená.");
          if (!populationManifestPromise) {
-             populationManifestPromise = fetch(POPULATION_RELEASE + "manifest.json", { cache: "no-store" })
+             populationManifestPromise = fetch(POPULATION_MANIFEST_URL + "?v=pop-debug-3", { cache: "no-store" })
                  .then(response => {
                      if (!response.ok) throw new Error("Manifest HTTP " + response.status);
                      return response.json();
