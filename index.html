@@ -65,7 +65,16 @@ if (savedPolygon) {
         let blockedPoints = {};
         let moveTracker = Array(polygonPoints.length).fill(0);
 
-        let populationDensity = 130; // Hustota zalidnění (obyvatel/km²) – může se upravit podle oblasti
+        // Populace z WorldPop API. Polygon dál roste lokálně a bez čekání na API.
+        // API vrací CELKOVÝ odhad obyvatel uvnitř polygonu, proto hodnotu nahrazujeme,
+        // nikdy ji nepřičítáme k předchozímu výsledku (žádné dvojí započítání).
+        const WORLDPOP_API = "https://api.worldpop.org/v2";
+        const POPULATION_REFRESH_MS = 60000;
+        let populationRequestInFlight = false;
+        let lastPopulationRequestAt = 0;
+        let populationRequestVersion = 0;
+        let lastPopulationArea = 0;
+        let populationApiAvailable = true;
 
 
 function isConnected(segmentA, segmentB) {
@@ -444,10 +453,84 @@ function expandPolygon() {
         polygon.setLatLngs(polygonPoints);
         const area=calculatePolygonArea(polygonPoints);
         document.getElementById("area").textContent=area.toFixed(2);
-        document.getElementById("population").textContent=Math.round(area*populationDensity).toLocaleString();
+        // Populační dotaz je oddělený od animační smyčky; neblokuje růst polygonu.
         localStorage.setItem("polygonPoints",JSON.stringify(polygonPoints));
     }
     currentIndex=(index+1)%polygonPoints.length;
+}
+
+// Pošle aktuální hranici do WorldPop. Data jsou odhadovaná populační mřížka
+// cca 100 m; dotaz se opakuje nejvýše jednou za minutu, nikoli při každém tahu.
+async function refreshPopulationEstimate(force = false) {
+    const now = Date.now();
+    if (!populationApiAvailable || populationRequestInFlight) return;
+    if (!force && now - lastPopulationRequestAt < POPULATION_REFRESH_MS) return;
+
+    const area = calculatePolygonArea(polygonPoints);
+    if (!Number.isFinite(area) || area <= 0) return;
+    // WorldPop API má omezení velikosti plochy. Při překročení necháme poslední
+    // platný údaj a nezatěžujeme službu opakovanými neúspěšnými požadavky.
+    if (area > 50000) {
+        document.getElementById("population").title =
+            "Polygon překročil limit plochy WorldPop API (50 000 km²); zobrazen je poslední dostupný odhad.";
+        return;
+    }
+
+    lastPopulationRequestAt = now;
+    lastPopulationArea = area;
+    populationRequestInFlight = true;
+    const requestVersion = ++populationRequestVersion;
+    const ring = polygonPoints.map(p => [p[1], p[0]]);
+    if (ring.length) {
+        const first = ring[0], last = ring[ring.length - 1];
+        if (first[0] !== last[0] || first[1] !== last[1]) ring.push([...first]);
+    }
+
+    try {
+        const response = await fetch(WORLDPOP_API + "/population", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                geojson: { type: "Polygon", coordinates: [ring] },
+                year: 2020,
+                resolution: "100m"
+            })
+        });
+        if (!response.ok) throw new Error("WorldPop HTTP " + response.status);
+        const submitted = await response.json();
+        if (!submitted.task_id) throw new Error(submitted.error || "WorldPop nevrátil task_id");
+
+        let result = null;
+        for (let attempt = 0; attempt < 12; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const statusResponse = await fetch(WORLDPOP_API + "/tasks/" + encodeURIComponent(submitted.task_id));
+            if (!statusResponse.ok) throw new Error("WorldPop status HTTP " + statusResponse.status);
+            const status = await statusResponse.json();
+            if (status.status === "success") {
+                result = status.result;
+                break;
+            }
+            if (status.status === "failure") throw new Error(status.error || "WorldPop výpočet selhal");
+        }
+        if (!result || !Number.isFinite(Number(result.total_population))) {
+            throw new Error("WorldPop výpočet trval příliš dlouho");
+        }
+
+        // Zastaralý výsledek se nikdy nepřepíše novějším požadavkem.
+        if (requestVersion === populationRequestVersion) {
+            document.getElementById("population").textContent =
+                Math.round(Number(result.total_population)).toLocaleString("cs-CZ");
+            document.getElementById("population").title =
+                "Odhad WorldPop, rok " + (result.data_year || 2020) +
+                ", rozlišení 100 m. Aktualizace přibližně každou minutu.";
+        }
+    } catch (error) {
+        console.warn("Populační odhad WorldPop není momentálně dostupný:", error);
+        document.getElementById("population").title =
+            "WorldPop se nepodařilo načíst. Zobrazený údaj může být poslední dostupný odhad.";
+    } finally {
+        populationRequestInFlight = false;
+    }
 }
 
 function turnLastSectorChangeFallback() {
@@ -462,6 +545,10 @@ function unlockBlockedPoints() {
                 }
             }
         }
+
+        // Populace se načítá samostatně; herní růst zůstává na původních 400 ms.
+        setTimeout(() => refreshPopulationEstimate(true), 3000);
+        setInterval(() => refreshPopulationEstimate(false), POPULATION_REFRESH_MS);
 
         setInterval(() => {
             expandPolygon();
