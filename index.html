@@ -33,7 +33,7 @@
 <button id="sendMaintenance" onclick="sendMaintenanceVehicle()">Vyslat údržbu</button>
 <button onclick="clearLocalStorage()">Vymazat LocalStorage</button>
     </div>  
-    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-raw-branch-1</div></div>
+    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-selective-tiles-2</div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -517,35 +517,27 @@ function expandPolygon() {
          const countedCells = new Set();
 
          for (const [code, country] of countries) {
-             let archivePromise = populationCountryArchives.get(code);
-             if (!archivePromise) {
-                 const archiveName = ({cz:"cz.zip",de:"de.zip",at:"at.zip"})[code];
-                 if (!archiveName) continue;
-                 // Archivy se publikují na samostatné větvi a stahují přímo z raw.githubusercontent.com,
-                 // bez přesměrování GitHub Releases/API, které v mobilních prohlížečích může selhat na CORS.
-                 const archiveUrl = "https://raw.githubusercontent.com/Wildwavestylez/World/population-data/" + archiveName;
-                 archivePromise = fetch(archiveUrl, { cache: "no-store" }).then(response => {
-                     if (!response.ok) throw new Error(archiveName + ": HTTP " + response.status);
-                     return response.arrayBuffer();
-                 }).then(buffer => {
-                     if (buffer.byteLength < 4) throw new Error(archiveName + ": odpověď je prázdná nebo neplatná.");
-                     return JSZip.loadAsync(buffer);
-                 }).catch(error => {
-                     populationCountryArchives.delete(code);
-                     throw new Error("Stažení " + archiveName + " selhalo: " + error.message);
-                 });
-                 populationCountryArchives.set(code, archivePromise);
-             }
-             const archive = await archivePromise;
              for (const tile of country.tiles || []) {
                  const south = tile.north + tile.height * tile.pixelHeight;
                  const east = tile.west + tile.width * tile.pixelWidth;
                  if (tile.west > bounds.east || east < bounds.west ||
                      south > bounds.north || tile.north < bounds.south) continue;
 
-                 const entry = archive.file(tile.file);
-                 if (!entry) continue;
-                 const gzBytes = await entry.async("uint8array");
+                 // Stahujeme jen jednotlivé dlaždice protínající aktuální polygon,
+                 // ne celý archiv země (německý archiv má desítky MB).
+                 const tileUrl = "https://raw.githubusercontent.com/Wildwavestylez/World/population-data/" + tile.file;
+                 let tilePromise = populationCountryArchives.get(tileUrl);
+                 if (!tilePromise) {
+                     tilePromise = fetch(tileUrl, { cache: "force-cache" }).then(response => {
+                         if (!response.ok) throw new Error(tile.file + ": HTTP " + response.status);
+                         return response.arrayBuffer();
+                     }).catch(error => {
+                         populationCountryArchives.delete(tileUrl);
+                         throw new Error("Stažení dlaždice " + tile.file + " selhalo: " + error.message);
+                     });
+                     populationCountryArchives.set(tileUrl, tilePromise);
+                 }
+                 const gzBytes = await tilePromise;
                  const rawStream = new Blob([gzBytes]).stream().pipeThrough(new DecompressionStream("gzip"));
                  const rawBuffer = await new Response(rawStream).arrayBuffer();
                  const values = new Float32Array(rawBuffer);
@@ -575,7 +567,8 @@ function expandPolygon() {
                          }
                      }
                  }
-                 // Předání řízení prohlížeči mezi dlaždicemi, aby růst mapy zůstal plynulý.
+                 statusOutput.textContent = "Populace: " + scannedCells.toLocaleString("cs-CZ") +
+                     " buněk zpracováno, načítám další dlaždice…";
                  await new Promise(resolve => setTimeout(resolve, 0));
              }
          }
