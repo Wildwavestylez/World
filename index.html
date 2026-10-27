@@ -614,8 +614,10 @@ function unlockBlockedPoints() {
 
 
 function clearLocalStorage() {
-    localStorage.removeItem("polygonPoints");
-    location.reload(); // Překreslí mapu od začátku
+    // Tlačítko se jmenuje „Vymazat LocalStorage“, proto opravdu vymaže
+    // celé lokální úložiště této hry, ne pouze uložený polygon.
+    localStorage.clear();
+    location.reload(); // Načte hru s výchozím polygonem
 }
 
 
