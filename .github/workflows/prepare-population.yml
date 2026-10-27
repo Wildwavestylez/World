@@ -54,6 +54,21 @@ jobs:
             git pull --rebase origin main
             git push origin HEAD:main
           fi
+      - name: Publish archives on CORS-friendly raw branch
+        run: |
+          mkdir -p population-raw
+          cp population-release/cz.zip population-raw/cz.zip
+          cp population-release/de.zip population-raw/de.zip
+          cp population-release/at.zip population-raw/at.zip
+          git fetch origin population-data || true
+          git checkout --orphan population-data
+          git rm -rf . >/dev/null 2>&1 || true
+          cp population-raw/*.zip .
+          git add cz.zip de.zip at.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Publish population archives for browser downloads"
+          git push --force origin HEAD:population-data
       - name: Upload prepared tiles for review
         uses: actions/upload-artifact@v4
         with:
