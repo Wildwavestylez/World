@@ -257,85 +257,144 @@ function isInSector(angle, sector) {
     }
 }
 
+// Test průsečíku dvou úseček v lokální projekci mapy.
+function segmentsIntersect(a, b, c, d) {
+    const cross = (p, q, r) =>
+        (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+    const eps = 1e-9;
+    const ab1 = cross(a, b, c);
+    const ab2 = cross(a, b, d);
+    const cd1 = cross(c, d, a);
+    const cd2 = cross(c, d, b);
+    return ((ab1 > eps && ab2 < -eps) || (ab1 < -eps && ab2 > eps)) &&
+           ((cd1 > eps && cd2 < -eps) || (cd1 < -eps && cd2 > eps));
+}
+
+// Kontrola, že nová hranice zůstane jednoduchým polygonem.
+function hasSelfIntersections(points) {
+    const lat0 = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+    const cosLat = Math.cos(lat0 * Math.PI / 180);
+    const projected = points.map(p => ({
+        x: p[1] * 111320 * cosLat,
+        y: p[0] * 110540
+    }));
+    const n = projected.length;
+    for (let i = 0; i < n; i++) {
+        const a = projected[i];
+        const b = projected[(i + 1) % n];
+        for (let j = i + 1; j < n; j++) {
+            // Sousední hrany sdílejí vrchol, takže se nekontrolují.
+            if (j === i || j === i + 1 || (i === 0 && j === n - 1)) continue;
+            const c = projected[j];
+            const d = projected[(j + 1) % n];
+            if (segmentsIntersect(a, b, c, d)) return true;
+        }
+    }
+    return false;
+}
+
 function expandPolygon() {
     turn++;
 
-    let center = getCentroid(polygonPoints);
-    let selectedIndex = currentIndex;
-    let currentPoint = polygonPoints[selectedIndex];
-
-    // Konvexní obal a kontrola, jestli bod je na vnější hraně
-    let convexHull = getConvexHull(polygonPoints);
-    let isOnHull = isOnConvexHull(currentPoint, convexHull);
-
-    // 🔁 Změna směru po stepsPerSector tazích
     if (turn - lastSectorChangeTurn >= stepsPerSector) {
         currentSectorIndex++;
-
         if (currentSectorIndex >= sectorQueue.length) {
-            sectorQueue = shuffleArray([...directionalSectors]); // Nové náhodné pořadí
+            sectorQueue = shuffleArray([...directionalSectors]);
             currentSectorIndex = 0;
         }
-
         lastSectorChangeTurn = turn;
         console.log("🧭 Nový směr:", sectorQueue[currentSectorIndex].name);
     }
 
-    let activeSector = sectorQueue[currentSectorIndex];
+    const activeSector = sectorQueue[currentSectorIndex];
+    const center = getCentroid(polygonPoints);
+    const n = polygonPoints.length;
+    if (n < 4) return;
 
-    // Výpočet úhlu bodu vůči středu
-    let angle = getAngleDegrees(center, currentPoint);
-    let inActiveSector = isInSector(angle, activeSector);
+    // Převod souřadnic na přibližné metry, aby se správně pracovalo
+    // s délkou hran a směrem i při rozdílu mezi latitudou a longitudou.
+    const cosLat = Math.cos(center[0] * Math.PI / 180);
+    const project = p => ({ x: p[1] * 111320 * cosLat, y: p[0] * 110540 });
+    const unproject = p => [p.y / 110540, p.x / (111320 * cosLat)];
+    const projected = polygonPoints.map(project);
 
-    // Určení vzdálenosti
-    // Určení vzdálenosti (agresivnější růst ve směru)
-let distance;
-if (!isOnHull) {
-    distance = inActiveSector
-        ? 0.0115 + Math.random() * 0.003 // 1500–1800 metrů
-        : 0.002 + Math.random() * 0.002;
-    newPoint = forcePointOutward(currentPoint, center, distance);
-} else {
-    distance = inActiveSector
-        ? 0.0135 + Math.random() * 0.003 // 1500–1800 metrů
-        : 0.002 + Math.random() * 0.002;
-    newPoint = movePointAway(currentPoint, center, distance, selectedIndex);
-}
+    // Vyhodnotíme úseky skutečného obvodu. Přednost mají úseky,
+    // které leží v aktivním směru, ale náhoda stále dovolí růst i jinde.
+    const candidates = [];
+    for (let i = 0; i < n; i++) {
+        const a = projected[i];
+        const b = projected[(i + 1) % n];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const length = Math.hypot(dx, dy);
+        if (length < 12) continue;
 
-    // Uložení nové pozice
-    polygonPoints[selectedIndex] = newPoint;
+        const midpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const midpointGeo = unproject(midpoint);
+        const angle = getAngleDegrees(center, midpointGeo);
+        const inActiveSector = isInSector(angle, activeSector);
 
-    // Přidání bodu mezi dlouhé segmenty
-    for (let i = 0; i < polygonPoints.length; i++) {
-        let p1 = polygonPoints[i];
-        let p2 = polygonPoints[(i + 1) % polygonPoints.length];
-        let segmentLength = distanceBetween(p1, p2);
-
-        if (segmentLength > 0.038) {
-            let midPoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
-            polygonPoints.splice(i + 1, 0, midPoint);
-            if (currentIndex > i) currentIndex++;
-            break;
-        }
+        // Váha podporuje aktivní sektor, ale neuzamkne růst jen do něj.
+        const score = Math.random() + (inActiveSector ? 0.85 : 0);
+        candidates.push({ i, a, b, dx, dy, length, score });
     }
 
-    // Další bod na řadě
-    currentIndex = (currentIndex + 1) % polygonPoints.length;
+    candidates.sort((a, b) => b.score - a.score);
 
-    // Aktualizace polygonu na mapě
-    polygon.setLatLngs(polygonPoints);
+    // Zkusíme několik nejlepších hran; neplatný výběžek se zahodí,
+    // místo aby rozbil polygon.
+    for (const edge of candidates.slice(0, 12)) {
+        const { i, a, b, dx, dy, length } = edge;
+        const tx = dx / length;
+        const ty = dy / length;
 
-    // Výpočet rozlohy a počtu obyvatel
-    let area = calculatePolygonArea(polygonPoints);
-    let population = Math.round(area * populationDensity);
+        // Zjistíme orientaci polygonu. Podle ní určíme normálu ven.
+        let signedArea = 0;
+        for (let k = 0; k < n; k++) {
+            const p = projected[k];
+            const q = projected[(k + 1) % n];
+            signedArea += p.x * q.y - q.x * p.y;
+        }
+        const orientation = signedArea < 0 ? 1 : -1;
+        const nx = -ty * orientation;
+        const ny = tx * orientation;
 
-    localStorage.setItem("polygonPoints", JSON.stringify(polygonPoints));
-    document.getElementById("area").textContent = area.toFixed(2);
-    document.getElementById("population").textContent = population.toLocaleString();
+        // Šířka výběžku je část původní hrany; hloubka je náhodná,
+        // ale omezená délkou hrany, aby se růst choval přirozeně.
+        const widthFraction = 0.34 + Math.random() * 0.18;
+        const halfWidth = Math.min(length * widthFraction / 2, 260);
+        const depth = Math.min(180 + Math.random() * 420, Math.max(90, length * 0.9));
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const baseA = { x: mid.x - tx * halfWidth, y: mid.y - ty * halfWidth };
+        const baseB = { x: mid.x + tx * halfWidth, y: mid.y + ty * halfWidth };
+        const tip = {
+            x: mid.x + nx * depth + tx * ((Math.random() - 0.5) * Math.min(100, length * 0.12)),
+            y: mid.y + ny * depth + ty * ((Math.random() - 0.5) * Math.min(100, length * 0.12))
+        };
+
+        const proposed = polygonPoints.slice();
+        proposed.splice(i + 1, 0, unproject(baseA), unproject(tip), unproject(baseB));
+
+        if (hasSelfIntersections(proposed)) continue;
+
+        // Přijmeme jedinou lokální expanzi. Ostatní obvod se nehýbe.
+        polygonPoints = proposed;
+        currentIndex = (i + 2) % polygonPoints.length;
+        polygon.setLatLngs(polygonPoints);
+
+        const area = calculatePolygonArea(polygonPoints);
+        const population = Math.round(area * populationDensity);
+        localStorage.setItem("polygonPoints", JSON.stringify(polygonPoints));
+        document.getElementById("area").textContent = area.toFixed(2);
+        document.getElementById("population").textContent = population.toLocaleString();
+        return;
+    }
+
+    // Pokud se nepodaří najít bezpečný výběžek, tah přeskočíme.
+    console.warn("Expanze přeskočena: nenašel se bezpečný úsek hranice.");
 }
 
-
-    function unlockBlockedPoints() {
+function unlockBlockedPoints() {
             let currentTime = Date.now();
             for (let index in blockedPoints) {
                 if (currentTime >= blockedPoints[index]) {
