@@ -33,7 +33,7 @@
 <button id="sendMaintenance" onclick="sendMaintenanceVehicle()">Vyslat údržbu</button>
 <button onclick="clearLocalStorage()">Vymazat LocalStorage</button>
     </div>  
-    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-debug-4</div></div>
+    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-raw-branch-1</div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -521,15 +521,11 @@ function expandPolygon() {
              if (!archivePromise) {
                  const archiveName = ({cz:"cz.zip",de:"de.zip",at:"at.zip"})[code];
                  if (!archiveName) continue;
-                 // Stahuj asset přes GitHub API; přímé release/download URL může v prohlížeči
-                 // selhat na CORS při přesměrování na úložiště binárních souborů.
-                 const assetIds = { "cz.zip": 680090649, "de.zip": 680090654, "at.zip": 680090664 };
-                 const assetUrl = "https://api.github.com/repos/Wildwavestylez/World/releases/assets/" + assetIds[archiveName];
-                 archivePromise = fetch(assetUrl, {
-                     cache: "no-store",
-                     headers: { "Accept": "application/octet-stream" }
-                 }).then(response => {
-                     if (!response.ok) throw new Error(archiveName + " přes GitHub API: HTTP " + response.status);
+                 // Archivy se publikují na samostatné větvi a stahují přímo z raw.githubusercontent.com,
+                 // bez přesměrování GitHub Releases/API, které v mobilních prohlížečích může selhat na CORS.
+                 const archiveUrl = "https://raw.githubusercontent.com/Wildwavestylez/World/population-data/" + archiveName;
+                 archivePromise = fetch(archiveUrl, { cache: "no-store" }).then(response => {
+                     if (!response.ok) throw new Error(archiveName + ": HTTP " + response.status);
                      return response.arrayBuffer();
                  }).then(buffer => {
                      if (buffer.byteLength < 4) throw new Error(archiveName + ": odpověď je prázdná nebo neplatná.");
