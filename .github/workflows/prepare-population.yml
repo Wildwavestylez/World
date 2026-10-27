@@ -42,6 +42,17 @@ jobs:
           done
           cp data/population/manifest.json population-release/manifest.json
           ls -lh population-release/*.zip population-release/manifest.json
+      - name: Publish small manifest to repository for browser access
+        run: |
+          mkdir -p data/population
+          cp population-release/manifest.json data/population/manifest.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/population/manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish population data manifest"
+            git push
+          fi
       - name: Upload prepared tiles for review
         uses: actions/upload-artifact@v4
         with:
