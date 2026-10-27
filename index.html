@@ -36,6 +36,7 @@
     <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">0</span></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script>
         let map = L.map('map').setView([49.1675000, 13.8898087], 15); // Lčovice jako start
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -65,15 +66,14 @@ if (savedPolygon) {
         let blockedPoints = {};
         let moveTracker = Array(polygonPoints.length).fill(0);
 
-        // Populace z WorldPop API. Polygon dál roste lokálně a bez čekání na API.
-        // API vrací CELKOVÝ odhad obyvatel uvnitř polygonu, proto hodnotu nahrazujeme,
-        // nikdy ji nepřičítáme k předchozímu výsledku (žádné dvojí započítání).
-        const WORLDPOP_API = "https://api.worldpop.org/v2";
+        // Populace z připravených WorldPop rastrů (2020, přibližně 100 m).
+        // Načítají se pouze archivy zemí, které zasahují do aktuálního polygonu.
+        const POPULATION_RELEASE = "https://github.com/Wildwavestylez/World/releases/download/population-data-2020/";
         const POPULATION_REFRESH_MS = 60000;
         let populationRequestInFlight = false;
         let lastPopulationRequestAt = 0;
-        let populationRequestVersion = 0;
-        let lastPopulationArea = 0;
+        let populationManifestPromise = null;
+        const populationCountryArchives = new Map();
         let populationApiAvailable = true;
 
 
@@ -459,78 +459,118 @@ function expandPolygon() {
     currentIndex=(index+1)%polygonPoints.length;
 }
 
-// Pošle aktuální hranici do WorldPop. Data jsou odhadovaná populační mřížka
-// cca 100 m; dotaz se opakuje nejvýše jednou za minutu, nikoli při každém tahu.
-async function refreshPopulationEstimate(force = false) {
-    const now = Date.now();
-    if (!populationApiAvailable || populationRequestInFlight) return;
-    if (!force && now - lastPopulationRequestAt < POPULATION_REFRESH_MS) return;
+// Přepočítá celkovou populaci uvnitř polygonu z populačních buněk.
+ // Hodnoty jsou počty osob na buňku, ne hustota. Každá původní buňka se
+ // v jednom výpočtu započítá nejvýše jednou, i když se dlaždice překrývají.
+ async function refreshPopulationEstimate(force = false) {
+     const now = Date.now();
+     if (!populationApiAvailable || populationRequestInFlight) return;
+     if (!force && now - lastPopulationRequestAt < POPULATION_REFRESH_MS) return;
+     if (!Array.isArray(polygonPoints) || polygonPoints.length < 3) return;
 
-    const area = calculatePolygonArea(polygonPoints);
-    if (!Number.isFinite(area) || area <= 0) return;
-    // WorldPop API má omezení velikosti plochy. Při překročení necháme poslední
-    // platný údaj a nezatěžujeme službu opakovanými neúspěšnými požadavky.
-    if (area > 50000) {
-        document.getElementById("population").title =
-            "Polygon překročil limit plochy WorldPop API (50 000 km²); zobrazen je poslední dostupný odhad.";
-        return;
-    }
+     lastPopulationRequestAt = now;
+     populationRequestInFlight = true;
+     const output = document.getElementById("population");
+     output.title = "Načítám populační data WorldPop (2020)…";
 
-    lastPopulationRequestAt = now;
-    lastPopulationArea = area;
-    populationRequestInFlight = true;
-    const requestVersion = ++populationRequestVersion;
-    const ring = polygonPoints.map(p => [p[1], p[0]]);
-    if (ring.length) {
-        const first = ring[0], last = ring[ring.length - 1];
-        if (first[0] !== last[0] || first[1] !== last[1]) ring.push([...first]);
-    }
+     try {
+         if (!("DecompressionStream" in window)) {
+             throw new Error("Prohlížeč nepodporuje rozbalení gzip dat.");
+         }
+         if (!window.JSZip) throw new Error("Knihovna pro ZIP není načtená.");
+         if (!populationManifestPromise) {
+             populationManifestPromise = fetch(POPULATION_RELEASE + "manifest.json")
+                 .then(response => {
+                     if (!response.ok) throw new Error("Manifest HTTP " + response.status);
+                     return response.json();
+                 });
+         }
+         const manifest = await populationManifestPromise;
+         const latitudes = polygonPoints.map(p => p[0]);
+         const longitudes = polygonPoints.map(p => p[1]);
+         const bounds = {
+             south: Math.min(...latitudes), north: Math.max(...latitudes),
+             west: Math.min(...longitudes), east: Math.max(...longitudes)
+         };
+         const countries = Object.entries(manifest.countries || {}).filter(([code, country]) =>
+             (country.tiles || []).some(tile => {
+                 const south = tile.north + tile.height * tile.pixelHeight;
+                 const east = tile.west + tile.width * tile.pixelWidth;
+                 return tile.west <= bounds.east && east >= bounds.west &&
+                        south <= bounds.north && tile.north >= bounds.south;
+             })
+         );
 
-    try {
-        const response = await fetch(WORLDPOP_API + "/population", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                geojson: { type: "Polygon", coordinates: [ring] },
-                year: 2020,
-                resolution: "100m"
-            })
-        });
-        if (!response.ok) throw new Error("WorldPop HTTP " + response.status);
-        const submitted = await response.json();
-        if (!submitted.task_id) throw new Error(submitted.error || "WorldPop nevrátil task_id");
+         let totalPopulation = 0;
+         let scannedCells = 0;
+         const countedCells = new Set();
 
-        let result = null;
-        for (let attempt = 0; attempt < 12; attempt++) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            const statusResponse = await fetch(WORLDPOP_API + "/tasks/" + encodeURIComponent(submitted.task_id));
-            if (!statusResponse.ok) throw new Error("WorldPop status HTTP " + statusResponse.status);
-            const status = await statusResponse.json();
-            if (status.status === "success") {
-                result = status.result;
-                break;
-            }
-            if (status.status === "failure") throw new Error(status.error || "WorldPop výpočet selhal");
-        }
-        if (!result || !Number.isFinite(Number(result.total_population))) {
-            throw new Error("WorldPop výpočet trval příliš dlouho");
-        }
+         for (const [code, country] of countries) {
+             let archivePromise = populationCountryArchives.get(code);
+             if (!archivePromise) {
+                 const archiveName = ({cz:"cz.zip",de:"de.zip",at:"at.zip"})[code];
+                 if (!archiveName) continue;
+                 archivePromise = fetch(POPULATION_RELEASE + archiveName)
+                     .then(response => {
+                         if (!response.ok) throw new Error(archiveName + " HTTP " + response.status);
+                         return response.arrayBuffer();
+                     })
+                     .then(buffer => JSZip.loadAsync(buffer));
+                 populationCountryArchives.set(code, archivePromise);
+             }
+             const archive = await archivePromise;
+             for (const tile of country.tiles || []) {
+                 const south = tile.north + tile.height * tile.pixelHeight;
+                 const east = tile.west + tile.width * tile.pixelWidth;
+                 if (tile.west > bounds.east || east < bounds.west ||
+                     south > bounds.north || tile.north < bounds.south) continue;
 
-        // Zastaralý výsledek se nikdy nepřepíše novějším požadavkem.
-        if (requestVersion === populationRequestVersion) {
-            document.getElementById("population").textContent =
-                Math.round(Number(result.total_population)).toLocaleString("cs-CZ");
-            document.getElementById("population").title =
-                "Odhad WorldPop, rok " + (result.data_year || 2020) +
-                ", rozlišení 100 m. Aktualizace přibližně každou minutu.";
-        }
-    } catch (error) {
-        console.warn("Populační odhad WorldPop není momentálně dostupný:", error);
-        document.getElementById("population").title =
-            "WorldPop se nepodařilo načíst. Zobrazený údaj může být poslední dostupný odhad.";
-    } finally {
-        populationRequestInFlight = false;
-    }
+                 const entry = archive.file(tile.file);
+                 if (!entry) continue;
+                 const gzBytes = await entry.async("uint8array");
+                 const rawStream = new Blob([gzBytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+                 const rawBuffer = await new Response(rawStream).arrayBuffer();
+                 const values = new Float32Array(rawBuffer);
+                 const expected = tile.width * tile.height;
+                 if (values.length < expected) {
+                     console.warn("Neúplná populační dlaždice:", tile.file);
+                     continue;
+                 }
+
+                 for (let row = 0; row < tile.height; row++) {
+                     const lat = tile.north + (row + 0.5) * tile.pixelHeight;
+                     if (lat < bounds.south || lat > bounds.north) continue;
+                     for (let col = 0; col < tile.width; col++) {
+                         const lng = tile.west + (col + 0.5) * tile.pixelWidth;
+                         if (lng < bounds.west || lng > bounds.east) continue;
+                         const value = values[row * tile.width + col];
+                         if (!Number.isFinite(value) || value < 0) continue;
+
+                         const cellId = country.iso3 + ":" +
+                             (tile.sourceRowOffset + row) + ":" +
+                             (tile.sourceColOffset + col);
+                         if (countedCells.has(cellId)) continue;
+                         countedCells.add(cellId);
+                         if (isPointInPolygon([lat, lng], polygonPoints)) {
+                             totalPopulation += value;
+                             scannedCells++;
+                         }
+                     }
+                 }
+                 // Předání řízení prohlížeči mezi dlaždicemi, aby růst mapy zůstal plynulý.
+                 await new Promise(resolve => setTimeout(resolve, 0));
+             }
+         }
+
+         output.textContent = Math.round(totalPopulation).toLocaleString("cs-CZ");
+         output.title = "WorldPop 2020, přibližně 100 m. Započteno " +
+             scannedCells.toLocaleString("cs-CZ") + " populačních buněk; výsledek se obnovuje přibližně každou minutu.";
+     } catch (error) {
+         console.warn("Populační data se nepodařilo načíst:", error);
+         output.title = "Populační data nejsou dostupná: " + error.message;
+     } finally {
+         populationRequestInFlight = false;
+     }
 }
 
 function turnLastSectorChangeFallback() {
