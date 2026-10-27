@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   prepare:
@@ -30,6 +30,17 @@ jobs:
         run: |
           du -sh data/population
           find data/population -type f -printf '%s %p\n' | sort -nr | head -20
+      - name: Package country data for selective downloads
+        run: |
+          mkdir -p population-release
+          for country in cz de at; do
+            mkdir -p "population-release/$country"
+            cp -r "data/population/$country" "population-release/$country/"
+            cp data/population/manifest.json "population-release/$country/"
+            (cd "population-release/$country" && zip -qr "../$country.zip" "$country" manifest.json)
+          done
+          cp data/population/manifest.json population-release/manifest.json
+          ls -lh population-release/*.zip population-release/manifest.json
       - name: Upload prepared tiles for review
         uses: actions/upload-artifact@v4
         with:
@@ -37,3 +48,22 @@ jobs:
           path: data/population/
           if-no-files-found: error
           retention-days: 14
+      - name: Publish versioned population data release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: population-data-2020
+          name: Population data 2020 (CZ, DE, AT)
+          body: |
+            WorldPop Global2 R2025A population-count tiles for Czechia, Germany and Austria.
+            Approximate 100 m resolution. Modelled estimates for 2020.
+            Attribution: WorldPop / University of Southampton. Source: https://hub.worldpop.org/project/categories?id=3
+            License: CC BY 4.0; retain attribution when redistributing.
+          draft: false
+          prerelease: false
+          make_latest: false
+          files: |
+            population-release/cz.zip
+            population-release/de.zip
+            population-release/at.zip
+            population-release/manifest.json
+          fail_on_unmatched_files: true
