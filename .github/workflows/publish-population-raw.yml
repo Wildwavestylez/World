@@ -1,0 +1,39 @@
+name: Publish population archives for browser
+
+on:
+  push:
+    paths:
+      - ".github/workflows/publish-population-raw.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download existing release archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir population-raw
+          gh release download population-data-2020 --repo "${GITHUB_REPOSITORY}" --pattern "cz.zip" --dir population-raw
+          gh release download population-data-2020 --repo "${GITHUB_REPOSITORY}" --pattern "de.zip" --dir population-raw
+          gh release download population-data-2020 --repo "${GITHUB_REPOSITORY}" --pattern "at.zip" --dir population-raw
+          ls -lh population-raw
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          path: source
+      - name: Publish ZIP files on raw branch
+        working-directory: source
+        run: |
+          cp ../population-raw/*.zip .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan population-data
+          git rm -rf . >/dev/null 2>&1 || true
+          git add cz.zip de.zip at.zip
+          git commit -m "Publish population archives for browser downloads"
+          git push --force origin HEAD:population-data
