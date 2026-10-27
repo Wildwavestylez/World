@@ -21,7 +21,11 @@ jobs:
           gh release download population-data-2020 --repo "${GITHUB_REPOSITORY}" --pattern "cz.zip" --dir population-raw
           gh release download population-data-2020 --repo "${GITHUB_REPOSITORY}" --pattern "de.zip" --dir population-raw
           gh release download population-data-2020 --repo "${GITHUB_REPOSITORY}" --pattern "at.zip" --dir population-raw
-          ls -lh population-raw
+          for country in cz de at; do
+            mkdir -p "population-raw/$country"
+            unzip -q "population-raw/$country.zip" -d "population-raw/$country"
+          done
+          find population-raw -type f | head -20
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -29,11 +33,14 @@ jobs:
       - name: Publish ZIP files on raw branch
         working-directory: source
         run: |
-          cp ../population-raw/*.zip .
+          cp -r ../population-raw/cz .
+          cp -r ../population-raw/de .
+          cp -r ../population-raw/at .
+          cp ../population-raw/manifest.json . 2>/dev/null || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan population-data
           git rm -rf . >/dev/null 2>&1 || true
-          git add cz.zip de.zip at.zip
+          git add cz de at
           git commit -m "Publish population archives for browser downloads"
           git push --force origin HEAD:population-data
