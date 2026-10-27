@@ -33,7 +33,7 @@
 <button id="sendMaintenance" onclick="sendMaintenanceVehicle()">Vyslat údržbu</button>
 <button onclick="clearLocalStorage()">Vymazat LocalStorage</button>
     </div>  
-    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">0</span></div>
+    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-debug-2</div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -471,7 +471,9 @@ function expandPolygon() {
      lastPopulationRequestAt = now;
      populationRequestInFlight = true;
      const output = document.getElementById("population");
+     const statusOutput = document.getElementById("populationStatus");
      output.textContent = "…";
+     statusOutput.textContent = "Populace: stahuji manifest…";
      output.title = "Načítám populační data WorldPop (2020)…";
 
      try {
@@ -480,7 +482,7 @@ function expandPolygon() {
          }
          if (!window.JSZip) throw new Error("Knihovna pro ZIP není načtená.");
          if (!populationManifestPromise) {
-             populationManifestPromise = fetch(POPULATION_RELEASE + "manifest.json")
+             populationManifestPromise = fetch(POPULATION_RELEASE + "manifest.json", { cache: "no-store" })
                  .then(response => {
                      if (!response.ok) throw new Error("Manifest HTTP " + response.status);
                      return response.json();
@@ -493,6 +495,7 @@ function expandPolygon() {
              south: Math.min(...latitudes), north: Math.max(...latitudes),
              west: Math.min(...longitudes), east: Math.max(...longitudes)
          };
+         statusOutput.textContent = "Populace: manifest načten, hledám dlaždice…";
          const countries = Object.entries(manifest.countries || {}).filter(([code, country]) =>
              (country.tiles || []).some(tile => {
                  const south = tile.north + tile.height * tile.pixelHeight;
@@ -506,6 +509,7 @@ function expandPolygon() {
              throw new Error("Manifest načten, ale pro aktuální oblast nebyla nalezena žádná populační dlaždice.");
          }
 
+         statusOutput.textContent = "Populace: nalezeno " + countries.length + " oblastí, načítám rastry…";
          let totalPopulation = 0;
          let scannedCells = 0;
          const countedCells = new Set();
@@ -515,7 +519,7 @@ function expandPolygon() {
              if (!archivePromise) {
                  const archiveName = ({cz:"cz.zip",de:"de.zip",at:"at.zip"})[code];
                  if (!archiveName) continue;
-                 archivePromise = fetch(POPULATION_RELEASE + archiveName)
+                 archivePromise = fetch(POPULATION_RELEASE + archiveName, { cache: "no-store" })
                      .then(response => {
                          if (!response.ok) throw new Error(archiveName + " HTTP " + response.status);
                          return response.arrayBuffer();
@@ -571,12 +575,16 @@ function expandPolygon() {
              throw new Error("Dlaždice se načetly, ale uvnitř polygonu nebyly nalezeny žádné platné buňky.");
          }
          output.textContent = Math.round(totalPopulation).toLocaleString("cs-CZ");
+         statusOutput.textContent = "Populace OK: " + scannedCells.toLocaleString("cs-CZ") + " buněk.";
          output.title = "WorldPop 2020, přibližně 100 m. Započteno " +
              scannedCells.toLocaleString("cs-CZ") + " populačních buněk; výsledek se obnovuje přibližně každou minutu.";
      } catch (error) {
          console.warn("Populační data se nepodařilo načíst:", error);
          output.textContent = "—";
-         output.title = "CHYBA POPULACE: " + error.message;
+         const message = "CHYBA POPULACE: " + error.message;
+         statusOutput.textContent = message;
+         statusOutput.style.color = "#b00020";
+         output.title = message;
      } finally {
          populationRequestInFlight = false;
      }
