@@ -33,10 +33,10 @@ jobs:
       - name: Publish ZIP files on raw branch
         working-directory: source
         run: |
-          cp -r ../population-raw/cz .
-          cp -r ../population-raw/de .
-          cp -r ../population-raw/at .
-          cp ../population-raw/manifest.json . 2>/dev/null || true
+          cp -r ../population-raw/cz/cz .
+          cp -r ../population-raw/de/de .
+          cp -r ../population-raw/at/at .
+          cp ../population-raw/cz/manifest.json .
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan population-data
