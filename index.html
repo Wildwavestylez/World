@@ -257,11 +257,35 @@ function isInSector(angle, sector) {
     }
 }
 
-// Test průsečíku dvou úseček v lokální projekci mapy.
+// Geometrie růstu: každý vrchol postupuje po obvodu, ale jeho směr
+// vychází z místní normály, okolních vrcholů a pomalu se měnícího šumu.
+function projectPolygon(points) {
+    const lat0 = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+    const cosLat = Math.cos(lat0 * Math.PI / 180);
+    return {
+        cosLat,
+        points: points.map(p => ({ x: p[1] * 111320 * cosLat, y: p[0] * 110540 }))
+    };
+}
+
+function unprojectPoint(p, cosLat) {
+    return [p.y / 110540, p.x / (111320 * cosLat)];
+}
+
+function polygonSignedArea(points) {
+    let sum = 0;
+    for (let i = 0; i < points.length; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        sum += a.x * b.y - b.x * a.y;
+    }
+    return sum / 2;
+}
+
 function segmentsIntersect(a, b, c, d) {
     const cross = (p, q, r) =>
         (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
-    const eps = 1e-9;
+    const eps = 1e-7;
     const ab1 = cross(a, b, c);
     const ab2 = cross(a, b, d);
     const cd1 = cross(c, d, a);
@@ -270,27 +294,50 @@ function segmentsIntersect(a, b, c, d) {
            ((cd1 > eps && cd2 < -eps) || (cd1 < -eps && cd2 > eps));
 }
 
-// Kontrola, že nová hranice zůstane jednoduchým polygonem.
 function hasSelfIntersections(points) {
-    const lat0 = points.reduce((sum, p) => sum + p[0], 0) / points.length;
-    const cosLat = Math.cos(lat0 * Math.PI / 180);
-    const projected = points.map(p => ({
-        x: p[1] * 111320 * cosLat,
-        y: p[0] * 110540
-    }));
-    const n = projected.length;
+    const n = points.length;
     for (let i = 0; i < n; i++) {
-        const a = projected[i];
-        const b = projected[(i + 1) % n];
+        const a = points[i];
+        const b = points[(i + 1) % n];
         for (let j = i + 1; j < n; j++) {
-            // Sousední hrany sdílejí vrchol, takže se nekontrolují.
             if (j === i || j === i + 1 || (i === 0 && j === n - 1)) continue;
-            const c = projected[j];
-            const d = projected[(j + 1) % n];
-            if (segmentsIntersect(a, b, c, d)) return true;
+            if (segmentsIntersect(a, b, points[j], points[(j + 1) % n])) return true;
         }
     }
     return false;
+}
+
+// Rozdělí příliš dlouhé hrany, aby se růst rozkládal do menších úseků.
+function splitLongEdges(points, maxLength = 420) {
+    const out = [];
+    for (let i = 0; i < points.length; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        out.push(a);
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const length = Math.hypot(dx, dy);
+        const pieces = Math.min(8, Math.floor(length / maxLength));
+        for (let j = 1; j <= pieces; j++) {
+            const t = j / (pieces + 1);
+            out.push({ x: a.x + dx * t, y: a.y + dy * t });
+        }
+    }
+    return out;
+}
+
+// Lehký Laplaceův filtr potlačí jednotlivé ostré zuby. Používá se jen
+// v malých dávkách a výsledek se přijme pouze tehdy, když je platný.
+function smoothBoundary(points, strength = 0.10) {
+    const n = points.length;
+    return points.map((p, i) => {
+        const prev = points[(i - 1 + n) % n];
+        const next = points[(i + 1) % n];
+        return {
+            x: p.x + ((prev.x + next.x) / 2 - p.x) * strength,
+            y: p.y + ((prev.y + next.y) / 2 - p.y) * strength
+        };
+    });
 }
 
 function expandPolygon() {
@@ -303,83 +350,114 @@ function expandPolygon() {
             currentSectorIndex = 0;
         }
         lastSectorChangeTurn = turn;
-        console.log("🧭 Nový směr:", sectorQueue[currentSectorIndex].name);
+        console.log("🧭 Nový preferovaný směr:", sectorQueue[currentSectorIndex].name);
     }
 
+    if (polygonPoints.length < 4) return;
+
+    const { cosLat, points: original } = projectPolygon(polygonPoints);
+    const n = original.length;
+    const signedArea = polygonSignedArea(original);
+    const orientation = signedArea >= 0 ? 1 : -1;
+    const center = {
+        x: original.reduce((sum, p) => sum + p.x, 0) / n,
+        y: original.reduce((sum, p) => sum + p.y, 0) / n
+    };
     const activeSector = sectorQueue[currentSectorIndex];
-    const center = getCentroid(polygonPoints);
-    const n = polygonPoints.length;
-    if (n < 4) return;
 
-    // Převod souřadnic na přibližné metry, aby se správně pracovalo
-    // s délkou hran a směrem i při rozdílu mezi latitudou a longitudou.
-    const cosLat = Math.cos(center[0] * Math.PI / 180);
-    const project = p => ({ x: p[1] * 111320 * cosLat, y: p[0] * 110540 });
-    const unproject = p => [p.y / 110540, p.x / (111320 * cosLat)];
-    const projected = polygonPoints.map(project);
+    // Každý tah obslouží jeden vrchol, ale po celém obvodu se vracíme
+    // dokola. Náhodný vliv je omezený a sdílený se sousedy, takže netvoří jehly.
+    const index = currentIndex % n;
+    const prev = original[(index - 1 + n) % n];
+    const point = original[index];
+    const next = original[(index + 1) % n];
 
-    // Vyhodnotíme úseky skutečného obvodu. Přednost mají úseky,
-    // které leží v aktivním směru, ale náhoda stále dovolí růst i jinde.
-    const candidates = [];
-    for (let i = 0; i < n; i++) {
-        const a = projected[i];
-        const b = projected[(i + 1) % n];
+    function outwardNormal(a, b) {
         const dx = b.x - a.x;
         const dy = b.y - a.y;
-        const length = Math.hypot(dx, dy);
-        if (length < 12) continue;
-
-        const midpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        const midpointGeo = unproject(midpoint);
-        const angle = getAngleDegrees(center, midpointGeo);
-        const inActiveSector = isInSector(angle, activeSector);
-
-        // Váha podporuje aktivní sektor, ale neuzamkne růst jen do něj.
-        const score = Math.random() + (inActiveSector ? 0.85 : 0);
-        candidates.push({ i, a, b, dx, dy, length, score });
+        const len = Math.hypot(dx, dy) || 1;
+        return { x: orientation * dy / len, y: -orientation * dx / len };
     }
 
-    candidates.sort((a, b) => b.score - a.score);
+    const normalPrev = outwardNormal(prev, point);
+    const normalNext = outwardNormal(point, next);
+    let nx = normalPrev.x + normalNext.x;
+    let ny = normalPrev.y + normalNext.y;
+    let normalLen = Math.hypot(nx, ny);
+    if (normalLen < 0.15) {
+        nx = point.x - center.x;
+        ny = point.y - center.y;
+        normalLen = Math.hypot(nx, ny) || 1;
+    }
+    nx /= normalLen;
+    ny /= normalLen;
 
-    // Zkusíme několik nejlepších hran; neplatný výběžek se zahodí,
-    // místo aby rozbil polygon.
-    for (const edge of candidates.slice(0, 12)) {
-        const { i, a, b, dx, dy, length } = edge;
-        const tx = dx / length;
-        const ty = dy / length;
+    // Směr sektoru je jen mírná preference, nikoli příkaz pro celý stát.
+    const targetAngle = ((activeSector.from + ((activeSector.to - activeSector.from + 360) % 360) / 2) % 360) * Math.PI / 180;
+    const sectorX = Math.sin(targetAngle);
+    const sectorY = Math.cos(targetAngle);
+    const sectorDot = nx * sectorX + ny * sectorY;
+    const sectorBoost = Math.max(0, sectorDot) * 0.16;
 
-        // Zjistíme orientaci polygonu. Podle ní určíme normálu ven.
-        let signedArea = 0;
-        for (let k = 0; k < n; k++) {
-            const p = projected[k];
-            const q = projected[(k + 1) % n];
-            signedArea += p.x * q.y - q.x * p.y;
-        }
-        const orientation = signedArea < 0 ? 1 : -1;
-        const nx = -ty * orientation;
-        const ny = tx * orientation;
+    // Pomalý, korelovaný šum: sousední body mají podobný pohyb.
+    const neighborBiasX = (prev.x + next.x) / 2 - point.x;
+    const neighborBiasY = (prev.y + next.y) / 2 - point.y;
+    const neighborLen = Math.hypot(neighborBiasX, neighborBiasY) || 1;
+    const noiseAngle = (Math.random() - 0.5) * 0.42; // přibližně ±12°
+    const cosA = Math.cos(noiseAngle);
+    const sinA = Math.sin(noiseAngle);
+    const rotatedX = nx * cosA - ny * sinA;
+    const rotatedY = nx * sinA + ny * cosA;
 
-        // Šířka výběžku je část původní hrany; hloubka je náhodná,
-        // ale omezená délkou hrany, aby se růst choval přirozeně.
-        const widthFraction = 0.34 + Math.random() * 0.18;
-        const halfWidth = Math.min(length * widthFraction / 2, 260);
-        const depth = Math.min(180 + Math.random() * 420, Math.max(90, length * 0.9));
-        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        const baseA = { x: mid.x - tx * halfWidth, y: mid.y - ty * halfWidth };
-        const baseB = { x: mid.x + tx * halfWidth, y: mid.y + ty * halfWidth };
-        const tip = {
-            x: mid.x + nx * depth + tx * ((Math.random() - 0.5) * Math.min(100, length * 0.12)),
-            y: mid.y + ny * depth + ty * ((Math.random() - 0.5) * Math.min(100, length * 0.12))
+    const neighborWeight = 0.07;
+    let dirX = rotatedX * (1 - neighborWeight) + (neighborBiasX / neighborLen) * neighborWeight;
+    let dirY = rotatedY * (1 - neighborWeight) + (neighborBiasY / neighborLen) * neighborWeight;
+    const dirLen = Math.hypot(dirX, dirY) || 1;
+    dirX /= dirLen;
+    dirY /= dirLen;
+
+    // Krátký základní krok a občasný mírně rychlejší růst dávají tvar
+    // mezi oválem a ježkem, místo dlouhých ostrých výběžků.
+    const baseStep = 7 + Math.random() * 5; // metry na vybraný vrchol
+    const growthPulse = Math.random() < 0.10 ? 1.8 : 1;
+    const distance = baseStep * (1 + sectorBoost) * growthPulse;
+
+    const candidate = original.map(p => ({ x: p.x, y: p.y }));
+    candidate[index] = {
+        x: point.x + dirX * distance,
+        y: point.y + dirY * distance
+    };
+
+    // Nový krok musí být platný a musí zvětšit plochu. Při neúspěchu
+    // zkusíme menší pohyb po čisté vnější normále.
+    let accepted = !hasSelfIntersections(candidate) &&
+        Math.abs(polygonSignedArea(candidate)) > Math.abs(signedArea);
+
+    if (!accepted) {
+        candidate[index] = {
+            x: point.x + nx * (distance * 0.55),
+            y: point.y + ny * (distance * 0.55)
         };
+        accepted = !hasSelfIntersections(candidate) &&
+            Math.abs(polygonSignedArea(candidate)) > Math.abs(signedArea);
+    }
 
-        const proposed = polygonPoints.slice();
-        proposed.splice(i + 1, 0, unproject(baseA), unproject(tip), unproject(baseB));
+    if (accepted) {
+        let working = candidate;
 
-        if (hasSelfIntersections(proposed)) continue;
+        // Pravidelně přidáme body na delších úsecích a velmi jemně
+        // vyhladíme celý obvod. Vyhlazení se odmítne, pokud by zmenšilo
+        // plochu nebo vytvořilo průsečík.
+        if (turn % 12 === 0) {
+            working = splitLongEdges(working, 420);
+            const smoothed = smoothBoundary(working, 0.08);
+            if (!hasSelfIntersections(smoothed) &&
+                Math.abs(polygonSignedArea(smoothed)) >= Math.abs(polygonSignedArea(working))) {
+                working = smoothed;
+            }
+        }
 
-        // Přijmeme jedinou lokální expanzi. Ostatní obvod se nehýbe.
-        polygonPoints = proposed;
-        currentIndex = (i + 2) % polygonPoints.length;
+        polygonPoints = working.map(p => unprojectPoint(p, cosLat));
         polygon.setLatLngs(polygonPoints);
 
         const area = calculatePolygonArea(polygonPoints);
@@ -387,11 +465,9 @@ function expandPolygon() {
         localStorage.setItem("polygonPoints", JSON.stringify(polygonPoints));
         document.getElementById("area").textContent = area.toFixed(2);
         document.getElementById("population").textContent = population.toLocaleString();
-        return;
     }
 
-    // Pokud se nepodaří najít bezpečný výběžek, tah přeskočíme.
-    console.warn("Expanze přeskočena: nenašel se bezpečný úsek hranice.");
+    currentIndex = (index + 1) % polygonPoints.length;
 }
 
 function unlockBlockedPoints() {
