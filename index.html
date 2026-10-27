@@ -521,12 +521,23 @@ function expandPolygon() {
              if (!archivePromise) {
                  const archiveName = ({cz:"cz.zip",de:"de.zip",at:"at.zip"})[code];
                  if (!archiveName) continue;
-                 archivePromise = fetch(POPULATION_RELEASE + archiveName, { cache: "no-store" })
-                     .then(response => {
-                         if (!response.ok) throw new Error(archiveName + " HTTP " + response.status);
-                         return response.arrayBuffer();
-                     })
-                     .then(buffer => JSZip.loadAsync(buffer));
+                 // Stahuj asset přes GitHub API; přímé release/download URL může v prohlížeči
+                 // selhat na CORS při přesměrování na úložiště binárních souborů.
+                 const assetIds = { "cz.zip": 680090649, "de.zip": 680090654, "at.zip": 680090664 };
+                 const assetUrl = "https://api.github.com/repos/Wildwavestylez/World/releases/assets/" + assetIds[archiveName];
+                 archivePromise = fetch(assetUrl, {
+                     cache: "no-store",
+                     headers: { "Accept": "application/octet-stream" }
+                 }).then(response => {
+                     if (!response.ok) throw new Error(archiveName + " přes GitHub API: HTTP " + response.status);
+                     return response.arrayBuffer();
+                 }).then(buffer => {
+                     if (buffer.byteLength < 4) throw new Error(archiveName + ": odpověď je prázdná nebo neplatná.");
+                     return JSZip.loadAsync(buffer);
+                 }).catch(error => {
+                     populationCountryArchives.delete(code);
+                     throw new Error("Stažení " + archiveName + " selhalo: " + error.message);
+                 });
                  populationCountryArchives.set(code, archivePromise);
              }
              const archive = await archivePromise;
