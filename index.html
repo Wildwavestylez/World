@@ -471,6 +471,7 @@ function expandPolygon() {
      lastPopulationRequestAt = now;
      populationRequestInFlight = true;
      const output = document.getElementById("population");
+     output.textContent = "…";
      output.title = "Načítám populační data WorldPop (2020)…";
 
      try {
@@ -500,6 +501,10 @@ function expandPolygon() {
                         south <= bounds.north && tile.north >= bounds.south;
              })
          );
+
+         if (countries.length === 0) {
+             throw new Error("Manifest načten, ale pro aktuální oblast nebyla nalezena žádná populační dlaždice.");
+         }
 
          let totalPopulation = 0;
          let scannedCells = 0;
@@ -562,12 +567,16 @@ function expandPolygon() {
              }
          }
 
+         if (scannedCells === 0) {
+             throw new Error("Dlaždice se načetly, ale uvnitř polygonu nebyly nalezeny žádné platné buňky.");
+         }
          output.textContent = Math.round(totalPopulation).toLocaleString("cs-CZ");
          output.title = "WorldPop 2020, přibližně 100 m. Započteno " +
              scannedCells.toLocaleString("cs-CZ") + " populačních buněk; výsledek se obnovuje přibližně každou minutu.";
      } catch (error) {
          console.warn("Populační data se nepodařilo načíst:", error);
-         output.title = "Populační data nejsou dostupná: " + error.message;
+         output.textContent = "—";
+         output.title = "CHYBA POPULACE: " + error.message;
      } finally {
          populationRequestInFlight = false;
      }
