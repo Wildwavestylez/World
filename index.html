@@ -510,27 +510,19 @@ function expandPolygon() {
     let rescueMode=false;
     let accepted=false;
     if(rescueTarget){
-        // Záchrana posouvá jen aktuální vrchol a nikdy neuloží překřížený polygon.
-        // Zkusíme běžnou rychlost růstu a postupně zmenšujeme krok, dokud je tvar platný.
+        // Při záchraně je dočasné překřížení povolené. Pohybujeme jen aktuálním
+        // vrcholem a dovolíme mu projít skrz blízké rameno, aby se camcour otevřel.
         const vx=rescueTarget.x-point.x,vy=rescueTarget.y-point.y;
         const d=Math.hypot(vx,vy);
         if(d>1){
-            const wantedStep=Math.min(d,Math.max(distance,65));
-            for(let attempt=0;attempt<9;attempt++){
-                const step=wantedStep*Math.pow(0.5,attempt);
-                const trial=original.map(p=>({x:p.x,y:p.y}));
-                trial[index]={x:point.x+vx/d*step,y:point.y+vy/d*step};
-                if(!hasSelfIntersections(trial)){
-                    candidate=trial;
-                    rescueMode=true;
-                    accepted=true;
-                    break;
-                }
-            }
+            const step=Math.min(d,Math.max(distance,65));
+            candidate[index]={x:point.x+vx/d*step,y:point.y+vy/d*step};
+            rescueMode=true;
+            accepted=true;
         }
     }
 
-    // Pokud záchranný posun není možný bez překřížení, pokračujeme běžným tahem.
+    // Pokud není potřeba záchrana nebo k ní chybí směr, pokračujeme běžným tahem.
     if(!accepted){
         candidate=original.map(p=>({x:p.x,y:p.y}));
         candidate[index]={x:point.x+nx*distance,y:point.y+ny*distance};
