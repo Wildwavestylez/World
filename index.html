@@ -289,6 +289,64 @@ let expansionWave = null;
 let waveRotationCount = 0;
 let nextExpansionWaveTurn = EXPANSION_WAVE_START_TURN;
 
+// Ukládáme také stav simulace, ne jen souřadnice polygonu.
+// Po obnovení stránky tak pokračuje stejné pořadí vrcholů, fáze růstu i vlna.
+const GAME_STATE_KEY = "worldGameState";
+function saveGameState() {
+    const state = {
+        turn,
+        currentIndex,
+        currentSectorIndex,
+        lastSectorChangeTurn,
+        sectorQueue,
+        dominantGrowthDirection,
+        growthDirectionInitialized,
+        localGrowthNoise,
+        expansionWave,
+        waveRotationCount,
+        nextExpansionWaveTurn
+    };
+    try {
+        localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
+    } catch (error) {
+        console.warn("Stav hry se nepodařilo uložit:", error);
+    }
+}
+function restoreGameState() {
+    try {
+        const raw = localStorage.getItem(GAME_STATE_KEY);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        if (!state || typeof state !== "object") return;
+        if (Number.isFinite(state.turn) && state.turn >= 0) turn = Math.floor(state.turn);
+        if (Number.isFinite(state.currentIndex) && state.currentIndex >= 0) {
+            currentIndex = Math.floor(state.currentIndex) % Math.max(1, polygonPoints.length);
+        }
+        if (Number.isFinite(state.currentSectorIndex)) currentSectorIndex = state.currentSectorIndex;
+        if (Number.isFinite(state.lastSectorChangeTurn)) lastSectorChangeTurn = state.lastSectorChangeTurn;
+        if (Array.isArray(state.sectorQueue) && state.sectorQueue.length) sectorQueue = state.sectorQueue;
+        if (["north","east","south","west"].includes(state.dominantGrowthDirection)) {
+            dominantGrowthDirection = state.dominantGrowthDirection;
+        }
+        if (typeof state.growthDirectionInitialized === "boolean") {
+            growthDirectionInitialized = state.growthDirectionInitialized;
+        }
+        if (state.localGrowthNoise && typeof state.localGrowthNoise === "object") {
+            localGrowthNoise = state.localGrowthNoise;
+        }
+        if (state.expansionWave && Number.isFinite(state.expansionWave.anchor?.x) &&
+            Number.isFinite(state.expansionWave.anchor?.y)) {
+            expansionWave = state.expansionWave;
+        }
+        if (Number.isFinite(state.waveRotationCount)) waveRotationCount = state.waveRotationCount;
+        if (Number.isFinite(state.nextExpansionWaveTurn)) nextExpansionWaveTurn = state.nextExpansionWaveTurn;
+        console.log("💾 Obnoven stav hry, tah:", turn, "index:", currentIndex);
+    } catch (error) {
+        console.warn("Uložený stav hry se nepodařilo obnovit; začínám s výchozím stavem:", error);
+    }
+}
+restoreGameState();
+
 function startExpansionWave(points) {
     if (!points.length) return;
     const anchorIndex = Math.floor(Math.random() * points.length);
@@ -575,6 +633,8 @@ function expandPolygon() {
             console.log("🌊 Expanzní vlna dokončena; připravuji další bod.");
         }
     }
+    // Ukládáme po každém tahu, i když se vrchol v tomto tahu nepodařilo posunout.
+    saveGameState();
 }
 
 // Přepočítá celkovou populaci uvnitř polygonu z populačních buněk.
