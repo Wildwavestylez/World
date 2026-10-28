@@ -33,7 +33,7 @@
 <button id="sendMaintenance" onclick="sendMaintenanceVehicle()">Vyslat údržbu</button>
 <button onclick="clearLocalStorage()">Vymazat LocalStorage</button>
     </div>  
-    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-selective-tiles-2</div></div>
+    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-selective-tiles-3</div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -525,7 +525,7 @@ function expandPolygon() {
 
                  // Stahujeme jen jednotlivé dlaždice protínající aktuální polygon,
                  // ne celý archiv země (německý archiv má desítky MB).
-                 const tileUrl = "https://raw.githubusercontent.com/Wildwavestylez/World/population-data/" + tile.file;
+                 const tileUrl = "https://raw.githubusercontent.com/Wildwavestylez/World/population-data/" + code + "/" + tile.file;
                  let tilePromise = populationCountryArchives.get(tileUrl);
                  if (!tilePromise) {
                      tilePromise = fetch(tileUrl, { cache: "force-cache" }).then(response => {
