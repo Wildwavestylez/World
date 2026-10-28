@@ -375,6 +375,55 @@ function splitLongEdges(points, maxLength=300) {
     return out;
 }
 
+// Vrátí směr záchrany pouze pro právě zpracovávaný vrchol.
+// Zářez je kandidát jen tehdy, když dvě části hranice leží blízko sebe,
+// ale kratší cesta po hranici mezi nimi je dlouhá a výrazně delší než mezera.
+function findNotchRescueTarget(points, index, maxGap=300, minDepth=500) {
+    const n=points.length;
+    if(n<6) return null;
+    const segmentLengths=new Array(n);
+    for(let i=0;i<n;i++){
+        const a=points[i],b=points[(i+1)%n];
+        segmentLengths[i]=Math.hypot(b.x-a.x,b.y-a.y);
+    }
+    let best=null;
+    for(let i=0;i<n;i++){
+        for(let j=i+3;j<n;j++){
+            if(i===0 && j===n-1) continue;
+            const a=points[i],b=points[j];
+            const gap=Math.hypot(b.x-a.x,b.y-a.y);
+            if(gap<1 || gap>maxGap) continue;
+
+            let arcForward=0;
+            for(let k=i;k<j;k++) arcForward+=segmentLengths[k];
+            let arcBackward=0;
+            for(let k=j;k<n;k++) arcBackward+=segmentLengths[k];
+            for(let k=0;k<i;k++) arcBackward+=segmentLengths[k];
+
+            // Zářez musí být dlouhý a úzký; běžné véčko tím neprojde.
+            let start,end,arc;
+            if(arcForward<=arcBackward){start=i;end=j;arc=arcForward;}
+            else {start=j;end=i;arc=arcBackward;}
+            if(arc<minDepth || arc<gap*2.4) continue;
+
+            // Aktuální vrchol musí ležet na vnitřní cestě mezi rameny zářezu.
+            let onArc=false,k=(start+1)%n,guard=0;
+            while(k!==end && guard++<n){
+                if(k===index){onArc=true;break;}
+                k=(k+1)%n;
+            }
+            if(!onArc) continue;
+            const score=arc/Math.max(gap,1);
+            if(!best || score>best.score) best={a,b,score,gap,arc};
+        }
+    }
+    if(!best) return null;
+    const {a,b}=best;
+    const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy || 1;
+    const t=Math.max(0,Math.min(1,((points[index].x-a.x)*dx+(points[index].y-a.y)*dy)/len2));
+    return {x:a.x+t*dx,y:a.y+t*dy,score:best.score};
+}
+
 
 function getDirectionalGrowthMultiplier(angleDegrees, balanced) {
     if (balanced) return 1 + (Math.random()-0.5)*0.12;
@@ -466,10 +515,25 @@ function expandPolygon() {
     const waveBonus = getExpansionWaveBonus(original,index);
     const distance=baseStep*multiplier*localNoise*pulse + waveBonus;
     const candidate=original.map(p=>({x:p.x,y:p.y}));
-    candidate[index]={x:point.x+nx*distance,y:point.y+ny*distance};
+    const rescueTarget=findNotchRescueTarget(original,index);
+    let rescueMode=false;
+    if(rescueTarget){
+        // Jen aktuální vrchol se posune max. 25 m směrem k ústí zářezu.
+        // V režimu záchrany povolíme dočasný průsečík; ostatní body se nemění.
+        const vx=rescueTarget.x-point.x,vy=rescueTarget.y-point.y;
+        const d=Math.hypot(vx,vy);
+        if(d>1){
+            const step=Math.min(25,d);
+            candidate[index]={x:point.x+vx/d*step,y:point.y+vy/d*step};
+            rescueMode=true;
+        }
+    } else {
+        candidate[index]={x:point.x+nx*distance,y:point.y+ny*distance};
+    }
 
-    let accepted=!hasSelfIntersections(candidate) &&
-        Math.abs(polygonSignedArea(candidate))>Math.abs(oldArea);
+    let accepted=rescueMode ||
+        (!hasSelfIntersections(candidate) &&
+         Math.abs(polygonSignedArea(candidate))>Math.abs(oldArea));
     if(!accepted){
         candidate[index]={x:point.x+nx*distance*0.45,y:point.y+ny*distance*0.45};
         accepted=!hasSelfIntersections(candidate) &&
