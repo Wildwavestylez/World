@@ -447,6 +447,16 @@ function expandPolygon() {
     if(nl<0.15){nx=point.x-center.x;ny=point.y-center.y;nl=Math.hypot(nx,ny)||1;}
     nx/=nl;ny/=nl;
 
+    // Konkávní vrcholy tvoří zářezy dovnitř území. Jejich běžná vnější
+    // normála míří hlouběji do zářezu, takže kontrola růstu pohyb opakovaně odmítá.
+    // U konkávního vrcholu obrátíme směr: vrchol se může postupně posouvat
+    // do zářezu a hranici přirozeně rozšiřovat. Nehýbeme žádným jiným bodem.
+    const edge1={x:point.x-prev.x,y:point.y-prev.y};
+    const edge2={x:next.x-point.x,y:next.y-point.y};
+    const turnCross=edge1.x*edge2.y-edge1.y*edge2.x;
+    const isConcave=turnCross*orientation < -1e-7;
+    if(isConcave){nx=-nx;ny=-ny;}
+
     // Určíme zeměpisný směr od středu k bodu: sever = 0°, východ = 90°.
     const angle=Math.atan2(point.x-center.x,point.y-center.y)*180/Math.PI;
     const normalizedAngle=(angle+360)%360;
