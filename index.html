@@ -505,31 +505,42 @@ function expandPolygon() {
     const pulse=Math.random()<0.07?(1.12+Math.random()*0.18):1;
     const waveBonus = getExpansionWaveBonus(original,index);
     const distance=baseStep*multiplier*localNoise*pulse + waveBonus;
-    const candidate=original.map(p=>({x:p.x,y:p.y}));
+    let candidate=original.map(p=>({x:p.x,y:p.y}));
     const rescueTarget=findNotchRescueTarget(original,index);
     let rescueMode=false;
+    let accepted=false;
     if(rescueTarget){
-        // Jen aktuální vrchol se posune max. 25 m směrem k ústí zářezu.
-        // V režimu záchrany povolíme dočasný průsečík; ostatní body se nemění.
+        // Záchrana posouvá jen aktuální vrchol a nikdy neuloží překřížený polygon.
+        // Zkusíme běžnou rychlost růstu a postupně zmenšujeme krok, dokud je tvar platný.
         const vx=rescueTarget.x-point.x,vy=rescueTarget.y-point.y;
         const d=Math.hypot(vx,vy);
         if(d>1){
-            // Záchrana nesmí zaostávat za běžným růstem okolí.
-            const step=Math.min(d,Math.max(distance,65));
-            candidate[index]={x:point.x+vx/d*step,y:point.y+vy/d*step};
-            rescueMode=true;
+            const wantedStep=Math.min(d,Math.max(distance,65));
+            for(let attempt=0;attempt<9;attempt++){
+                const step=wantedStep*Math.pow(0.5,attempt);
+                const trial=original.map(p=>({x:p.x,y:p.y}));
+                trial[index]={x:point.x+vx/d*step,y:point.y+vy/d*step};
+                if(!hasSelfIntersections(trial)){
+                    candidate=trial;
+                    rescueMode=true;
+                    accepted=true;
+                    break;
+                }
+            }
         }
-    } else {
-        candidate[index]={x:point.x+nx*distance,y:point.y+ny*distance};
     }
 
-    let accepted=rescueMode ||
-        (!hasSelfIntersections(candidate) &&
-         Math.abs(polygonSignedArea(candidate))>Math.abs(oldArea));
+    // Pokud záchranný posun není možný bez překřížení, pokračujeme běžným tahem.
     if(!accepted){
-        candidate[index]={x:point.x+nx*distance*0.45,y:point.y+ny*distance*0.45};
+        candidate=original.map(p=>({x:p.x,y:p.y}));
+        candidate[index]={x:point.x+nx*distance,y:point.y+ny*distance};
         accepted=!hasSelfIntersections(candidate) &&
             Math.abs(polygonSignedArea(candidate))>Math.abs(oldArea);
+        if(!accepted){
+            candidate[index]={x:point.x+nx*distance*0.45,y:point.y+ny*distance*0.45};
+            accepted=!hasSelfIntersections(candidate) &&
+                Math.abs(polygonSignedArea(candidate))>Math.abs(oldArea);
+        }
     }
 
     if(accepted){
