@@ -361,16 +361,15 @@ function hasSelfIntersections(points) {
     return false;
 }
 
-function splitLongEdges(points, maxLength=420) {
+function splitLongEdges(points, maxLength=300) {
     const out=[];
     for(let i=0;i<points.length;i++){
         const a=points[i], b=points[(i+1)%points.length];
         out.push(a);
-        const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy);
-        const pieces=Math.min(8,Math.floor(len/maxLength));
-        for(let j=1;j<=pieces;j++){
-            const t=j/(pieces+1);
-            out.push({x:a.x+dx*t,y:a.y+dy*t});
+        const len=Math.hypot(b.x-a.x,b.y-a.y);
+        // Dlouhou hranu rozdělíme přesně napůl; existující vrcholy neposouváme.
+        if(len>maxLength){
+            out.push({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
         }
     }
     return out;
@@ -481,7 +480,7 @@ function expandPolygon() {
         // Zachováme lámání dlouhých hran: přidá body na přímé úseky,
         // ale neposouvá existující vrcholy. Vyhlazování a narovnávání zůstává vypnuté.
         if(turn%8===0){
-            working=splitLongEdges(working,420);
+            working=splitLongEdges(working,300);
         }
         polygonPoints=working.map(p=>unprojectPoint(p,cosLat));
         polygon.setLatLngs(polygonPoints);
