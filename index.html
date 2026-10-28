@@ -411,20 +411,13 @@ function findNotchRescueTarget(points, index, maxGap=300, minDepth=500) {
             }
             if(!contains||arc<minDepth||arc<gap*2.4) continue;
             const score=arc/Math.max(gap,1);
-            if(!best||score>best.score) best={i,j,score};
+            if(!best||score>best.score) best={i,j,score,start,end};
         }
     }
     if(!best) return null;
-    const a=points[best.i],b=points[best.j];
-    const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy||1;
-    const t=Math.max(0,Math.min(1,((points[index].x-a.x)*dx+(points[index].y-a.y)*dy)/len2));
-    const foot={x:a.x+t*dx,y:a.y+t*dy};
-    // Cíl není jen hrana ústí: leží i kousek za ní, ven z úzkého zářezu.
-    // To umožní bod vytáhnout skrz hranu, i když se dočasně ocitne uvnitř území.
-    const cx=points.reduce((s,p)=>s+p.x,0)/n,cy=points.reduce((s,p)=>s+p.y,0)/n;
-    let ox=foot.x-cx,oy=foot.y-cy,ol=Math.hypot(ox,oy)||1;
-    ox/=ol;oy/=ol;
-    return {x:foot.x+ox*150,y:foot.y+oy*150,score:best.score};
+    // Vrátíme konce krátkého ústí a směr oblouku, který tvoří úzký zářez.
+    // Ořez odstraní pouze vnitřní vrcholy tohoto oblouku; ramena zůstanou beze změny.
+    return {start:best.start,end:best.end,score:best.score};
 }
 
 function getDirectionalGrowthMultiplier(angleDegrees, balanced) {
@@ -517,23 +510,34 @@ function expandPolygon() {
     const waveBonus = getExpansionWaveBonus(original,index);
     const distance=baseStep*multiplier*localNoise*pulse + waveBonus;
     let candidate=original.map(p=>({x:p.x,y:p.y}));
-    const rescueTarget=findNotchRescueTarget(original,index);
-    let rescueMode=false;
-    let accepted=false;
-    if(rescueTarget){
-        // Při záchraně je dočasné překřížení povolené. Pohybujeme jen aktuálním
-        // vrcholem a dovolíme mu projít skrz blízké rameno, aby se camcour otevřel.
-        const vx=rescueTarget.x-point.x,vy=rescueTarget.y-point.y;
-        const d=Math.hypot(vx,vy);
-        if(d>1){
-            const step=Math.min(d,Math.max(distance,65));
-            candidate[index]={x:point.x+vx/d*step,y:point.y+vy/d*step};
-            rescueMode=true;
-            accepted=true;
+    const notch=findNotchRescueTarget(original,index);
+    // Camcour řešíme jednorázovým lokálním ořezem místo pomalého vytahování bodu.
+    // Smažeme pouze vnitřní vrcholy problémového oblouku; žádný jiný bod neposouváme.
+    if(notch){
+        const trimmed=[];
+        for(let k=0;k<n;k++){
+            const onCut = notch.start<notch.end
+                ? (k>notch.start && k<notch.end)
+                : (k>notch.start || k<notch.end);
+            if(!onCut) trimmed.push(original[k]);
+        }
+        if(trimmed.length>=4 && trimmed.length<n){
+            polygonPoints=trimmed.map(p=>unprojectPoint(p,cosLat));
+            polygon.setLatLngs(polygonPoints);
+            const area=calculatePolygonArea(polygonPoints);
+            document.getElementById("area").textContent=area.toFixed(2);
+            localStorage.setItem("polygonPoints",JSON.stringify(polygonPoints));
+            // Navážeme hned za začátek ustřiženého oblouku, na jeho zachované rameno.
+            const startPoint=original[notch.start];
+            const newStart=trimmed.findIndex(p=>p.x===startPoint.x && p.y===startPoint.y);
+            currentIndex=(Math.max(0,newStart)+1)%trimmed.length;
+            console.log("✂️ Camcour lokálně ustřižen; odstraněno",n-trimmed.length,"vrcholů.");
+            return;
         }
     }
+    let accepted=false;
 
-    // Pokud není potřeba záchrana nebo k ní chybí směr, pokračujeme běžným tahem.
+    // Pokud není potřeba ořez, pokračujeme běžným tahem.
     if(!accepted){
         candidate=original.map(p=>({x:p.x,y:p.y}));
         candidate[index]={x:point.x+nx*distance,y:point.y+ny*distance};
