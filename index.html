@@ -463,12 +463,11 @@ function expandPolygon() {
 
     if(accepted){
         let working=candidate;
-        // Kompromis: jemné vyhlazení každých 8 tahů, ne agresivní vyhlazení celé hranice.
-        // Potom lehce zkrotíme pouze extrémně ostré vnitřní zářezy; vnější výběžky zachováme.
+        // Žádné plošné vyhlazování: saháme jen na konkrétní extrémně ostré vnitřní zářezy.
+        // Vnější výběžky a ostatní části hranice zůstávají beze změny.
         if(turn%8===0){
             working=splitLongEdges(working,420);
-            const smoothed=smoothBoundary(working,0.08);
-            const tamed=softenSharpConcaveNotches(smoothed,orientation,0.06);
+            const tamed=softenSharpConcaveNotches(working,orientation,0.06);
             const areaBeforeSmooth=Math.abs(polygonSignedArea(working));
             const areaAfterSmooth=Math.abs(polygonSignedArea(tamed));
             if(!hasSelfIntersections(tamed) && areaAfterSmooth>=areaBeforeSmooth*0.99){
