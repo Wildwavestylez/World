@@ -375,55 +375,46 @@ function splitLongEdges(points, maxLength=300) {
     return out;
 }
 
-// Vrátí směr záchrany pouze pro právě zpracovávaný vrchol.
-// Zářez je kandidát jen tehdy, když dvě části hranice leží blízko sebe,
-// ale kratší cesta po hranici mezi nimi je dlouhá a výrazně delší než mezera.
+// Detekce úzkého hlubokého zářezu v O(n²), bez opakovaného procházení celé hranice.
 function findNotchRescueTarget(points, index, maxGap=300, minDepth=500) {
     const n=points.length;
     if(n<6) return null;
-    const segmentLengths=new Array(n);
+    const lengths=new Array(n), prefix=new Array(n+1).fill(0);
     for(let i=0;i<n;i++){
         const a=points[i],b=points[(i+1)%n];
-        segmentLengths[i]=Math.hypot(b.x-a.x,b.y-a.y);
+        lengths[i]=Math.hypot(b.x-a.x,b.y-a.y);
+        prefix[i+1]=prefix[i]+lengths[i];
     }
+    const forwardLength=(i,j)=>prefix[j]-prefix[i];
+    const wrapLength=(i,j)=>prefix[n]-prefix[i]+prefix[j];
     let best=null;
     for(let i=0;i<n;i++){
         for(let j=i+3;j<n;j++){
-            if(i===0 && j===n-1) continue;
-            const a=points[i],b=points[j];
-            const gap=Math.hypot(b.x-a.x,b.y-a.y);
-            if(gap<1 || gap>maxGap) continue;
-
-            let arcForward=0;
-            for(let k=i;k<j;k++) arcForward+=segmentLengths[k];
-            let arcBackward=0;
-            for(let k=j;k<n;k++) arcBackward+=segmentLengths[k];
-            for(let k=0;k<i;k++) arcBackward+=segmentLengths[k];
-
-            // Zářez musí být dlouhý a úzký; běžné véčko tím neprojde.
-            let start,end,arc;
-            if(arcForward<=arcBackward){start=i;end=j;arc=arcForward;}
-            else {start=j;end=i;arc=arcBackward;}
-            if(arc<minDepth || arc<gap*2.4) continue;
-
-            // Aktuální vrchol musí ležet na vnitřní cestě mezi rameny zářezu.
-            let onArc=false,k=(start+1)%n,guard=0;
-            while(k!==end && guard++<n){
-                if(k===index){onArc=true;break;}
-                k=(k+1)%n;
+            if(i===0&&j===n-1) continue;
+            const gap=Math.hypot(points[j].x-points[i].x,points[j].y-points[i].y);
+            if(gap<1||gap>maxGap) continue;
+            const f=forwardLength(i,j), back=prefix[n]-f;
+            let start,end,arc,contains;
+            if(f<=back){
+                start=i;end=j;arc=f;
+                const pos=(index-i+n)%n;
+                contains=pos>0 && pos<(j-i);
+            }else{
+                start=j;end=i;arc=back;
+                const pos=(index-j+n)%n;
+                contains=pos>0 && pos<(n-(j-i));
             }
-            if(!onArc) continue;
+            if(!contains||arc<minDepth||arc<gap*2.4) continue;
             const score=arc/Math.max(gap,1);
-            if(!best || score>best.score) best={a,b,score,gap,arc};
+            if(!best||score>best.score) best={i,j,score};
         }
     }
     if(!best) return null;
-    const {a,b}=best;
-    const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy || 1;
+    const a=points[best.i],b=points[best.j];
+    const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy||1;
     const t=Math.max(0,Math.min(1,((points[index].x-a.x)*dx+(points[index].y-a.y)*dy)/len2));
     return {x:a.x+t*dx,y:a.y+t*dy,score:best.score};
 }
-
 
 function getDirectionalGrowthMultiplier(angleDegrees, balanced) {
     if (balanced) return 1 + (Math.random()-0.5)*0.12;
@@ -523,7 +514,8 @@ function expandPolygon() {
         const vx=rescueTarget.x-point.x,vy=rescueTarget.y-point.y;
         const d=Math.hypot(vx,vy);
         if(d>1){
-            const step=Math.min(25,d);
+            // Záchrana nesmí zaostávat za běžným růstem okolí.
+            const step=Math.min(d,Math.max(distance,65));
             candidate[index]={x:point.x+vx/d*step,y:point.y+vy/d*step};
             rescueMode=true;
         }
