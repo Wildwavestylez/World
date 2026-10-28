@@ -349,12 +349,17 @@ function segmentsIntersect(a, b, c, d) {
            ((cd1>eps&&cd2< -eps)||(cd1< -eps&&cd2>eps));
 }
 
-function hasSelfIntersections(points) {
+function hasSelfIntersections(points, changedIndex=null) {
     const n=points.length;
-    for(let i=0;i<n;i++){
+    // Při běžném tahu se mění jediný vrchol, a tedy pouze dvě sousední hrany.
+    // Kontrolujeme jen tyto hrany proti zbytku hranice: O(n), nikoli O(n²).
+    const edges = changedIndex===null
+        ? Array.from({length:n},(_,i)=>i)
+        : [...new Set([(changedIndex-1+n)%n, changedIndex%n])];
+    for(const i of edges){
         const a=points[i], b=points[(i+1)%n];
-        for(let j=i+1;j<n;j++){
-            if(j===i||j===i+1||(i===0&&j===n-1)) continue;
+        for(let j=0;j<n;j++){
+            if(j===i || j===(i+1)%n || (j+1)%n===i) continue;
             if(segmentsIntersect(a,b,points[j],points[(j+1)%n])) return true;
         }
     }
@@ -532,11 +537,11 @@ function expandPolygon() {
     if(!accepted){
         candidate=original.map(p=>({x:p.x,y:p.y}));
         candidate[index]={x:point.x+nx*distance,y:point.y+ny*distance};
-        accepted=!hasSelfIntersections(candidate) &&
+        accepted=!hasSelfIntersections(candidate,index) &&
             Math.abs(polygonSignedArea(candidate))>Math.abs(oldArea);
         if(!accepted){
             candidate[index]={x:point.x+nx*distance*0.45,y:point.y+ny*distance*0.45};
-            accepted=!hasSelfIntersections(candidate) &&
+            accepted=!hasSelfIntersections(candidate,index) &&
                 Math.abs(polygonSignedArea(candidate))>Math.abs(oldArea);
         }
     }
