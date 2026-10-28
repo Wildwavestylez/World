@@ -477,8 +477,12 @@ function expandPolygon() {
     }
 
     if(accepted){
-        // Žádné automatické vyhlazování, narovnávání ani dělení hran.
         let working=candidate;
+        // Zachováme lámání dlouhých hran: přidá body na přímé úseky,
+        // ale neposouvá existující vrcholy. Vyhlazování a narovnávání zůstává vypnuté.
+        if(turn%8===0){
+            working=splitLongEdges(working,420);
+        }
         polygonPoints=working.map(p=>unprojectPoint(p,cosLat));
         polygon.setLatLngs(polygonPoints);
         const area=calculatePolygonArea(polygonPoints);
