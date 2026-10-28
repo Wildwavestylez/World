@@ -33,7 +33,7 @@
 <button id="sendMaintenance" onclick="sendMaintenanceVehicle()">Vyslat údržbu</button>
 <button onclick="clearLocalStorage()">Vymazat LocalStorage</button>
     </div>  
-    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-growth-50m-1</div></div>
+    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-growth-wave-1</div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -281,6 +281,44 @@ let dominantGrowthDirection = "east";
 let growthDirectionInitialized = false;
 let localGrowthNoise = {};
 
+// Lokální expanzní vlna: po 1000 tazích zesílí náhodnou oblast po 20 průchodech hranice.
+const EXPANSION_WAVE_START_TURN = 1000;
+const EXPANSION_WAVE_ROTATIONS = 20;
+const expansionWaveBonuses = [150,130,115,105,90,75,60,45,30,18,8];
+let expansionWave = null;
+let waveRotationCount = 0;
+let nextExpansionWaveTurn = EXPANSION_WAVE_START_TURN;
+
+function startExpansionWave(points) {
+    if (!points.length) return;
+    const anchorIndex = Math.floor(Math.random() * points.length);
+    const anchor = points[anchorIndex];
+    expansionWave = { anchor: { x: anchor.x, y: anchor.y } };
+    waveRotationCount = 0;
+    console.log("🌊 Připravena expanzní vlna na bodě", anchorIndex);
+}
+
+function getExpansionWaveBonus(points, index) {
+    if (!expansionWave || points.length < 3) return 0;
+    // Sledujeme oblast podle souřadnic, protože dělení hran vkládá nové body.
+    let anchorIndex = 0, bestDistance = Infinity;
+    for (let i = 0; i < points.length; i++) {
+        const d = Math.hypot(points[i].x-expansionWave.anchor.x, points[i].y-expansionWave.anchor.y);
+        if (d < bestDistance) { bestDistance = d; anchorIndex = i; }
+    }
+    let offset = index-anchorIndex;
+    if (offset > points.length/2) offset -= points.length;
+    if (offset < -points.length/2) offset += points.length;
+    const neighborDistance = Math.abs(offset);
+    if (neighborDistance >= expansionWaveBonuses.length) return 0;
+
+    // Prvních 5 oběhů rozjezd, 10 oběhů plná síla, posledních 5 postupné utlumení.
+    let phase = 1;
+    if (waveRotationCount < 5) phase = (waveRotationCount+1)/5;
+    else if (waveRotationCount >= 15) phase = Math.max(0,(20-waveRotationCount)/5);
+    return expansionWaveBonuses[neighborDistance] * phase;
+}
+
 function projectPolygon(points) {
     const lat0 = points.reduce((sum, p) => sum + p[0], 0) / points.length;
     const cosLat = Math.cos(lat0 * Math.PI / 180);
@@ -397,6 +435,10 @@ function getDirectionalGrowthMultiplier(angleDegrees, balanced) {
 function expandPolygon() {
     turn++;
 
+    if (!expansionWave && turn >= nextExpansionWaveTurn) {
+        startExpansionWave(projectPolygon(polygonPoints).points);
+    }
+
     if (turn-turnLastSectorChangeFallback() >= stepsPerSector) {
         currentSectorIndex++;
         if(currentSectorIndex>=sectorQueue.length){
@@ -449,7 +491,8 @@ function expandPolygon() {
     // Průměrný základní posun přibližně 50 m za tah; směrové násobitele a nepravidelnost zachováváme.
     const baseStep=45+Math.random()*10;
     const pulse=Math.random()<0.07?(1.12+Math.random()*0.18):1;
-    const distance=baseStep*multiplier*localNoise*pulse;
+    const waveBonus = getExpansionWaveBonus(original,index);
+    const distance=baseStep*multiplier*localNoise*pulse + waveBonus;
     const candidate=original.map(p=>({x:p.x,y:p.y}));
     candidate[index]={x:point.x+nx*distance,y:point.y+ny*distance};
 
@@ -482,6 +525,16 @@ function expandPolygon() {
         localStorage.setItem("polygonPoints",JSON.stringify(polygonPoints));
     }
     currentIndex=(index+1)%polygonPoints.length;
+
+    // Každý úplný průchod aktuální hranice je jedna otočka vlny.
+    if (expansionWave && currentIndex <= index) {
+        waveRotationCount++;
+        if (waveRotationCount >= EXPANSION_WAVE_ROTATIONS) {
+            expansionWave = null;
+            nextExpansionWaveTurn = turn + 1;
+            console.log("🌊 Expanzní vlna dokončena; připravuji další bod.");
+        }
+    }
 }
 
 // Přepočítá celkovou populaci uvnitř polygonu z populačních buněk.
