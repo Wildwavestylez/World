@@ -376,34 +376,6 @@ function splitLongEdges(points, maxLength=420) {
     return out;
 }
 
-function smoothBoundary(points, strength=0.08) {
-    const n=points.length;
-    return points.map((p,i)=>{
-        const prev=points[(i-1+n)%n], next=points[(i+1)%n];
-        return {x:p.x+((prev.x+next.x)/2-p.x)*strength,
-                y:p.y+((prev.y+next.y)/2-p.y)*strength};
-    });
-}
-
-// Jemně potlačíme jen extrémně ostré, úzké vnitřní zářezy.
-// Vnější výběžky (např. ašský) zůstávají nedotčené.
-function softenSharpConcaveNotches(points, orientation, strength=0.06) {
-    const n=points.length;
-    return points.map((p,i)=>{
-        const prev=points[(i-1+n)%n], next=points[(i+1)%n];
-        const ax=p.x-prev.x, ay=p.y-prev.y;
-        const bx=next.x-p.x, by=next.y-p.y;
-        const lenA=Math.hypot(ax,ay), lenB=Math.hypot(bx,by);
-        if(lenA<1 || lenB<1) return p;
-        const cross=ax*by-ay*bx;
-        const normalizedCross=cross/(lenA*lenB);
-        // Zásah jen do velmi ostrých konkávních vrcholů, ne do běžných zálivů.
-        if(normalizedCross*orientation > -0.55) return p;
-        const mx=(prev.x+next.x)/2, my=(prev.y+next.y)/2;
-        return {x:p.x+(mx-p.x)*strength, y:p.y+(my-p.y)*strength};
-    });
-}
-
 function getDirectionalGrowthMultiplier(angleDegrees, balanced) {
     if (balanced) return 1 + (Math.random()-0.5)*0.12;
 
@@ -506,16 +478,10 @@ function expandPolygon() {
 
     if(accepted){
         let working=candidate;
-        // Žádné plošné vyhlazování: saháme jen na konkrétní extrémně ostré vnitřní zářezy.
-        // Vnější výběžky a ostatní části hranice zůstávají beze změny.
+        // Hranici už automaticky nevyhlazujeme ani nenarovnáváme.
+        // Dělení dlouhých hran pouze přidá body na stejné úseky, geometrii neposouvá.
         if(turn%8===0){
             working=splitLongEdges(working,420);
-            const tamed=softenSharpConcaveNotches(working,orientation,0.06);
-            const areaBeforeSmooth=Math.abs(polygonSignedArea(working));
-            const areaAfterSmooth=Math.abs(polygonSignedArea(tamed));
-            if(!hasSelfIntersections(tamed) && areaAfterSmooth>=areaBeforeSmooth*0.99){
-                working=tamed;
-            }
         }
         polygonPoints=working.map(p=>unprojectPoint(p,cosLat));
         polygon.setLatLngs(polygonPoints);
