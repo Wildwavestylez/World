@@ -413,7 +413,13 @@ function findNotchRescueTarget(points, index, maxGap=300, minDepth=500) {
     const a=points[best.i],b=points[best.j];
     const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy||1;
     const t=Math.max(0,Math.min(1,((points[index].x-a.x)*dx+(points[index].y-a.y)*dy)/len2));
-    return {x:a.x+t*dx,y:a.y+t*dy,score:best.score};
+    const foot={x:a.x+t*dx,y:a.y+t*dy};
+    // Cíl není jen hrana ústí: leží i kousek za ní, ven z úzkého zářezu.
+    // To umožní bod vytáhnout skrz hranu, i když se dočasně ocitne uvnitř území.
+    const cx=points.reduce((s,p)=>s+p.x,0)/n,cy=points.reduce((s,p)=>s+p.y,0)/n;
+    let ox=foot.x-cx,oy=foot.y-cy,ol=Math.hypot(ox,oy)||1;
+    ox/=ol;oy/=ol;
+    return {x:foot.x+ox*150,y:foot.y+oy*150,score:best.score};
 }
 
 function getDirectionalGrowthMultiplier(angleDegrees, balanced) {
