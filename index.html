@@ -33,7 +33,7 @@
 <button id="sendMaintenance" onclick="sendMaintenanceVehicle()">Vyslat údržbu</button>
 <button onclick="clearLocalStorage()">Vymazat LocalStorage</button>
     </div>  
-    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-growth-wave-1</div></div>
+    <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-growth-wave-2</div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -477,12 +477,8 @@ function expandPolygon() {
     }
 
     if(accepted){
+        // Žádné automatické vyhlazování, narovnávání ani dělení hran.
         let working=candidate;
-        // Hranici už automaticky nevyhlazujeme ani nenarovnáváme.
-        // Dělení dlouhých hran pouze přidá body na stejné úseky, geometrii neposouvá.
-        if(turn%8===0){
-            working=splitLongEdges(working,420);
-        }
         polygonPoints=working.map(p=>unprojectPoint(p,cosLat));
         polygon.setLatLngs(polygonPoints);
         const area=calculatePolygonArea(polygonPoints);
