@@ -338,12 +338,31 @@ function splitLongEdges(points, maxLength=420) {
     return out;
 }
 
-function smoothBoundary(points, strength=0.14) {
+function smoothBoundary(points, strength=0.08) {
     const n=points.length;
     return points.map((p,i)=>{
         const prev=points[(i-1+n)%n], next=points[(i+1)%n];
         return {x:p.x+((prev.x+next.x)/2-p.x)*strength,
                 y:p.y+((prev.y+next.y)/2-p.y)*strength};
+    });
+}
+
+// Jemně potlačíme jen extrémně ostré, úzké vnitřní zářezy.
+// Vnější výběžky (např. ašský) zůstávají nedotčené.
+function softenSharpConcaveNotches(points, orientation, strength=0.06) {
+    const n=points.length;
+    return points.map((p,i)=>{
+        const prev=points[(i-1+n)%n], next=points[(i+1)%n];
+        const ax=p.x-prev.x, ay=p.y-prev.y;
+        const bx=next.x-p.x, by=next.y-p.y;
+        const lenA=Math.hypot(ax,ay), lenB=Math.hypot(bx,by);
+        if(lenA<1 || lenB<1) return p;
+        const cross=ax*by-ay*bx;
+        const normalizedCross=cross/(lenA*lenB);
+        // Zásah jen do velmi ostrých konkávních vrcholů, ne do běžných zálivů.
+        if(normalizedCross*orientation > -0.55) return p;
+        const mx=(prev.x+next.x)/2, my=(prev.y+next.y)/2;
+        return {x:p.x+(mx-p.x)*strength, y:p.y+(my-p.y)*strength};
     });
 }
 
@@ -444,17 +463,16 @@ function expandPolygon() {
 
     if(accepted){
         let working=candidate;
-        // Pravidelně zjemňujeme celou hranici, ne jen nově posunutý vrchol.
-        // Tím se i staré zářezy pomalu posouvají a nově vložené body přizpůsobí okolí.
-        if(turn%4===0){
+        // Kompromis: jemné vyhlazení každých 8 tahů, ne agresivní vyhlazení celé hranice.
+        // Potom lehce zkrotíme pouze extrémně ostré vnitřní zářezy; vnější výběžky zachováme.
+        if(turn%8===0){
             working=splitLongEdges(working,420);
-            const smoothed=smoothBoundary(working,0.14);
+            const smoothed=smoothBoundary(working,0.08);
+            const tamed=softenSharpConcaveNotches(smoothed,orientation,0.06);
             const areaBeforeSmooth=Math.abs(polygonSignedArea(working));
-            const areaAfterSmooth=Math.abs(polygonSignedArea(smoothed));
-            // Dovolíme jen nepatrnou lokální ztrátu plochy kvůli vyhlazení;
-            // kontrola průsečíků stále chrání tvar polygonu.
-            if(!hasSelfIntersections(smoothed) && areaAfterSmooth>=areaBeforeSmooth*0.995){
-                working=smoothed;
+            const areaAfterSmooth=Math.abs(polygonSignedArea(tamed));
+            if(!hasSelfIntersections(tamed) && areaAfterSmooth>=areaBeforeSmooth*0.99){
+                working=tamed;
             }
         }
         polygonPoints=working.map(p=>unprojectPoint(p,cosLat));
