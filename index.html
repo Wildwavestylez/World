@@ -374,6 +374,69 @@ function splitLongEdges(points, maxLength=300) {
     }
     return out;
 }
+ 
+// Opravuje výhradně extrémně úzký a hluboký zářez („camcour“).
+// Normální véčka a vnější výběžky zůstávají nedotčené.
+// Pátráme po dvojici blízkých bodů, mezi nimiž vede krátký, ale výrazně
+// hlubší úsek hranice; jeho vnitřní vrcholy se posunou jen trochu směrem
+// k přímé spojnici ramen. Opakuje se postupně, nikoli jednorázovým narovnáním.
+function nudgeNarrowDeepNotch(points, maxGap=300, minArcLength=650, minDepth=350) {
+    const n=points.length;
+    if(n<6) return points;
+    let best=null;
+    for(let i=0;i<n;i++){
+        for(let j=i+3;j<n;j++){
+            if(i===0 && j===n-1) continue;
+            const a=points[i], b=points[j];
+            const gap=Math.hypot(b.x-a.x,b.y-a.y);
+            if(gap>maxGap) continue;
+
+            // Zvolíme kratší z obou cest po hranici mezi rameny zářezu.
+            let forwardLength=0;
+            for(let k=i;k<j;k++) forwardLength+=Math.hypot(points[k+1].x-points[k].x,points[k+1].y-points[k].y);
+            let backwardLength=0;
+            for(let k=j;k<n;k++) backwardLength+=Math.hypot(points[(k+1)%n].x-points[k].x,points[(k+1)%n].y-points[k].y);
+            for(let k=0;k<i;k++) backwardLength+=Math.hypot(points[k+1].x-points[k].x,points[k+1].y-points[k].y);
+
+            let start,end,arcLength,step;
+            if(forwardLength<=backwardLength){start=i;end=j;arcLength=forwardLength;step=1;}
+            else {start=j;end=i;arcLength=backwardLength;step=1;}
+            if(arcLength<minArcLength || arcLength<gap*2.4) continue;
+
+            const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy || 1;
+            let maxDepth=0, depthIndex=-1;
+            // Měříme odchylku cesty od spojnice ramen.
+            let k=(start+1)%n, guard=0;
+            while(k!==end && guard++<n){
+                const p=points[k];
+                const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/len2));
+                const proj={x:a.x+t*dx,y:a.y+t*dy};
+                const d=Math.hypot(p.x-proj.x,p.y-proj.y);
+                if(d>maxDepth){maxDepth=d;depthIndex=k;}
+                k=(k+1)%n;
+            }
+            if(maxDepth<minDepth || depthIndex<0) continue;
+            const score=maxDepth/Math.max(gap,1);
+            if(!best || score>best.score) best={a,b,start,end,gap,maxDepth,depthIndex,score};
+        }
+    }
+    if(!best) return points;
+
+    const out=points.map(p=>({x:p.x,y:p.y}));
+    const a=best.a,b=best.b,dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy || 1;
+    let k=(best.start+1)%n,guard=0;
+    while(k!==best.end && guard++<n){
+        const p=points[k];
+        const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/len2));
+        const target={x:a.x+t*dx,y:a.y+t*dy};
+        const vx=target.x-p.x,vy=target.y-p.y,dist=Math.hypot(vx,vy);
+        // Malý, omezený posun; zachovává členitost a rozkládá opravu do více tahů.
+        const move=Math.min(25,dist*0.08);
+        if(dist>0){out[k]={x:p.x+vx/dist*move,y:p.y+vy/dist*move};}
+        k=(k+1)%n;
+    }
+    return out;
+}
 
 function getDirectionalGrowthMultiplier(angleDegrees, balanced) {
     if (balanced) return 1 + (Math.random()-0.5)*0.12;
@@ -467,16 +530,20 @@ function expandPolygon() {
     const candidate=original.map(p=>({x:p.x,y:p.y}));
     candidate[index]={x:point.x+nx*distance,y:point.y+ny*distance};
 
-    let accepted=!hasSelfIntersections(candidate) &&
-        Math.abs(polygonSignedArea(candidate))>Math.abs(oldArea);
+    // Zásah jen do hlubokých, úzkých camcourů; běžné zářezy se nemění.
+    const repairedCandidate=nudgeNarrowDeepNotch(candidate);
+    let accepted=!hasSelfIntersections(repairedCandidate) &&
+        Math.abs(polygonSignedArea(repairedCandidate))>Math.abs(oldArea);
     if(!accepted){
         candidate[index]={x:point.x+nx*distance*0.45,y:point.y+ny*distance*0.45};
-        accepted=!hasSelfIntersections(candidate) &&
-            Math.abs(polygonSignedArea(candidate))>Math.abs(oldArea);
+        const retryCandidate=nudgeNarrowDeepNotch(candidate);
+        accepted=!hasSelfIntersections(retryCandidate) &&
+            Math.abs(polygonSignedArea(retryCandidate))>Math.abs(oldArea);
+        if(accepted) repairedCandidate.splice(0,repairedCandidate.length,...retryCandidate);
     }
 
     if(accepted){
-        let working=candidate;
+        let working=repairedCandidate;
         // Zachováme lámání dlouhých hran: přidá body na přímé úseky,
         // ale neposouvá existující vrcholy. Vyhlazování a narovnávání zůstává vypnuté.
         if(turn%8===0){
