@@ -290,7 +290,7 @@ let waveRotationCount = 0;
 let nextExpansionWaveTurn = EXPANSION_WAVE_START_TURN;
 
 // Samostatná vizuální vrstva: zvýrazňuje pouze 20 hran aktivní expanzní vlny.
-const expansionWaveLayer = L.layerGroup().addTo(map);
+const expansionWaveLayer = L.featureGroup().addTo(map);
 function updateExpansionWaveHighlight() {
     expansionWaveLayer.clearLayers();
     if (!expansionWave || !Array.isArray(polygonPoints) || polygonPoints.length < 3) return;
