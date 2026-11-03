@@ -386,6 +386,17 @@ function restoreGameState() {
 }
 restoreGameState();
 
+// Po načtení hry přesuň mapu na bod, který je právě na řadě.
+// Zachováme aktuální přiblížení a neprovádíme animaci přes celé území.
+if (Array.isArray(polygonPoints) && polygonPoints.length > 0) {
+    currentIndex = ((currentIndex % polygonPoints.length) + polygonPoints.length) % polygonPoints.length;
+    const activePoint = polygonPoints[currentIndex];
+    if (Array.isArray(activePoint) && Number.isFinite(activePoint[0]) && Number.isFinite(activePoint[1])) {
+        map.setView(activePoint, map.getZoom(), { animate: false });
+        console.log("📍 Mapa vystředěna na aktuální bod růstu:", currentIndex);
+    }
+}
+
 function startExpansionWave(points) {
     if (!points.length) return;
     const anchorIndex = Math.floor(Math.random() * points.length);
