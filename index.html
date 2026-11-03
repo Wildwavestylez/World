@@ -284,10 +284,49 @@ let localGrowthNoise = {};
 // Lokální expanzní vlna: po 1000 tazích zesílí náhodnou oblast po 20 průchodech hranice.
 const EXPANSION_WAVE_START_TURN = 1000;
 const EXPANSION_WAVE_ROTATIONS = 20;
-const expansionWaveBonuses = [150,130,115,105,90,75,60,45,30,18,8];
+const expansionWaveBonuses = [300,260,230,210,180,150,120,90,60,36,16];
 let expansionWave = null;
 let waveRotationCount = 0;
 let nextExpansionWaveTurn = EXPANSION_WAVE_START_TURN;
+
+// Samostatná vizuální vrstva: zvýrazňuje pouze 20 hran aktivní expanzní vlny.
+const expansionWaveLayer = L.layerGroup().addTo(map);
+function updateExpansionWaveHighlight() {
+    expansionWaveLayer.clearLayers();
+    if (!expansionWave || !Array.isArray(polygonPoints) || polygonPoints.length < 3) return;
+
+    const projected = projectPolygon(polygonPoints).points;
+    let anchorIndex = 0;
+    let bestDistance = Infinity;
+    for (let i = 0; i < projected.length; i++) {
+        const d = Math.hypot(
+            projected[i].x - expansionWave.anchor.x,
+            projected[i].y - expansionWave.anchor.y
+        );
+        if (d < bestDistance) {
+            bestDistance = d;
+            anchorIndex = i;
+        }
+    }
+
+    // Aktivní oblast tvoří 10 hran před středem a 10 hran za ním.
+    const edgeIndexes = new Set();
+    for (let offset = -10; offset < 10; offset++) {
+        edgeIndexes.add((anchorIndex + offset + projected.length) % projected.length);
+    }
+
+    edgeIndexes.forEach(index => {
+        const nextIndex = (index + 1) % polygonPoints.length;
+        L.polyline([polygonPoints[index], polygonPoints[nextIndex]], {
+            color: "#e53935",
+            weight: 5,
+            opacity: 0.95,
+            lineCap: "round",
+            interactive: false
+        }).addTo(expansionWaveLayer);
+    });
+    expansionWaveLayer.bringToFront();
+}
 
 // Ukládáme také stav simulace, ne jen souřadnice polygonu.
 // Po obnovení stránky tak pokračuje stejné pořadí vrcholů, fáze růstu i vlna.
@@ -353,6 +392,7 @@ function startExpansionWave(points) {
     const anchor = points[anchorIndex];
     expansionWave = { anchor: { x: anchor.x, y: anchor.y } };
     waveRotationCount = 0;
+    updateExpansionWaveHighlight();
     console.log("🌊 Připravena expanzní vlna na bodě", anchorIndex);
 }
 
@@ -385,6 +425,9 @@ function projectPolygon(points) {
         points: points.map(p => ({ x: p[1] * 111320 * cosLat, y: p[0] * 110540 }))
     };
 }
+
+// Po načtení uloženého stavu obnovíme i vizuální označení aktivní vlny.
+updateExpansionWaveHighlight();
 
 function unprojectPoint(p, cosLat) {
     return [p.y / 110540, p.x / (111320 * cosLat)];
@@ -582,6 +625,7 @@ function expandPolygon() {
         if(trimmed.length>=4 && trimmed.length<n){
             polygonPoints=trimmed.map(p=>unprojectPoint(p,cosLat));
             polygon.setLatLngs(polygonPoints);
+            updateExpansionWaveHighlight();
             const area=calculatePolygonArea(polygonPoints);
             document.getElementById("area").textContent=area.toFixed(2);
             localStorage.setItem("polygonPoints",JSON.stringify(polygonPoints));
@@ -617,6 +661,7 @@ function expandPolygon() {
         }
         polygonPoints=working.map(p=>unprojectPoint(p,cosLat));
         polygon.setLatLngs(polygonPoints);
+        updateExpansionWaveHighlight();
         const area=calculatePolygonArea(polygonPoints);
         document.getElementById("area").textContent=area.toFixed(2);
         // Populační dotaz je oddělený od animační smyčky; neblokuje růst polygonu.
@@ -629,6 +674,7 @@ function expandPolygon() {
         waveRotationCount++;
         if (waveRotationCount >= EXPANSION_WAVE_ROTATIONS) {
             expansionWave = null;
+            updateExpansionWaveHighlight();
             nextExpansionWaveTurn = turn + 1;
             console.log("🌊 Expanzní vlna dokončena; připravuji další bod.");
         }
