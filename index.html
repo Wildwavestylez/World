@@ -785,6 +785,7 @@ function expandPolygon() {
  // Hodnoty jsou počty osob na buňku, ne hustota. Každá původní buňka se
  // v jednom výpočtu započítá nejvýše jednou, i když se dlaždice překrývají.
  async function refreshPopulationEstimate(force = false) {
+     if (awaitingStartingLocation) return;
      const now = Date.now();
      if (!populationApiAvailable || populationRequestInFlight) return;
      if (!force && now - lastPopulationRequestAt < POPULATION_REFRESH_MS) return;
