@@ -376,30 +376,19 @@ let expansionWave = null;
 let waveRotationCount = 0;
 let nextExpansionWaveTurn = EXPANSION_WAVE_START_TURN;
 
-// Samostatná vizuální vrstva: zvýrazňuje pouze 20 hran aktivní expanzní vlny.
+// Samostatná vizuální vrstva: 10 hran před kotevním vrcholem a 10 za ním.
 const expansionWaveLayer = L.featureGroup().addTo(map);
 function updateExpansionWaveHighlight() {
     expansionWaveLayer.clearLayers();
     if (!expansionWave || !Array.isArray(polygonPoints) || polygonPoints.length < 3) return;
 
-    const projected = projectPolygon(polygonPoints).points;
-    let anchorIndex = 0;
-    let bestDistance = Infinity;
-    for (let i = 0; i < projected.length; i++) {
-        const d = Math.hypot(
-            projected[i].x - expansionWave.anchor.x,
-            projected[i].y - expansionWave.anchor.y
-        );
-        if (d < bestDistance) {
-            bestDistance = d;
-            anchorIndex = i;
-        }
-    }
+    const count = polygonPoints.length;
+    const anchorIndex = ((Math.floor(expansionWave.anchorIndex || 0) % count) + count) % count;
 
-    // Aktivní oblast tvoří 10 hran před středem a 10 hran za ním.
+    // Kotevní vrchol je střed: 10 vrcholů na každou stranu, celkem 20 hran.
     const edgeIndexes = new Set();
     for (let offset = -10; offset < 10; offset++) {
-        edgeIndexes.add((anchorIndex + offset + projected.length) % projected.length);
+        edgeIndexes.add((anchorIndex + offset + count) % count);
     }
 
     edgeIndexes.forEach(index => {
@@ -460,9 +449,21 @@ function restoreGameState() {
         if (state.localGrowthNoise && typeof state.localGrowthNoise === "object") {
             localGrowthNoise = state.localGrowthNoise;
         }
-        if (state.expansionWave && Number.isFinite(state.expansionWave.anchor?.x) &&
-            Number.isFinite(state.expansionWave.anchor?.y)) {
-            expansionWave = state.expansionWave;
+        if (state.expansionWave && (
+            Number.isInteger(state.expansionWave.anchorIndex) ||
+            (Number.isFinite(state.expansionWave.anchor?.x) && Number.isFinite(state.expansionWave.anchor?.y))
+        )) {
+            expansionWave = { ...state.expansionWave };
+            // Jednorázová kompatibilita se starší uloženou vlnou, která měla jen souřadnice.
+            if (!Number.isInteger(expansionWave.anchorIndex) && Array.isArray(polygonPoints) && polygonPoints.length) {
+                const projected = projectPolygon(polygonPoints).points;
+                let nearest = 0, best = Infinity;
+                for (let i = 0; i < projected.length; i++) {
+                    const d = Math.hypot(projected[i].x - expansionWave.anchor.x, projected[i].y - expansionWave.anchor.y);
+                    if (d < best) { best = d; nearest = i; }
+                }
+                expansionWave = { anchorIndex: nearest };
+            }
         }
         if (Number.isFinite(state.waveRotationCount)) waveRotationCount = state.waveRotationCount;
         if (Number.isFinite(state.nextExpansionWaveTurn)) nextExpansionWaveTurn = state.nextExpansionWaveTurn;
@@ -487,8 +488,7 @@ if (Array.isArray(polygonPoints) && polygonPoints.length > 0) {
 function startExpansionWave(points) {
     if (!points.length) return;
     const anchorIndex = Math.floor(Math.random() * points.length);
-    const anchor = points[anchorIndex];
-    expansionWave = { anchor: { x: anchor.x, y: anchor.y } };
+    expansionWave = { anchorIndex };
     waveRotationCount = 0;
     updateExpansionWaveHighlight();
     console.log("🌊 Připravena expanzní vlna na bodě", anchorIndex);
@@ -496,12 +496,8 @@ function startExpansionWave(points) {
 
 function getExpansionWaveBonus(points, index) {
     if (!expansionWave || points.length < 3) return 0;
-    // Sledujeme oblast podle souřadnic, protože dělení hran vkládá nové body.
-    let anchorIndex = 0, bestDistance = Infinity;
-    for (let i = 0; i < points.length; i++) {
-        const d = Math.hypot(points[i].x-expansionWave.anchor.x, points[i].y-expansionWave.anchor.y);
-        if (d < bestDistance) { bestDistance = d; anchorIndex = i; }
-    }
+    // Kotevní vrchol sledujeme podle indexu; jeho identita se upravuje při dělení/ořezu hran. 
+    const anchorIndex = ((Math.floor(expansionWave.anchorIndex || 0) % points.length) + points.length) % points.length;
     let offset = index-anchorIndex;
     if (offset > points.length/2) offset -= points.length;
     if (offset < -points.length/2) offset += points.length;
@@ -721,6 +717,16 @@ function expandPolygon() {
             if(!onCut) trimmed.push(original[k]);
         }
         if(trimmed.length>=4 && trimmed.length<n){
+            if (expansionWave) {
+                const oldAnchor = original[((expansionWave.anchorIndex % n) + n) % n];
+                let retainedAnchorIndex = trimmed.indexOf(oldAnchor);
+                if (retainedAnchorIndex < 0) {
+                    // Pokud camcour odstraní i kotevní vrchol, navážeme vlnu na zachované rameno ořezu.
+                    const shoulder = original[notch.start];
+                    retainedAnchorIndex = Math.max(0, trimmed.indexOf(shoulder));
+                }
+                expansionWave.anchorIndex = retainedAnchorIndex;
+            }
             polygonPoints=trimmed.map(p=>unprojectPoint(p,cosLat));
             polygon.setLatLngs(polygonPoints);
             updateExpansionWaveHighlight();
@@ -755,7 +761,14 @@ function expandPolygon() {
         // Zachováme lámání dlouhých hran: přidá body na přímé úseky,
         // ale neposouvá existující vrcholy. Vyhlazování a narovnávání zůstává vypnuté.
         if(turn%8===0){
+            const anchorVertex = expansionWave
+                ? candidate[((expansionWave.anchorIndex % candidate.length) + candidate.length) % candidate.length]
+                : null;
             working=splitLongEdges(working,300);
+            if (expansionWave && anchorVertex) {
+                const updatedAnchorIndex = working.indexOf(anchorVertex);
+                if (updatedAnchorIndex >= 0) expansionWave.anchorIndex = updatedAnchorIndex;
+            }
         }
         polygonPoints=working.map(p=>unprojectPoint(p,cosLat));
         polygon.setLatLngs(polygonPoints);
