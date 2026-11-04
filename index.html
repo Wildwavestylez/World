@@ -22,6 +22,27 @@
             font-family: Arial, sans-serif;
             font-size: 16px;
         }
+        #startLocationPanel {
+            position: fixed; inset: 0; z-index: 2000;
+            display: none; align-items: center; justify-content: center;
+            padding: 20px; box-sizing: border-box;
+            background: rgba(12, 22, 35, 0.72);
+            font-family: Arial, sans-serif;
+        }
+        #startLocationCard {
+            width: min(440px, 100%); padding: 22px; box-sizing: border-box;
+            background: #fff; border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.3);
+        }
+        #startLocationInput {
+            width: 100%; box-sizing: border-box; padding: 13px;
+            margin: 12px 0; border: 1px solid #bbb; border-radius: 8px; font-size: 16px;
+        }
+        #startLocationButton {
+            width: 100%; padding: 13px; border: 0; border-radius: 8px;
+            background: #1769aa; color: white; font-size: 16px; font-weight: bold;
+        }
+        #startLocationButton:disabled { opacity: .55; }
+        #startLocationStatus { min-height: 20px; margin-top: 10px; font-size: 13px; color: #555; }
     </style>
 </head>
 <body>
@@ -34,6 +55,15 @@
 <button onclick="clearLocalStorage()">Vymazat LocalStorage</button>
     </div>  
     <div id="info">| Rozloha: <span id="area">0</span> km² | Počet obyvatel: <span id="population">—</span><div id="populationStatus" style="margin-top:6px;font-size:13px;color:#8a3b12">Populace: připravuji načtení…</div><div style="margin-top:4px;font-size:11px;color:#777">World build: pop-growth-wave-2</div></div>
+    <div id="startLocationPanel" role="dialog" aria-modal="true" aria-labelledby="startLocationTitle">
+        <div id="startLocationCard">
+            <h2 id="startLocationTitle" style="margin:0 0 8px">🌍 Kde začne tvoje expanze?</h2>
+            <div style="color:#555;font-size:14px">Zadej město nebo obec – například Vimperk, Passau nebo Praha.</div>
+            <input id="startLocationInput" type="text" placeholder="Např. Vimperk" autocomplete="off">
+            <button id="startLocationButton" type="button" onclick="chooseStartingLocation()">Začít zde</button>
+            <div id="startLocationStatus" aria-live="polite"></div>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -46,6 +76,7 @@
         let center = [49.109068742, 13.867299556];
 
         let savedPolygon = localStorage.getItem("polygonPoints");
+let awaitingStartingLocation = !savedPolygon;
 let currentIndex = 0;
 let polygonPoints;
 
@@ -62,6 +93,62 @@ if (savedPolygon) {
 
 
         let polygon = L.polygon(polygonPoints, { color: 'blue' }).addTo(map);
+
+// Nová hra si vyžádá vlastní startovní místo; rozehraná hra pokračuje beze změny.
+if (awaitingStartingLocation) {
+    document.getElementById("startLocationPanel").style.display = "flex";
+    setTimeout(() => document.getElementById("startLocationInput").focus(), 100);
+}
+async function chooseStartingLocation() {
+    if (!awaitingStartingLocation) return;
+    const input = document.getElementById("startLocationInput");
+    const button = document.getElementById("startLocationButton");
+    const status = document.getElementById("startLocationStatus");
+    const query = input.value.trim();
+    if (!query) {
+        status.textContent = "Nejdřív zadej název místa.";
+        return;
+    }
+    button.disabled = true;
+    status.textContent = "Hledám místo…";
+    try {
+        const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=" + encodeURIComponent(query);
+        const response = await fetch(url, { headers: { "Accept": "application/json" } });
+        if (!response.ok) throw new Error("Vyhledávání momentálně není dostupné (HTTP " + response.status + ").");
+        const results = await response.json();
+        if (!results.length) throw new Error("Místo se nepodařilo najít. Zkus přesnější název nebo přidej stát.");
+        const lat = Number(results[0].lat);
+        const lng = Number(results[0].lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error("Vyhledávání vrátilo neplatné souřadnice.");
+
+        center = [lat, lng];
+        polygonPoints = [
+            [lat + 0.002, lng - 0.002],
+            [lat + 0.002, lng + 0.002],
+            [lat - 0.002, lng + 0.002],
+            [lat - 0.002, lng - 0.002]
+        ];
+        currentIndex = 0;
+        polygon.setLatLngs(polygonPoints);
+        map.setView(center, 15, { animate: false });
+        localStorage.setItem("polygonPoints", JSON.stringify(polygonPoints));
+        document.getElementById("area").textContent = calculatePolygonArea(polygonPoints).toFixed(2);
+        awaitingStartingLocation = false;
+        saveGameState();
+        document.getElementById("startLocationPanel").style.display = "none";
+        status.textContent = "";
+        setTimeout(() => refreshPopulationEstimate(true), 500);
+        console.log("📍 Nová hra začíná v:", results[0].display_name, center);
+    } catch (error) {
+        status.textContent = error.message || "Místo se nepodařilo vyhledat.";
+    } finally {
+        button.disabled = false;
+    }
+}
+document.getElementById("startLocationInput").addEventListener("keydown", event => {
+    if (event.key === "Enter") chooseStartingLocation();
+});
+
 
         let blockedPoints = {};
         let moveTracker = Array(polygonPoints.length).fill(0);
@@ -839,12 +926,14 @@ function unlockBlockedPoints() {
         }
 
         // Populace se načítá samostatně; herní růst zůstává na původních 400 ms.
-        setTimeout(() => refreshPopulationEstimate(true), 3000);
+        if (!awaitingStartingLocation) setTimeout(() => refreshPopulationEstimate(true), 3000);
         setInterval(() => refreshPopulationEstimate(false), POPULATION_REFRESH_MS);
 
         setInterval(() => {
-            expandPolygon();
-            unlockBlockedPoints();
+            if (!awaitingStartingLocation) {
+                expandPolygon();
+                unlockBlockedPoints();
+            }
         }, 400);
 
 
